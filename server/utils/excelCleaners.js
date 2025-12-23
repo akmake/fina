@@ -22,7 +22,7 @@ function findTableData(data, keyHeaders) {
 }
 
 export function cleanMaxFile(data) {
-  // Max file usually has these headers
+  // מחפש את הכותרות המדויקות שמופיעות בקובץ ששלחת
   const { headers, dataRows } = findTableData(data, ['תאריך עסקה', 'שם בית העסק', 'סכום חיוב']);
 
   if (dataRows.length < 1) {
@@ -41,7 +41,6 @@ export function cleanMaxFile(data) {
 }
 
 export function cleanCalFile(data) {
-    // Cal logic: find header row, then take fixed indices
     const headerRowIndex = data.findIndex(row =>
         Array.isArray(row) &&
         row.some(cell => typeof cell === 'string' && cell.includes('תאריך')) &&
@@ -65,7 +64,7 @@ export function cleanCalFile(data) {
         return {
             "תאריך עסקה": rowArray[0],
             "שם בית העסק": rowArray[1],
-            "סכום חיוב": rowArray[2] // Assuming amount is always at index 2 for Cal structure
+            "סכום חיוב": rowArray[2]
         };
     });
 }

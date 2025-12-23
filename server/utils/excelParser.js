@@ -24,7 +24,7 @@ function parseDate(dateInput) {
 }
 
 const createTransactionObject = (row, userId, type) => {
-    // פונקציית עזר למציאת ערך לפי מספר מפתחות אפשריים
+    // פונקציית עזר למציאת ערך לפי רשימת מפתחות אפשריים
     const getValue = (keys) => {
         for (const key of keys) {
             if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
@@ -65,7 +65,7 @@ const createTransactionObject = (row, userId, type) => {
         amount = Math.abs(amount);
     }
 
-    // --- התיקון: חיפוש רחב של קטגוריה (כולל וריאציות של Max) ---
+    // קריאת הקטגוריה מהקובץ (תומך גם ב"שם ענף" וגם ב"קטגוריה" כמו בקובץ ששלחת)
     const rawCategory = getValue([
         'קטגוריה', 
         'שם קטגוריה', 
@@ -103,12 +103,15 @@ export async function parseTransactions(cleanedData, fileType, userId) {
         let finalDescription = trx.description;
         let finalCategoryName = trx.category;
         
-        // בדיקה האם הקטגוריה מהקובץ היא אמיתית או גנרית
+        // --- התיקון הקריטי כאן ---
+        // בודקים האם הקטגוריה שהגיעה מהקובץ היא "קטגוריה אמיתית" ולא סתם "כללי"
         const genericNames = ['כללי', 'שונות', '', 'null', 'undefined'];
         let categoryIsGeneric = genericNames.includes(finalCategoryName);
-        let categoryFound = !categoryIsGeneric; // אם הקטגוריה מהקובץ טובה, אנחנו מסודרים
+        
+        // אם הקטגוריה לא גנרית (כלומר היא "עיצוב הבית" או "מזון"), אז מצאנו קטגוריה!
+        let categoryFound = !categoryIsGeneric; 
 
-        // שלב 1: מיפוי ידני (גובר על הכל)
+        // שלב 1: מיפוי ידני (גובר על הכל - אם המשתמש קבע אחרת בעבר)
         const mapping = merchantMapCache.get(trx.rawDescription);
         if (mapping) {
             finalDescription = mapping.newName;
@@ -118,7 +121,7 @@ export async function parseTransactions(cleanedData, fileType, userId) {
             }
         }
 
-        // שלב 2: חוקים אוטומטיים (רק אם לא מצאנו קטגוריה טובה)
+        // שלב 2: חוקים אוטומטיים (רק אם לא מצאנו קטגוריה טובה עדיין)
         if (!categoryFound) {
             for (const rule of categoryRules) {
                 if (finalDescription.toLowerCase().includes(rule.keyword.toLowerCase())) {
@@ -131,7 +134,7 @@ export async function parseTransactions(cleanedData, fileType, userId) {
             }
         }
 
-        // שלב 3: אם בסוף התהליך אין קטגוריה טובה, סמן למיפוי
+        // שלב 3: רק אם בסוף באמת אין קטגוריה (לא מהקובץ, לא ממיפוי ולא מחוקים) - תוסיף למיפוי
         if (!categoryFound) {
             merchantsThatNeedMapping.add(trx.rawDescription);
         }
