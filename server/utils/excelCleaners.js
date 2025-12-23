@@ -1,11 +1,5 @@
 // server/utils/excelCleaners.js
 
-/**
- * פונקציית עזר גנרית לאיתור טבלת הנתונים בתוך קובץ אקסל.
- * @param {Array<Array<string>>} data הנתונים הגולמיים מהגיליון.
- * @param {string[]} keyHeaders רשימת כותרות חובה שחייבות להופיע בשורת הכותרות.
- * @returns {{headers: string[], dataRows: Array<Array<string>>}}
- */
 function findTableData(data, keyHeaders) {
   const headerRowIndex = data.findIndex(row =>
     Array.isArray(row) && keyHeaders.every(header =>
@@ -27,10 +21,8 @@ function findTableData(data, keyHeaders) {
   return { headers, dataRows };
 }
 
-/**
- * מנקה ומעבד קובץ עסקאות של חברת "מקס".
- */
 export function cleanMaxFile(data) {
+  // Max file usually has these headers
   const { headers, dataRows } = findTableData(data, ['תאריך עסקה', 'שם בית העסק', 'סכום חיוב']);
 
   if (dataRows.length < 1) {
@@ -48,12 +40,8 @@ export function cleanMaxFile(data) {
   });
 }
 
-/**
- * מנקה ומעבד קובץ עסקאות של חברת "כאל".
- * הלוגיקה מזהה את תחילת הנתונים וממפה אותם לפי מיקום קבוע של עמודות.
- */
 export function cleanCalFile(data) {
-    // שלב 1: מצא את האינדקס של שורת הכותרות כדי לדעת מאיפה להתחיל
+    // Cal logic: find header row, then take fixed indices
     const headerRowIndex = data.findIndex(row =>
         Array.isArray(row) &&
         row.some(cell => typeof cell === 'string' && cell.includes('תאריך')) &&
@@ -61,30 +49,23 @@ export function cleanCalFile(data) {
     );
     
     if (headerRowIndex === -1) {
-        throw new Error("קובץ 'כאל' לא תקין: לא הצלחנו לזהות את שורת הכותרות. ודא שהקובץ מכיל את העמודות הנדרשות.");
+        throw new Error("קובץ 'כאל' לא תקין: לא הצלחנו לזהות את שורת הכותרות.");
     }
 
-    // שלב 2: חלץ את שורות הנתונים שמתחילות מיד אחרי הכותרות
     const dataRows = data.slice(headerRowIndex + 1);
-
-    // שלב 3: סנן שורות לא רלוונטיות (ריקות או שורות סיכום)
     const finalRows = dataRows.filter(row => 
-        Array.isArray(row) && 
-        row[0] && // חייב להיות ערך בעמודת התאריך (אינדקס 0)
-        row[1]    // חייב להיות ערך בעמודת שם בית העסק (אינדקס 1)
+        Array.isArray(row) && row[0] && row[1]
     );
 
     if (finalRows.length < 1) {
-        throw new Error("לא נמצאו שורות נתונים תקינות בקובץ 'כאל' לאחר הניקוי.");
+        throw new Error("לא נמצאו שורות נתונים תקינות בקובץ 'כאל'.");
     }
 
-    // --- 👇 התיקון כאן: מיפוי לפי מיקום קבוע של שלוש העמודות הראשונות ---
     return finalRows.map(rowArray => {
         return {
             "תאריך עסקה": rowArray[0],
             "שם בית העסק": rowArray[1],
-            // עמודה 3 היא הסכום, וניתן לה שם קבוע שהקוד מצפה לו
-            "סכום חיוב": rowArray[2]
+            "סכום חיוב": rowArray[2] // Assuming amount is always at index 2 for Cal structure
         };
     });
 }

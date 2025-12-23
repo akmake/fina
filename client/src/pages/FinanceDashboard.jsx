@@ -88,10 +88,7 @@ export default function FinanceDashboard() {
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 space-y-8">
-            <header>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">דשבורד פיננסי</h1>
-                <p className="mt-1 text-lg text-gray-600 dark:text-slate-400">סקירה כללית של המצב הפיננסי שלך.</p>
-            </header>
+
 
             {/* --- Stats Cards --- */}
             <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">

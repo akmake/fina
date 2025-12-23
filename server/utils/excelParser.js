@@ -1,15 +1,11 @@
-// server/utils/excelParser.js
 import MerchantMap from '../models/MerchantMap.js';
 import CategoryRule from '../models/CategoryRule.js';
 
 function parseDate(dateInput) {
-  if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
-    return dateInput;
-  }
+  if (dateInput instanceof Date && !isNaN(dateInput.getTime())) return dateInput;
   if (!dateInput) return null;
 
   const dateStr = String(dateInput).trim();
-  
   const parts = dateStr.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
   if (parts) {
     const day = parseInt(parts[1], 10);
@@ -28,13 +24,29 @@ function parseDate(dateInput) {
 }
 
 const createTransactionObject = (row, userId, type) => {
-    const date = parseDate(row["תאריך עסקה"]);
-    if (!date || !row["שם בית העסק"]) return null;
+    // פונקציית עזר למציאת ערך לפי מספר מפתחות אפשריים
+    const getValue = (keys) => {
+        for (const key of keys) {
+            if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
+                return row[key];
+            }
+        }
+        return null;
+    };
+
+    const date = parseDate(getValue(['תאריך עסקה', 'תאריך', 'Date', 'date']));
+    const description = getValue(['שם בית העסק', 'שם בית עסק', 'תיאור', 'Description', 'description']);
+    
+    if (!date || !description) return null;
 
     let amount, transactionType;
     if (type === 'max') {
-        const chargeAmount = parseFloat(String(row["סכום חיוב"]).replace(/,/g, ''));
-        const creditAmount = parseFloat(String(row["סכום זיכוי"]).replace(/,/g, ''));
+        const chargeAmountStr = String(getValue(['סכום חיוב', 'סכום לתשלום', 'Amount', 'amount']) || '0').replace(/,/g, '');
+        const creditAmountStr = String(getValue(['סכום זיכוי', 'זיכוי']) || '0').replace(/,/g, '');
+        
+        const chargeAmount = parseFloat(chargeAmountStr);
+        const creditAmount = parseFloat(creditAmountStr);
+
         if (!isNaN(chargeAmount) && chargeAmount !== 0) {
             amount = Math.abs(chargeAmount);
             transactionType = chargeAmount > 0 ? 'הוצאה' : 'הכנסה';
@@ -45,7 +57,7 @@ const createTransactionObject = (row, userId, type) => {
             return null;
         }
     } else { // 'cal'
-        const amountValue = row["סכום בש\"ח"] || row["סכום עסקה"] || row["סכום חיוב"];
+        const amountValue = getValue(["סכום בש\"ח", "סכום עסקה", "סכום חיוב"]);
         if (amountValue == null) return null;
         amount = parseFloat(String(amountValue).replace(/,/g, ''));
         if (isNaN(amount)) return null;
@@ -53,15 +65,25 @@ const createTransactionObject = (row, userId, type) => {
         amount = Math.abs(amount);
     }
 
+    // --- התיקון: חיפוש רחב של קטגוריה (כולל וריאציות של Max) ---
+    const rawCategory = getValue([
+        'קטגוריה', 
+        'שם קטגוריה', 
+        'Category', 
+        'שם ענף',      
+        'תיאור ענף',   
+        'ענף'
+    ]) || 'כללי';
+
     return {
         user: userId,
         date,
-        description: row["שם בית העסק"],
-        rawDescription: row["שם בית העסק"],
+        description: description,
+        rawDescription: description,
         amount,
         type: transactionType,
         account: 'checking',
-        category: row['קטגוריה']?.trim() || 'כללי',
+        category: String(rawCategory).trim(),
     };
 };
 
@@ -78,13 +100,16 @@ export async function parseTransactions(cleanedData, fileType, userId) {
     const merchantsThatNeedMapping = new Set();
 
     const transactions = initialTransactions.map(trx => {
-        const originalDescription = trx.rawDescription;
         let finalDescription = trx.description;
         let finalCategoryName = trx.category;
-        let categoryFound = false;
+        
+        // בדיקה האם הקטגוריה מהקובץ היא אמיתית או גנרית
+        const genericNames = ['כללי', 'שונות', '', 'null', 'undefined'];
+        let categoryIsGeneric = genericNames.includes(finalCategoryName);
+        let categoryFound = !categoryIsGeneric; // אם הקטגוריה מהקובץ טובה, אנחנו מסודרים
 
-        // שלב 1: בדיקת מיפוי
-        const mapping = merchantMapCache.get(originalDescription);
+        // שלב 1: מיפוי ידני (גובר על הכל)
+        const mapping = merchantMapCache.get(trx.rawDescription);
         if (mapping) {
             finalDescription = mapping.newName;
             if (mapping.category) {
@@ -93,7 +118,7 @@ export async function parseTransactions(cleanedData, fileType, userId) {
             }
         }
 
-        // שלב 2: אם המיפוי לא קבע קטגוריה, בדוק חוקים
+        // שלב 2: חוקים אוטומטיים (רק אם לא מצאנו קטגוריה טובה)
         if (!categoryFound) {
             for (const rule of categoryRules) {
                 if (finalDescription.toLowerCase().includes(rule.keyword.toLowerCase())) {
@@ -106,9 +131,9 @@ export async function parseTransactions(cleanedData, fileType, userId) {
             }
         }
 
-        // שלב 3: אם עדיין אין קטגוריה, הוסף לרשימת המיפוי הידני
+        // שלב 3: אם בסוף התהליך אין קטגוריה טובה, סמן למיפוי
         if (!categoryFound) {
-            merchantsThatNeedMapping.add(originalDescription);
+            merchantsThatNeedMapping.add(trx.rawDescription);
         }
 
         return { ...trx, description: finalDescription, category: finalCategoryName };

@@ -1,30 +1,29 @@
-// client/src/utils/api.js
-
 import axios from 'axios';
 
-// We create a variable to hold the store's functions.
-// This avoids a direct import cycle.
+// משתנה להחזקת הפונקציות מה-Store כדי למנוע תלות מעגלית
 let authStoreApi = {
-  login: () => console.error('Auth store not initialized for API utility.'),
-  logout: () => console.error('Auth store not initialized for API utility.'),
+  login: () => console.warn('Auth store not initialized yet (login).'),
+  logout: () => console.warn('Auth store not initialized yet (logout).'),
 };
 
 /**
- * This function allows the authStore to "inject" its functions into this module.
- * It will be called from authStore.js to break the circular dependency.
- * @param {object} store - The auth store's state and actions.
+ * פונקציה להזרקת ה-Store לתוך ה-API
  */
 export function injectAuthStore(store) {
   authStoreApi = store;
 }
 
+// יצירת מופע Axios
 const api = axios.create({
-  baseURL: '/api',
+  // אם משתמשים ב-Vite Proxy, זה בסדר להשאיר /api. 
+  // לייצור, עדיף להשתמש ב-import.meta.env.VITE_API_URL
+  baseURL: '/api', 
   withCredentials: true,
 });
 
 let csrfTokenPromise = null;
 
+// פונקציה להשגת טוקן CSRF (מונעת קריאות כפולות)
 const getCsrfToken = () => {
   if (!csrfTokenPromise) {
     csrfTokenPromise = api.get('/csrf-token')
@@ -34,7 +33,7 @@ const getCsrfToken = () => {
         return csrfToken;
       })
       .catch(error => {
-        console.error('Could not get CSRF token', error);
+        console.error('Failed to fetch CSRF token', error);
         csrfTokenPromise = null;
         return Promise.reject(error);
       });
@@ -42,49 +41,79 @@ const getCsrfToken = () => {
   return csrfTokenPromise;
 };
 
+// Interceptor לבקשות - וידוא שיש CSRF
 api.interceptors.request.use(async (config) => {
+  // דילוג אם הבקשה היא לקבלת הטוקן עצמו
   if (config.url === '/csrf-token') {
     return config;
   }
+  
+  // אם אין טוקן בהדרים, ננסה להשיג אותו
   if (!api.defaults.headers.common['X-CSRF-Token']) {
-    await getCsrfToken();
+    try {
+      await getCsrfToken();
+    } catch (err) {
+      // אם נכשלנו להשיג טוקן, ייתכן שהשרת למטה או בעיית רשת.
+      // נמשיך בכל זאת כדי שהשרת יחזיר שגיאה מתאימה.
+    }
   }
   return config;
 }, (error) => Promise.reject(error));
 
+// משתנים לניהול חידוש טוקן (Refresh Token)
 let isRefreshing = false;
 let failedQueue = [];
 
 const processQueue = (error, token = null) => {
-  failedQueue.forEach(prom => error ? prom.reject(error) : prom.resolve(token));
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
   failedQueue = [];
 };
 
+// Interceptor לתשובות - טיפול בשגיאות 401 וחידוש טוקן
 api.interceptors.response.use(
-  response => response,
+  (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // אם קיבלנו 401 וזו לא בקשה שכבר ניסינו לחדש
     if (error.response?.status === 401 && !originalRequest._retry) {
+      
+      // אם אנחנו כבר באמצע תהליך חידוש, הכנס לתור
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
-        }).then(() => api(originalRequest));
+        })
+        .then(() => api(originalRequest))
+        .catch((err) => Promise.reject(err));
       }
 
       originalRequest._retry = true;
       isRefreshing = true;
 
       try {
+        // בקשת חידוש טוקן
         const { data } = await api.post('/auth/refresh');
-        // Now we use the injected store functions directly
-        authStoreApi.login(data.user);
+        
+        // עדכון ה-Store בהצלחה
+        if (data && data.user) {
+          authStoreApi.login(data.user);
+        }
+
+        // שחרור התור
         processQueue(null);
+        
+        // שליחה מחדש של הבקשה המקורית
         return api(originalRequest);
       } catch (refreshError) {
-        processQueue(refreshError);
-        authStoreApi.logout();
-        // Redirecting from here can be problematic. The UI should handle redirects
-        // based on the authentication state.
+        // במקרה של כישלון בחידוש (למשל הטוקן פג תוקף לגמרי)
+        processQueue(refreshError, null);
+        authStoreApi.logout(); // ניתוק המשתמש
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

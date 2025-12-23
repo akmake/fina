@@ -294,10 +294,7 @@ export default function DepositsPage() {
 
     return (
         <div className="container mx-auto p-4 md:p-6 lg:p-8 bg-muted/20 min-h-screen">
-            <header className="mb-8">
-                <h1 className="text-3xl md:text-4xl font-bold text-foreground">ניהול פיקדונות</h1>
-                <p className="mt-2 text-lg text-muted-foreground">הוסף, עקוב ונהל את הפיקדונות והחסכונות שלך במקום אחד.</p>
-            </header>
+
 
             <main className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                 

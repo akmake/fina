@@ -387,12 +387,7 @@ function StocksManager() {
 export default function InvestmentsPage() {
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8 bg-slate-50 min-h-screen">
-       <header className="mb-8">
-        <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">ניהול השקעות</h1>
-        <p className="mt-2 text-lg text-slate-600">
-          מעקב וניהול אינטראקטיבי אחר תיק המניות שלך.
-        </p>
-      </header>
+
       <main>
         <StocksErrorBoundary>
           <StocksManager />

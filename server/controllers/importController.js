@@ -42,30 +42,28 @@ export const processTransactions = async (req, res, next) => {
         newName: m.newName,
         category: m.category || null,
       }));
+      // שמירת מיפויים חדשים (מתעלם מכפילויות)
       await MerchantMap.insertMany(mappingDocs, { ordered: false }).catch(err => {
         if (err.code !== 11000) throw err;
       });
     }
 
-    // --- 👇 התיקון כאן: לא מוחקים יותר, רק מוסיפים ---
     let insertedCount = 0;
     if (transactions.length > 0) {
         try {
-            // ordered: false - ימשיך גם אם חלק מהרשומות נכשלות (בגלל כפילות)
+            // שמירת עסקאות (מתעלם מכפילויות כדי לא לעצור את כל התהליך)
             const result = await Transaction.insertMany(transactions, { ordered: false });
             insertedCount = result.length;
         } catch (error) {
-            // אם השגיאה היא שגיאת כפילות, נספור כמה עסקאות כן הצליחו להיכנס
             if (error.code === 11000 && error.result && Array.isArray(error.result.insertedDocs)) {
                 insertedCount = error.result.insertedDocs.length;
             } else {
-                // אם זו שגיאה אחרת, נזרוק אותה הלאה
                 throw error;
             }
         }
     }
-    // --- 👆 עד כאן התיקון ---
 
+    // חישוב יתרות מחדש
     const aggregation = await Transaction.aggregate([
       { $match: { user: userId } },
       {
