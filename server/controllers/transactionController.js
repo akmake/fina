@@ -2,58 +2,111 @@ import mongoose from 'mongoose';
 import Transaction from '../models/Transaction.js';
 import FinanceProfile from '../models/FinanceProfile.js';
 
-// ... פונקציית getTransactions נשארת ללא שינוי ...
+// --- פונקציית עזר לתרגום סוגים ---
+const normalizeType = (type) => {
+    if (type === 'income' || type === 'הכנסה') return 'הכנסה';
+    return 'הוצאה'; // ברירת מחדל
+};
+
+const normalizeAccount = (account) => {
+    const map = { 'עו"ש': 'checking', 'מזומן': 'cash' };
+    return map[account] || account || 'checking';
+};
+
+// @desc   קבלת כל העסקאות של המשתמש
+// @route  GET /api/transactions
 export const getTransactions = async (req, res) => {
   try {
+    // שליפה לפי המשתמש המחובר, ממוין לפי תאריך יורד
     const transactions = await Transaction.find({ user: req.user._id }).sort({ date: -1 });
     res.json(transactions);
   } catch (error) {
-    res.status(500).json({ message: 'שגיאת שרת' });
+    console.error("Get transactions error:", error);
+    res.status(500).json({ message: 'שגיאת שרת בשליפת עסקאות' });
   }
 };
 
-
-// @desc   הוספת עסקה חדשה ועדכון היתרה בחשבון
+// @desc   הוספת עסקה חדשה ועדכון היתרה
 // @route  POST /api/transactions
 export const addTransaction = async (req, res) => {
-  const { date, description, amount, type, category, account } = req.body;
+  let { date, description, amount, type, category, account } = req.body;
 
-  if (!date || !description || !amount || !type || !account) {
-    return res.status(400).json({ message: 'נא למלא את כל שדות החובה' });
+  if (!date || !description || !amount || !type) {
+    return res.status(400).json({ message: 'נא למלא תאריך, תיאור, סכום וסוג' });
   }
-  
-  // --- בדיקה אם הסביבה תומכת בטרנזקציות ---
+
+  // 1. נרמול הנתונים לפני עבודה (כדי למנוע באגים בחישובים)
+  const finalType = normalizeType(type);
+  const finalAccount = normalizeAccount(account);
+  const numericAmount = Math.abs(Number(amount)); // מוודאים שהסכום חיובי בבסיסו
+
   const supportsTransactions = process.env.DB_SUPPORTS_TRANSACTIONS === 'true';
 
   if (supportsTransactions) {
-    // --- לוגיקה לסביבת Production (עם טרנזקציה) ---
     const session = await mongoose.startSession();
     session.startTransaction();
     try {
-      const newTransaction = new Transaction({ user: req.user._id, date, description, amount: Number(amount), type, category, account });
+      const newTransaction = new Transaction({ 
+          user: req.user._id, 
+          date, 
+          description, 
+          amount: numericAmount, 
+          type: finalType, 
+          category, 
+          account: finalAccount 
+      });
+      
       await newTransaction.save({ session });
 
-      const amountToUpdate = type === 'הכנסה' ? Number(amount) : -Number(amount);
-      await FinanceProfile.updateOne({ user: req.user._id }, { $inc: { [account]: amountToUpdate } }, { session });
+      // חישוב העדכון: אם הכנסה -> פלוס, אם הוצאה -> מינוס
+      const amountToUpdate = finalType === 'הכנסה' ? numericAmount : -numericAmount;
+      
+      // עדכון הפרופיל הפיננסי
+      await FinanceProfile.updateOne(
+          { user: req.user._id }, 
+          { $inc: { [finalAccount]: amountToUpdate } }, 
+          { session }
+      );
 
       await session.commitTransaction();
       res.status(201).json(newTransaction);
     } catch (error) {
       await session.abortTransaction();
-      console.error("Error adding transaction with session:", error);
+      // טיפול בשגיאת כפילות (אם מנסים להוסיף אותה עסקה בדיוק פעמיים)
+      if (error.code === 11000) {
+          return res.status(409).json({ message: 'עסקה זו כבר קיימת במערכת' });
+      }
+      console.error("Error adding transaction (session):", error);
       res.status(500).json({ message: 'שגיאה בהוספת העסקה' });
     } finally {
       session.endSession();
     }
   } else {
-    // --- לוגיקה לסביבת פיתוח מקומית (בלי טרנזקציה) ---
+    // --- לוגיקה ללא טרנזקציות (פיתוח) ---
     try {
-      const newTransaction = await Transaction.create({ user: req.user._id, date, description, amount: Number(amount), type, category, account });
-      const amountToUpdate = type === 'הכנסה' ? Number(amount) : -Number(amount);
-      await FinanceProfile.updateOne({ user: req.user._id }, { $inc: { [account]: amountToUpdate } });
+      const newTransaction = await Transaction.create({ 
+          user: req.user._id, 
+          date, 
+          description, 
+          amount: numericAmount, 
+          type: finalType, 
+          category, 
+          account: finalAccount 
+      });
+
+      const amountToUpdate = finalType === 'הכנסה' ? numericAmount : -numericAmount;
+      
+      await FinanceProfile.updateOne(
+          { user: req.user._id }, 
+          { $inc: { [finalAccount]: amountToUpdate } }
+      );
+      
       res.status(201).json(newTransaction);
     } catch (error) {
-      console.error("Error adding transaction without session:", error);
+      if (error.code === 11000) {
+          return res.status(409).json({ message: 'עסקה זו כבר קיימת במערכת' });
+      }
+      console.error("Error adding transaction (no session):", error);
       res.status(500).json({ message: 'שגיאה בהוספת העסקה' });
     }
   }

@@ -1,26 +1,34 @@
 import express from 'express';
-import { body, param } from 'express-validator';
-import { getCategories, createCategory, updateCategory, deleteCategory } from '../controllers/categoryController.js';
-import requireAuth            from '../middlewares/requireAuth.js';
-import { handleValidationErrors } from '../utils/validators.js'; // כבר קיים בכלי-העזר שלך
+import { 
+  getCategories, 
+  createCategory, 
+  deleteCategory,
+  getRules,
+  createRule,
+  deleteRule,
+  applyRulesToTransactions,
+  syncCategoriesFromTransactions
+} from '../controllers/categoryController.js';
+
+// שימוש בשם המדויק מהקובץ authMiddleware.js שלך
+import { requireAuth } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
+
+// החלת אימות על כל הנתיבים
 router.use(requireAuth);
 
 router.route('/')
-  .get(getCategories)
-  .post(
-    [
-      body('name').trim().notEmpty().withMessage('חובה לציין שם קטגוריה'),
-      body('type').optional().isIn(['הוצאה', 'הכנסה', 'כללי'])
-        .withMessage("ה-type חייב להיות 'הוצאה', 'הכנסה' או 'כללי'"),
-      handleValidationErrors
-    ],
-    createCategory
-  );
+    .get(getCategories)
+    .post(createCategory);
 
-router.route('/:id')
-  .put(param('id').isMongoId(), updateCategory)
-  .delete(param('id').isMongoId(), deleteCategory);
+router.route('/:id').delete(deleteCategory);
+
+// נתיבי מנוע החוקים והסנכרון
+router.get('/rules/all', getRules);
+router.post('/rules', createRule);
+router.delete('/rules/:id', deleteRule);
+router.post('/rules/apply', applyRulesToTransactions);
+router.post('/sync', syncCategoriesFromTransactions);
 
 export default router;

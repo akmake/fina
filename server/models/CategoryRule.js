@@ -1,23 +1,35 @@
 import mongoose from 'mongoose';
 
-const categoryRuleSchema = new mongoose.Schema({
-  // מילת המפתח לחיפוש בשם הספק, למשל "סופר", "דלק", "AMZN"
-  keyword: {
+const categoryRuleSchema = mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  searchString: {
     type: String,
     required: true,
     trim: true,
-    unique: true, // כל מילת מפתח היא ייחודית
   },
-  // הקישור לקטגוריה שאליה יש לשייך את העסקה אם נמצאה מילת המפתח
+  matchType: {
+    type: String,
+    enum: ['contains', 'exact', 'starts_with'],
+    default: 'contains',
+  },
+  // השם החדש שנרצה לתת לעסקה (נרמול שמות)
+  newName: {
+    type: String,
+    trim: true,
+  },
+  // הקטגוריה שנרצה לשייך
   category: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
     required: true,
-  },
-  // ניתן להוסיף עדיפות בעתיד, כדי לטפל במקרים שמספר חוקים מתאימים
-  // priority: { type: Number, default: 0 }
-}, {
-  timestamps: true,
-});
+  }
+}, { timestamps: true });
 
-export default mongoose.model('CategoryRule', categoryRuleSchema);
+categoryRuleSchema.index({ user: 1, searchString: 1 }, { unique: true });
+
+const CategoryRule = mongoose.model('CategoryRule', categoryRuleSchema);
+export default CategoryRule;

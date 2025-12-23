@@ -1,10 +1,9 @@
-// server/controllers/importController.js
-
 import { cleanCalFile, cleanMaxFile } from '../utils/excelCleaners.js';
 import { parseTransactions } from '../utils/excelParser.js';
 import Transaction from '../models/Transaction.js';
 import FinanceProfile from '../models/FinanceProfile.js';
 import MerchantMap from '../models/MerchantMap.js';
+import CategoryRule from '../models/CategoryRule.js'; // ייבוא מודל החוקים
 import AppError from '../utils/AppError.js';
 
 export const uploadAndParse = async (req, res, next) => {
@@ -27,6 +26,40 @@ export const uploadAndParse = async (req, res, next) => {
   }
 };
 
+/**
+ * פונקציית עזר להחלת חוקים על עסקה בודדת בזיכרון (לפני שמירה)
+ */
+const applyRulesToTransactionInMemory = (transaction, rules) => {
+  // שמירת השם המקורי אם עדיין לא נשמר
+  if (!transaction.originalDescription) {
+    transaction.originalDescription = transaction.description;
+  }
+
+  for (const rule of rules) {
+    let isMatch = false;
+    const desc = transaction.originalDescription || transaction.description;
+
+    if (rule.matchType === 'exact') {
+      isMatch = desc === rule.searchString;
+    } else if (rule.matchType === 'starts_with') {
+      isMatch = desc.startsWith(rule.searchString);
+    } else {
+      isMatch = desc.includes(rule.searchString);
+    }
+
+    if (isMatch) {
+      // אם נמצאה התאמה, מעדכנים קטגוריה ושם
+      transaction.category = rule.category;
+      if (rule.newName) {
+        transaction.description = rule.newName;
+      }
+      // ברגע שמצאנו חוק מתאים, אפשר לעצור (או להמשיך אם רוצים חוקים דורסים - כרגע עוצרים בראשון)
+      break; 
+    }
+  }
+  return transaction;
+};
+
 export const processTransactions = async (req, res, next) => {
   const { transactions, newMappings } = req.body;
   const userId = req.user._id;
@@ -36,7 +69,23 @@ export const processTransactions = async (req, res, next) => {
   }
 
   try {
-    // 1. שמירת מיפויים חדשים
+    // 1. טעינת כל החוקים של המשתמש לזיכרון
+    const rules = await CategoryRule.find({ user: userId });
+
+    // 2. עיבוד העסקאות (החלת חוקים + שמירת מקור)
+    const processedTransactions = transactions.map(t => {
+      // יצירת אובייקט עסקה בסיסי
+      const transactionObj = {
+        ...t,
+        user: userId,
+        originalDescription: t.description // שומרים את השם המקורי תמיד
+      };
+      
+      // החלת המנוע
+      return applyRulesToTransactionInMemory(transactionObj, rules);
+    });
+
+    // 3. שמירת מיפויים (MerchantMap) - אופציונלי, למקרים ידניים בעתיד
     if (newMappings && newMappings.length > 0) {
       const mappingDocs = newMappings.map(m => ({
         originalName: m.originalName,
@@ -48,11 +97,11 @@ export const processTransactions = async (req, res, next) => {
       });
     }
 
-    // 2. שמירת עסקאות
+    // 4. שמירת העסקאות המעובדות
     let insertedCount = 0;
-    if (transactions.length > 0) {
+    if (processedTransactions.length > 0) {
         try {
-            const result = await Transaction.insertMany(transactions, { ordered: false });
+            const result = await Transaction.insertMany(processedTransactions, { ordered: false });
             insertedCount = result.length;
         } catch (error) {
             if (error.code === 11000 && error.result && Array.isArray(error.result.insertedDocs)) {
@@ -63,40 +112,34 @@ export const processTransactions = async (req, res, next) => {
         }
     }
 
-    // 3. חישוב יתרות חכם (ללא דריסת שדות ידניים)
+    // 5. חישוב יתרות (כמו בקובץ הקודם)
     const aggregation = await Transaction.aggregate([
       { $match: { user: userId } },
       {
         $group: {
-          _id: '$account', // מקבץ לפי שם החשבון בעסקה
+          _id: '$account',
           total: { $sum: { $cond: [{ $eq: ['$type', 'הכנסה'] }, '$amount', { $multiply: ['$amount', -1] }] } }
         }
       }
     ]);
     
-    // מכינים אובייקט עדכון ריק
     const updates = {};
     const knownFields = ['checking', 'cash', 'deposits', 'stocks'];
 
     aggregation.forEach(item => {
       const accountKey = item._id;
-      
-      // בדיקה האם שם החשבון קיים בסכמה שלנו
       if (knownFields.includes(accountKey)) {
         updates[accountKey] = item.total;
       } else {
-        // אם שם החשבון לא מוכר (למשל 'Leumi Card'), נוסיף אותו ל-checking כברירת מחדל
-        // או שאפשר ליצור שדה דינמי אם הסכמה מאפשרת. כרגע נסכם ל-checking:
         updates['checking'] = (updates['checking'] || 0) + item.total;
       }
     });
 
-    // שימוש ב-$set כדי לעדכן רק את השדות שחושבו מחדש, מבלי למחוק שדות אחרים (כמו מזומן שלא היה בקובץ)
     if (Object.keys(updates).length > 0) {
       await FinanceProfile.updateOne({ user: userId }, { $set: updates }, { upsert: true });
     }
 
-    res.json({ message: `הייבוא הושלם! נוספו ${insertedCount} עסקאות חדשות.` });
+    res.json({ message: `הייבוא הושלם! נוספו ${insertedCount} עסקאות (חוקים הוחלו אוטומטית).` });
   } catch (error) {
     console.error("Error processing transactions:", error);
     return next(new AppError(`שגיאה בעיבוד העסקאות: ${error.message}`, 500));

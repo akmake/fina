@@ -1,9 +1,9 @@
 import { useState, Fragment } from "react";
 import { Link, NavLink } from "react-router-dom";
 import {
-    Menu, X, LogOut, LayoutDashboard, Wrench, FileText, User, Landmark,
-    TrendingUp, Home, Settings, UserCircle, Briefcase, ChevronDown 
-} from "lucide-react";
+  Menu, X, LogOut, LayoutDashboard, Wrench, FileText, User, Landmark,
+  TrendingUp, Home, Settings, UserCircle, Briefcase, ChevronDown, Cpu 
+} from "lucide-react"; // הוספנו את Cpu לאייקונים
 import { motion, AnimatePresence } from "framer-motion";
 
 // --- Imports from your project structure ---
@@ -25,8 +25,11 @@ const navItems = [
     { to: '/investments', label: 'ניהול השקעות', icon: TrendingUp, type: 'link', auth: true },
     { to: '/portfolio', label: 'דף עסקאות', icon: FileText, type: 'link', auth: true },
     { to: '/projects', label: 'פרויקטים', icon: Briefcase, type: 'link', auth: true },
+    
+    // --- הקישור החדש למרכז האוטומציה (לכל משתמש רשום) ---
+    { to: '/management', label: 'אוטומציה', icon: Cpu, type: 'link', auth: true },
+    
     { to: '/tzitzit', label: 'ציציות/טלית', icon: () => <span className="font-bold text-lg h-5 w-5 flex items-center justify-center">צ</span>, type: 'link', auth: true },
-    { to: '/management', label: 'ניהול מערכת', icon: Wrench, type: 'link', auth: true, admin: true },
     { to: '/deposits', label: 'פיקדונות', icon: Landmark, type: 'link', auth: true },
     { to: '/funds', label: 'קרנות', icon: () => <span className="font-bold text-lg h-5 w-5 flex items-center justify-center">ק</span>, type: 'link', auth: true },
 
@@ -36,6 +39,7 @@ const navItems = [
 const getVisibleItems = (isAuthenticated, user) => {
     return navItems.filter(item => {
         if (item.auth && !isAuthenticated) return false;
+        // הסרנו את התנאי המחמיר לניהול, או השארנו אותו רק לפריטים שעדיין מוגדרים admin: true
         if (item.admin && user?.role !== 'admin') return false;
         return true;
     });
