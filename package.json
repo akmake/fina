@@ -1,0 +1,19 @@
+{
+  "name": "pasover-monorepo",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "install-all": "npm install --prefix client && npm install --prefix server",
+    "dev": "concurrently -n client,server -c 'bgBlue.bold,bgMagenta.bold' \"npm run dev --prefix client\" \"npm run dev --prefix server\"",
+    "build": "npm run build --prefix client",
+    "start": "npm run start --prefix server",
+    "docker:up": "docker-compose up -d --build",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
