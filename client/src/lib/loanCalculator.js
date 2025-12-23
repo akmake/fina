@@ -1,4 +1,18 @@
-// server/utils/loanCalculator.js
+// client/src/lib/loanCalculator.js
+
+/**
+ * הוספת חודשים לתאריך ללא דילוג על חודשים קצרים.
+ */
+function addMonths(date, months) {
+  const d = new Date(date);
+  const targetMonth = d.getMonth() + months;
+  d.setMonth(targetMonth);
+  // אם חרגנו מהחודש (למשל 31 לפברואר), נלך אחורה לסוף החודש הקודם
+  if (d.getMonth() !== targetMonth % 12 && d.getMonth() !== (targetMonth % 12 + 12) % 12) {
+    d.setDate(0); 
+  }
+  return d;
+}
 
 /**
  * מחשב לוח סילוקין להלוואה בשיטת "שפיצר".
@@ -9,16 +23,23 @@ export function calculateSpitzerSchedule({ principal, annualRate, termInMonths, 
   let remainingBalance = principal;
   const monthlyInterestRate = annualRate / 100 / 12;
 
-  // נוסחת שפיצר לחישוב ההחזר החודשי הקבוע
-  const monthlyPayment = principal * (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, termInMonths)) / (Math.pow(1 + monthlyInterestRate, termInMonths) - 1);
+  let monthlyPayment;
+  // טיפול במקרה קצה של ריבית 0
+  if (monthlyInterestRate === 0) {
+      monthlyPayment = principal / termInMonths;
+  } else {
+      // נוסחת שפיצר לחישוב ההחזר החודשי הקבוע
+      monthlyPayment = principal * (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, termInMonths)) / (Math.pow(1 + monthlyInterestRate, termInMonths) - 1);
+  }
+
+  const start = new Date(startDate);
 
   for (let i = 1; i <= termInMonths; i++) {
     const interestPayment = remainingBalance * monthlyInterestRate;
     const principalPayment = monthlyPayment - interestPayment;
     remainingBalance -= principalPayment;
 
-    const paymentDate = new Date(startDate);
-    paymentDate.setMonth(paymentDate.getMonth() + i);
+    const paymentDate = addMonths(start, i);
 
     schedule.push({
       paymentNumber: i,
@@ -41,14 +62,15 @@ export function calculateKerenShavaSchedule({ principal, annualRate, termInMonth
   let remainingBalance = principal;
   const monthlyInterestRate = annualRate / 100 / 12;
   const principalPerMonth = principal / termInMonths;
+  
+  const start = new Date(startDate);
 
   for (let i = 1; i <= termInMonths; i++) {
     const interestPayment = remainingBalance * monthlyInterestRate;
     const totalPayment = principalPerMonth + interestPayment;
     remainingBalance -= principalPerMonth;
 
-    const paymentDate = new Date(startDate);
-    paymentDate.setMonth(paymentDate.getMonth() + i);
+    const paymentDate = addMonths(start, i);
 
     schedule.push({
       paymentNumber: i,

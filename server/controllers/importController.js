@@ -36,22 +36,22 @@ export const processTransactions = async (req, res, next) => {
   }
 
   try {
+    // 1. שמירת מיפויים חדשים
     if (newMappings && newMappings.length > 0) {
       const mappingDocs = newMappings.map(m => ({
         originalName: m.originalName,
         newName: m.newName,
         category: m.category || null,
       }));
-      // שמירת מיפויים חדשים (מתעלם מכפילויות)
       await MerchantMap.insertMany(mappingDocs, { ordered: false }).catch(err => {
         if (err.code !== 11000) throw err;
       });
     }
 
+    // 2. שמירת עסקאות
     let insertedCount = 0;
     if (transactions.length > 0) {
         try {
-            // שמירת עסקאות (מתעלם מכפילויות כדי לא לעצור את כל התהליך)
             const result = await Transaction.insertMany(transactions, { ordered: false });
             insertedCount = result.length;
         } catch (error) {
@@ -63,25 +63,38 @@ export const processTransactions = async (req, res, next) => {
         }
     }
 
-    // חישוב יתרות מחדש
+    // 3. חישוב יתרות חכם (ללא דריסת שדות ידניים)
     const aggregation = await Transaction.aggregate([
       { $match: { user: userId } },
       {
         $group: {
-          _id: '$account',
+          _id: '$account', // מקבץ לפי שם החשבון בעסקה
           total: { $sum: { $cond: [{ $eq: ['$type', 'הכנסה'] }, '$amount', { $multiply: ['$amount', -1] }] } }
         }
       }
     ]);
     
-    const newBalances = { checking: 0, cash: 0, deposits: 0, stocks: 0 };
+    // מכינים אובייקט עדכון ריק
+    const updates = {};
+    const knownFields = ['checking', 'cash', 'deposits', 'stocks'];
+
     aggregation.forEach(item => {
-      if (newBalances.hasOwnProperty(item._id)) {
-        newBalances[item._id] = item.total;
+      const accountKey = item._id;
+      
+      // בדיקה האם שם החשבון קיים בסכמה שלנו
+      if (knownFields.includes(accountKey)) {
+        updates[accountKey] = item.total;
+      } else {
+        // אם שם החשבון לא מוכר (למשל 'Leumi Card'), נוסיף אותו ל-checking כברירת מחדל
+        // או שאפשר ליצור שדה דינמי אם הסכמה מאפשרת. כרגע נסכם ל-checking:
+        updates['checking'] = (updates['checking'] || 0) + item.total;
       }
     });
 
-    await FinanceProfile.updateOne({ user: userId }, { $set: newBalances }, { upsert: true });
+    // שימוש ב-$set כדי לעדכן רק את השדות שחושבו מחדש, מבלי למחוק שדות אחרים (כמו מזומן שלא היה בקובץ)
+    if (Object.keys(updates).length > 0) {
+      await FinanceProfile.updateOne({ user: userId }, { $set: updates }, { upsert: true });
+    }
 
     res.json({ message: `הייבוא הושלם! נוספו ${insertedCount} עסקאות חדשות.` });
   } catch (error) {

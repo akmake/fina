@@ -1,4 +1,20 @@
 /**
+ * פונקציית עזר להוספת חודשים לתאריך בצורה בטוחה.
+ * מונעת קפיצת תאריכים (למשל 31 לינואר + חודש -> 28/29 לפברואר ולא מרץ).
+ */
+function addMonths(date, months) {
+  const d = new Date(date);
+  const targetMonth = d.getMonth() + months;
+  d.setMonth(targetMonth);
+  
+  // אם התאריך זלג לחודש הבא (כי אין 31 בחודש היעד), נחזיר אותו לסוף החודש הקודם
+  if (d.getMonth() !== targetMonth % 12 && d.getMonth() !== (targetMonth % 12 + 12) % 12) {
+    d.setDate(0); 
+  }
+  return d;
+}
+
+/**
  * מחזיר את הריבית שהייתה בתוקף לתאריך מסוים.
  * @param {Date} date - התאריך לבדיקה.
  * @param {Array<object>} rateHistory - מערך ממוין של היסטוריית ריביות.
@@ -23,10 +39,12 @@ export function calculateDynamicSchedule({ loan, rateHistory }) {
   const schedule = [];
   let remainingBalance = principal;
   const principalPerMonth = repaymentType === 'קרן שווה' ? principal / termInMonths : 0;
+  
+  const start = new Date(startDate);
 
   for (let i = 1; i <= termInMonths; i++) {
-    const paymentDate = new Date(startDate);
-    paymentDate.setMonth(paymentDate.getMonth() + i);
+    // שימוש בפונקציה המתוקנת לחישוב תאריך
+    const paymentDate = addMonths(start, i);
 
     const primeRate = getRateForDate(paymentDate, rateHistory);
     const annualRate = primeRate + interestMargin;
@@ -36,12 +54,16 @@ export function calculateDynamicSchedule({ loan, rateHistory }) {
     let principalPayment, totalPayment;
     
     if (repaymentType === 'שפיצר') {
-      // בשפיצר צריך לחשב את ההחזר החודשי מחדש בכל פעם שהריבית משתנה, או בכל חודש
-      // החישוב מתבסס על היתרה הנוכחית, הריבית הנוכחית, ומספר התשלומים שנותרו
+      // בשפיצר צריך לחשב את ההחזר החודשי מחדש בכל פעם שהריבית משתנה
       const remainingTerm = termInMonths - i + 1;
-      const monthlyPayment = remainingBalance * (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, remainingTerm)) / (Math.pow(1 + monthlyInterestRate, remainingTerm) - 1);
-      totalPayment = monthlyPayment;
-      principalPayment = monthlyPayment - interestPayment;
+      
+      // הגנה מפני חלוקה באפס במקרה של ריבית 0
+      if (monthlyInterestRate === 0) {
+          totalPayment = remainingBalance / remainingTerm;
+      } else {
+          totalPayment = remainingBalance * (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, remainingTerm)) / (Math.pow(1 + monthlyInterestRate, remainingTerm) - 1);
+      }
+      principalPayment = totalPayment - interestPayment;
     } else { // קרן שווה
       principalPayment = principalPerMonth;
       totalPayment = principalPayment + interestPayment;
