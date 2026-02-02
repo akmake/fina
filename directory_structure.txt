@@ -3642,7 +3642,7 @@
         import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
         import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
         import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-        import { Input } from "@/components/ui/input";
+        import { Input } from "@/components/ui/Input";
         import { UploadCloud, FileText, Settings, CheckCircle, AlertTriangle } from 'lucide-react';
         
         // --- הגדרות קבועות ---
@@ -5378,7 +5378,7 @@
         import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
         import { Button } from "@/components/ui/button";
         import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-        import { Input } from "@/components/ui/input";
+        import { Input } from "@/components/ui/Input";
         import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
         import { Badge } from "@/components/ui/badge";
         import { useToast } from "@/hooks/useToast";
@@ -7258,7 +7258,7 @@
           SelectTrigger,
           SelectValue,
         } from "@/components/ui/select";
-        import { Input } from "@/components/ui/input";
+        import { Input } from "@/components/ui/Input";
         import { Badge } from "@/components/ui/badge";
         import {
           Tooltip,
