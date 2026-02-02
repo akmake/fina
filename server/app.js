@@ -43,17 +43,33 @@ await connectDB();
 
 const app = express();
 
-// --- הגדרות אבטחה בסיסיות ---
+// --- הגדרות אבטחה בסיסיות (Helmet) ---
 app.use(helmet({ 
   crossOriginResourcePolicy: false // מאפשר טעינת תמונות אם צריך
 }));
 
+// --- הגדרות CORS (החלק הקריטי לתקשורת ברנדר) ---
+const allowedOrigins = [
+  'http://localhost:5173',                  // לפיתוח מקומי
+  'https://english-1-hwkw.onrender.com',    // הכתובת של הקליינט ברנדר
+  process.env.CLIENT_URL                    // משתנה סביבה לגיבוי
+];
+
 app.use(cors({ 
-  origin: process.env.CLIENT_URL || 'http://localhost:5173', 
-  credentials: true 
+  origin: function (origin, callback) {
+    // מאפשר בקשות ללא origin (כמו Postman) או אם ה-origin ברשימה המותרת
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log("Blocked by CORS:", origin); // לוג שיעזור לך להבין אם משהו נחסם
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true, // חובה להעברת עוגיות
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 
-// 💥 תיקון קריטי: הגדלת מגבלת הגודל למניעת שגיאות בייבוא קבצים (413 Payload Too Large) 💥
+// --- הגדרות גודל גוף הבקשה ---
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -64,17 +80,18 @@ app.use(mongoSanitize());
 const csrfProtection = csurf({
   cookie: { 
     httpOnly: true, 
-    secure: process.env.NODE_ENV === 'production', 
-    sameSite: 'strict' 
+    secure: process.env.NODE_ENV === 'production', // ב-Production חייב להיות True
+    // קריטי: 'none' מאפשר עוגיות בין דומיינים שונים (Client ו-Server ב-Render הם שונים)
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' 
   },
 });
 
-// --- נתיבים ציבוריים (ללא CSRF בהכרח, או מוחרגים) ---
-app.use('/api/import', importRoutes);
+// --- נתיבים ציבוריים (ללא CSRF) ---
+// הערה: נתיבי ייבוא לפעמים צריכים להיות פתוחים, תלוי איך הם נקראים
+app.use('/api/import', importRoutes); 
 app.use('/api/auth', authRoutes);
 
-// Endpoint לקבלת ה-CSRF Token
-// הוספתי כאן את rateLimiter כפי שהיה במקור כדי להגן על הנתיב הזה
+// --- Endpoint לקבלת ה-CSRF Token ---
 app.get('/api/csrf-token', rateLimiter, csrfProtection, (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
@@ -82,7 +99,7 @@ app.get('/api/csrf-token', rateLimiter, csrfProtection, (req, res) => {
 // --- הפעלת הגנת CSRF על כל הנתיבים מכאן ומטה ---
 app.use(csrfProtection);
 
-// --- נתיבים מוגנים ---
+// --- נתיבים מוגנים (דורשים התחברות) ---
 app.use('/api/dashboard', requireAuth, dashboardRoutes);
 app.use('/api/tzitzit', requireAuth, tzitzitRoutes);
 app.use('/api/projects', requireAuth, projectRoutes);
@@ -94,19 +111,23 @@ app.use('/api/management', requireAuth, managementRoutes);
 app.use('/api/stocks', requireAuth, stockRoutes);
 app.use('/api/deposits', requireAuth, depositRoutes);
 app.use('/api/funds', requireAuth, fundRoutes);
-app.use('/api/loans', requireAuth, loanRoutes); // הוספתי requireAuth ליתר ביטחון
+app.use('/api/loans', requireAuth, loanRoutes);
 app.use('/api/rates', requireAuth, rateRoutes);
 
-// טיפול בשגיאות 404
+// --- טיפול בשגיאות ---
+
+// 404 - לא נמצא
 app.use('*', (req, res) => {
   res.status(404).json({ message: 'API endpoint not found' });
 });
 
-// טיפול בשגיאות גלובלי (Error Handler)
+// טיפול שגיאות גלובלי
 app.use((err, req, res, next) => {
+  // טיפול ספציפי לשגיאת CSRF
   if (err.code === 'EBADCSRFTOKEN') {
     return res.status(403).json({ message: 'Form has been tampered with (CSRF Invalid)' });
   }
+  
   console.error(err);
   res.status(500).json({ message: 'Internal Server Error' });
 });
