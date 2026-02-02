@@ -43,7 +43,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
