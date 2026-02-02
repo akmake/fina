@@ -11,8 +11,11 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 export const registerValidator = [
+  // הוספתי גם ולידציה לשם (כי הוא נשלח מהטופס), אך זה לא חובה אם לא תרצה
+  body('name').notEmpty().withMessage('Please provide your name.'),
   body('email').isEmail().withMessage('Please provide a valid email address.'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long.'),
+  // כאן השינוי: מינימום 8 תווים
+  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long.'),
   handleValidationErrors,
 ];
 

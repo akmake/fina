@@ -2,7 +2,7 @@ import { useState, Fragment } from "react";
 import { Link, NavLink } from "react-router-dom";
 import {
   Menu, X, LogOut, LayoutDashboard, Wrench, FileText, User, Landmark,
-  TrendingUp, Home, Settings, UserCircle, Briefcase, ChevronDown, Cpu 
+  TrendingUp, Home, Settings, UserCircle,PieChart, Briefcase, ChevronDown, Cpu 
 } from "lucide-react"; // הוספנו את Cpu לאייקונים
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -29,9 +29,9 @@ const navItems = [
     // --- הקישור החדש למרכז האוטומציה (לכל משתמש רשום) ---
     { to: '/management', label: 'אוטומציה', icon: Cpu, type: 'link', auth: true },
     
-    { to: '/tzitzit', label: 'ציציות/טלית', icon: () => <span className="font-bold text-lg h-5 w-5 flex items-center justify-center">צ</span>, type: 'link', auth: true },
+    //{ to: '/tzitzit', label: 'ציציות/טלית', icon: () => <span className="font-bold text-lg h-5 w-5 flex items-center justify-center">צ</span>, type: 'link', auth: true },
     { to: '/deposits', label: 'פיקדונות', icon: Landmark, type: 'link', auth: true },
-    { to: '/funds', label: 'קרנות', icon: () => <span className="font-bold text-lg h-5 w-5 flex items-center justify-center">ק</span>, type: 'link', auth: true },
+    { to: '/funds', label: 'קרנות', icon: PieChart, type: 'link', auth: true },
 
 ];
 

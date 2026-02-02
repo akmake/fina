@@ -1,27 +1,26 @@
 // client/src/pages/LoginPage.jsx
 
-import { useState, useEffect } from 'react'; // 1. הוספנו useEffect
-import { Link, useNavigate } from 'react-router-dom';
-import api from "@/utils/api"; //import { useAuthStore } from '@/stores/authStore';
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import api from "@/utils/api";
 import { useAuthStore } from "@/stores/authStore";
-import { Button } from '@/components/ui/Button';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, LoaderCircle, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, ArrowRight } from "lucide-react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
   const loginAction = useAuthStore((s) => s.login);
-  const navigate = useNavigate(); // הוספנו את useNavigate
+  const navigate = useNavigate();
 
-  // 3. הוספנו את הבלוק הזה כדי לקבל CSRF token
+  // משיכת CSRF Token בטעינה
   useEffect(() => {
     api.get('/csrf-token').catch((err) => {
       console.error("Failed to fetch CSRF token", err);
-      setError("שגיאת אבטחה. רענן את הדף ונסה שוב.");
+      // לא נציג שגיאה למשתמש בשלב זה כדי לא להלחיץ, רק נרשום בלוג
     });
   }, []);
 
@@ -30,113 +29,152 @@ export default function LoginPage() {
     if (loading) return;
 
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
-      // 4. הסרנו את /api מהנתיב כי axios המותאם כבר כולל אותו
       const { data } = await api.post('/auth/login', { email, password });
       
       if (data && data.user) {
         loginAction(data.user);
-        
-        // עדיף להשתמש ב-navigate של react-router
         navigate('/'); 
-
       } else {
         throw new Error("תגובת השרת אינה מכילה פרטי משתמש.");
       }
-
     } catch (err) {
-      setError(err.response?.data?.message || 'שגיאה לא צפויה. נסה שוב.');
+      setError(err.response?.data?.message || 'שם המשתמש או הסיסמה שגויים');
     } finally {
       setLoading(false);
     }
   };
 
-  const cardVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { 
-      opacity: 1, 
-      y: 0, 
-      transition: { 
-        duration: 0.6, 
-        ease: "easeOut",
-        when: "beforeChildren",
-        staggerChildren: 0.1
-      } 
-    },
-  };
-  
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
-  };
-
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 p-4">
-      <motion.div 
-        variants={cardVariants}
-        initial="hidden"
-        animate="visible"
-        className="w-full max-w-md bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl p-8 space-y-6"
-      >
-        <motion.div variants={itemVariants} className="text-center">
-          <Link to="/" className="text-3xl font-bold text-amber-700 inline-block mb-2">🍽️ קייטרינג פסח</Link>
-          <h1 className="text-2xl font-bold text-gray-900">ברוכים הבאים</h1>
-          <p className="text-gray-600">התחבר לחשבון שלך כדי להמשיך</p>
-        </motion.div>
+    <div className="min-h-screen flex w-full bg-white font-sans" dir="rtl">
+      
+      {/* צד ימין: אזור הטופס */}
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-20 xl:px-24 bg-white z-10">
+        <div className="w-full max-w-sm space-y-8">
+          
+          <div className="text-center sm:text-right">
+            <h2 className="mt-6 text-4xl font-extrabold text-gray-900 tracking-tight">
+              ברוכים השבים!
+            </h2>
+            <p className="mt-2 text-sm text-gray-500">
+              הזן את פרטי ההתחברות שלך כדי לגשת למערכת.
+            </p>
+          </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <motion.div variants={itemVariants}>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">כתובת אימייל</label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3"><Mail className="h-5 w-5 text-gray-400" /></span>
-              <input id="email" type="email" placeholder="you@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 transition"/>
+          {error && (
+            <div className="rounded-lg bg-red-50 p-4 border-r-4 border-red-500 flex items-start animate-pulse">
+              <AlertCircle className="h-5 w-5 text-red-500 ml-3 mt-0.5" />
+              <p className="text-sm text-red-700 font-medium">{error}</p>
             </div>
-          </motion.div>
+          )}
 
-          <motion.div variants={itemVariants}>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">סיסמה</label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3"><Lock className="h-5 w-5 text-gray-400" /></span>
-              <input id="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 transition"/>
-              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 flex items-center pr-3" aria-label={showPassword ? "הסתר סיסמה" : "הצג סיסמה"}>
-                {showPassword ? <EyeOff className="h-5 w-5 text-gray-500 hover:text-gray-800" /> : <Eye className="h-5 w-5 text-gray-500 hover:text-gray-800" />}
+          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+            <div className="space-y-5">
+              
+              {/* אימייל */}
+              <div>
+                <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-1">
+                  כתובת אימייל
+                </label>
+                <div className="relative mt-1">
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none z-10">
+                    <Mail className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="appearance-none block w-full pr-10 pl-3 py-3.5 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base"
+                    placeholder="name@example.com"
+                    style={{ direction: 'ltr', textAlign: 'right' }} 
+                  />
+                </div>
+              </div>
+
+              {/* סיסמה */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label htmlFor="password" class="block text-sm font-semibold text-gray-700">
+                    סיסמה
+                  </label>
+                  {/* אופציונלי: קישור לשכחתי סיסמה */}
+                  <a href="#" className="text-sm font-medium text-blue-600 hover:text-blue-500">
+                    שכחת סיסמה?
+                  </a>
+                </div>
+                
+                <div className="relative mt-1">
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none z-10">
+                    <Lock className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="appearance-none block w-full pr-10 pl-10 py-3.5 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base"
+                    placeholder="••••••••"
+                    style={{ direction: 'ltr', textAlign: 'right' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 left-0 pl-3 flex items-center cursor-pointer text-gray-400 hover:text-gray-600 focus:outline-none"
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex justify-center py-4 px-4 border border-transparent rounded-xl shadow-sm text-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all transform active:scale-[0.98]"
+              >
+                {loading ? (
+                  <Loader2 className="animate-spin h-6 w-6 text-white" />
+                ) : (
+                   "התחבר למערכת"
+                )}
               </button>
             </div>
-          </motion.div>
-          
-          <AnimatePresence>
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10, height: 0 }}
-                animate={{ opacity: 1, y: 0, height: 'auto' }}
-                exit={{ opacity: 0, y: -10, height: 0 }}
-                className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm flex items-center gap-2 overflow-hidden"
-              >
-                <AlertCircle className="h-5 w-5 flex-shrink-0"/>
-                <span>{error}</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
+            
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-600">
+                עדיין אין לך חשבון?{" "}
+                <Link to="/register" className="font-semibold text-blue-600 hover:text-blue-500 inline-flex items-center gap-1 group">
+                  הירשם עכשיו
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+                </Link>
+              </p>
+            </div>
 
-          <motion.div variants={itemVariants}>
-            <Button type="submit" className="w-full flex justify-center items-center gap-2" disabled={loading}>
-              {loading && <LoaderCircle className="animate-spin h-5 w-5" />}
-              {loading ? 'מתחבר...' : 'התחברות'}
-            </Button>
-          </motion.div>
-        </form>
+          </form>
+        </div>
+      </div>
 
-        <motion.div variants={itemVariants} className="text-sm text-center text-gray-600">
-          <p>
-            אין לך חשבון?{' '}
-            <Link to="/register" className="font-medium text-amber-600 hover:underline">
-              הרשם עכשיו
-            </Link>
-          </p>
-        </motion.div>
-      </motion.div>
+      {/* צד שמאל: תמונה גדולה (שונה במעט מזו של ההרשמה כדי ליצור גיוון) */}
+      <div className="hidden lg:block relative w-0 flex-1 overflow-hidden">
+        <img
+          className="absolute inset-0 h-full w-full object-cover"
+          src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80"
+          alt="Modern Building"
+        />
+        {/* שכבת כיסוי כחולה */}
+        <div className="absolute inset-0 bg-blue-900/30 mix-blend-multiply"></div>
+        
+        <div className="absolute inset-0 flex flex-col justify-end p-20 pb-24 bg-gradient-to-t from-black/70 via-black/20 to-transparent">
+            <h3 className="text-4xl font-bold text-white mb-4">ניהול השקעות חכם.</h3>
+            <p className="text-lg text-gray-100 max-w-md">הנתונים שלך מאובטחים ונגישים מכל מקום, כדי שתוכל לקבל החלטות בזמן אמת.</p>
+        </div>
+      </div>
     </div>
   );
 }

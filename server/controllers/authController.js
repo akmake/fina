@@ -5,36 +5,52 @@ import { createAndSendTokens } from '../utils/tokenHandler.js';
 
 export const registerUser = async (req, res) => {
   const { name, email, password, role } = req.body;
+  
   if (!name || !email || !password)
     return res.status(400).json({ message: 'שם, אימייל וסיסמה הם שדות חובה' });
+  
   const exists = await User.findOne({ email });
   if (exists)
     return res.status(400).json({ message: 'משתמש עם אימייל זה כבר קיים' });
-  const strong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$/;
-  if (!strong.test(password))
-    return res.status(400).json({ message: 'הסיסמה חלשה מדי. נדרשים 8 תווים, אות גדולה, קטנה, מספר ותו מיוחד.' });
+
+  // הוסרה הבדיקה הידנית לסיסמה מורכבת (Regex).
+  // כעת ההגבלה היחידה היא אורך מינימלי של 8 תווים (אם מוגדר בוולידטור).
+
   const hash = await bcrypt.hash(password, 12);
   const finalRole = role === 'admin' ? 'admin' : 'user';
+  
   const user = await User.create({ name, email, passwordHash: hash, role: finalRole });
   const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role };
+  
   createAndSendTokens(user, res);
   return res.status(201).json({ message: "ההרשמה הושלמה בהצלחה", user: userPayload });
 };
 
 export const loginUser = async (req, res) => {
   const { email, password } = req.body;
+  
   if (!email || !password)
     return res.status(400).json({ message: 'חסר אימייל או סיסמה' });
+  
   const user = await User.findOne({ email });
   if (!user)
     return res.status(401).json({ message: 'משתמש לא קיים' });
+  
   if (user.isLocked)
     return res.status(423).json({ message: 'החשבון נעול זמנית' });
+  
   if (!(await bcrypt.compare(password, user.passwordHash))) {
-    await user.incrementLoginAttempts();
+    // מניח שפונקציות אלו קיימות במודל המשתמש שלך
+    if (typeof user.incrementLoginAttempts === 'function') {
+        await user.incrementLoginAttempts();
+    }
     return res.status(401).json({ message: 'סיסמה שגויה' });
   }
-  await user.resetLoginAttempts();
+  
+  if (typeof user.resetLoginAttempts === 'function') {
+      await user.resetLoginAttempts();
+  }
+  
   const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role };
   createAndSendTokens(user, res);
   return res.status(200).json({ message: "התחברת בהצלחה", user: userPayload });
@@ -51,12 +67,15 @@ export const refresh = async (req, res) => {
   if (!refreshToken) {
     return res.status(401).json({ message: 'No refresh token provided.' });
   }
+  
   try {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.id);
+    
     if (!user || user.tokenVersion !== decoded.v) {
       return res.status(403).json({ message: 'Forbidden. Please log in again.' });
     }
+    
     createAndSendTokens(user, res);
     const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role };
     return res.status(200).json({ message: "Tokens refreshed successfully", user: userPayload });
