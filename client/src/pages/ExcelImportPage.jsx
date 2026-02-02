@@ -3,7 +3,7 @@ import api from '@/utils/api';
 import * as XLSX from 'xlsx';
 
 // --- ייבוא רכיבי UI מהספרייה שלך ---
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

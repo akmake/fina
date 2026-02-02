@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useFinanceStore } from '@/stores/financeStore';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/Button";
+import { Button } from '@/components/ui/Button';
 import { Input } from "@/components/ui/Input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
