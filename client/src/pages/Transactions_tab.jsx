@@ -9,7 +9,7 @@ import {
     Plus, Upload, Check, AlertCircle, Loader2, 
     ArrowUpRight, ArrowDownLeft, Wallet, CreditCard,
     Calendar, Search, Filter, Briefcase, ShoppingBag, 
-    Coffee, Home, Car, Zap, MoreHorizontal
+    Coffee, Home, Car, Zap, MoreHorizontal, Trash2
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
@@ -44,10 +44,17 @@ const CategoryIcon = ({ category }) => {
 };
 
 // --- כרטיס עסקה בסגנון Apple Wallet ---
-const TransactionCard = ({ transaction, onClick }) => {
+const TransactionCard = ({ transaction, onClick, onDelete }) => {
     const isExpense = transaction.type === 'הוצאה';
     const amountClass = isExpense ? 'text-slate-900' : 'text-emerald-600';
     const sign = isExpense ? '' : '+';
+
+    const handleDelete = (e) => {
+        e.stopPropagation();
+        if (confirm('למחוק את העסקה?')) {
+            onDelete(transaction._id);
+        }
+    };
 
     return (
         <div 
@@ -67,10 +74,17 @@ const TransactionCard = ({ transaction, onClick }) => {
                 </div>
             </div>
 
-            <div className="flex flex-col items-end">
+            <div className="flex items-center gap-3">
                 <span className={`text-[16px] font-bold tracking-tight ${amountClass}`}>
                     {sign}{formatCurrency(transaction.amount)}
                 </span>
+                <button
+                    onClick={handleDelete}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full hover:bg-red-50 text-slate-300 hover:text-red-500"
+                    title="מחק עסקה"
+                >
+                    <Trash2 className="h-4 w-4" />
+                </button>
             </div>
         </div>
     );
@@ -127,6 +141,16 @@ export default function FinanceDashboardPage() {
             const res = await api.get('/categories');
             setCategories(res.data);
         } catch (err) { console.error(err); }
+    };
+
+    const deleteTransaction = async (id) => {
+        try {
+            await api.delete(`/transactions/${id}`);
+            setTransactions(prev => prev.filter(t => t._id !== id));
+        } catch (err) {
+            console.error(err);
+            alert('שגיאה במחיקת העסקה');
+        }
     };
 
     useEffect(() => {
@@ -296,7 +320,7 @@ export default function FinanceDashboardPage() {
                                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">{month}</h3>
                                     </div>
                                     <div className="space-y-2">
-                                        {trans.map(t => <TransactionCard key={t._id} transaction={t} onClick={() => handleTransactionClick(t.description)} />)}
+                                        {trans.map(t => <TransactionCard key={t._id} transaction={t} onClick={() => handleTransactionClick(t.description)} onDelete={deleteTransaction} />)}
                                     </div>
                                 </div>
                             ))

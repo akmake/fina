@@ -4,7 +4,7 @@ import {
   Menu, X, LogOut, LayoutDashboard, Landmark,
   TrendingUp, Home, Settings, UserCircle, PieChart,
   ChevronDown, Cpu, BarChart3, Receipt,
-  CreditCard, Target, Moon, Sun,
+  CreditCard, Target, Moon, Sun, Lightbulb,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -57,6 +57,7 @@ const NAV_GROUPS = [
     label: "ניהול",
     items: [
       { to: "/management", label: "אוטומציה", icon: Cpu, auth: true },
+      { to: "/suggestions", label: "הצעות שיפור", icon: Lightbulb, auth: true },
     ],
   },
 ];

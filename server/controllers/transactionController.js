@@ -26,6 +26,54 @@ export const getTransactions = async (req, res) => {
   }
 };
 
+// @desc   מחיקת עסקה והחזרת היתרה
+// @route  DELETE /api/transactions/:id
+export const deleteTransaction = async (req, res) => {
+  const { id } = req.params;
+  const supportsTransactions = process.env.DB_SUPPORTS_TRANSACTIONS === 'true';
+
+  try {
+    const transaction = await Transaction.findOne({ _id: id, user: req.user._id });
+    if (!transaction) {
+      return res.status(404).json({ message: 'העסקה לא נמצאה' });
+    }
+
+    // חישוב הפוך: אם הייתה הכנסה -> מורידים, אם הוצאה -> מוסיפים
+    const reverseAmount = transaction.type === 'הכנסה' ? -transaction.amount : transaction.amount;
+    const account = transaction.account || 'checking';
+
+    if (supportsTransactions) {
+      const session = await mongoose.startSession();
+      session.startTransaction();
+      try {
+        await Transaction.deleteOne({ _id: id }, { session });
+        await FinanceProfile.updateOne(
+          { user: req.user._id },
+          { $inc: { [account]: reverseAmount } },
+          { session }
+        );
+        await session.commitTransaction();
+        session.endSession();
+      } catch (err) {
+        await session.abortTransaction();
+        session.endSession();
+        throw err;
+      }
+    } else {
+      await Transaction.deleteOne({ _id: id });
+      await FinanceProfile.updateOne(
+        { user: req.user._id },
+        { $inc: { [account]: reverseAmount } }
+      );
+    }
+
+    res.json({ message: 'העסקה נמחקה בהצלחה' });
+  } catch (error) {
+    console.error('Delete transaction error:', error);
+    res.status(500).json({ message: 'שגיאה במחיקת העסקה' });
+  }
+};
+
 // @desc   הוספת עסקה חדשה ועדכון היתרה
 // @route  POST /api/transactions
 export const addTransaction = async (req, res) => {

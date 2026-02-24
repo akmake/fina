@@ -25,6 +25,7 @@ const api = axios.create({
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
+    'X-Fina-Client': 'web-app',
   },
 });
 

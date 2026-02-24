@@ -38,6 +38,7 @@ import SettingsPage from "@/pages/SettingsPage";
 
 /* Misc */
 import NotFoundPage    from "@/pages/NotFoundPage";
+import SuggestionsPage from "@/pages/SuggestionsPage";
 
 export default function App() {
   return (
@@ -79,8 +80,9 @@ export default function App() {
           <Route path="projects/:id"  element={<ProjectPage />}    />
 
           {/* Account */}
-          <Route path="profile"  element={<ProfilePage />}  />
-          <Route path="settings" element={<SettingsPage />} />
+          <Route path="profile"     element={<ProfilePage />}     />
+          <Route path="settings"    element={<SettingsPage />}    />
+          <Route path="suggestions" element={<SuggestionsPage />} />
         </Route>
 
         {/* ── 404 ────────────────────────────────────────────── */}
