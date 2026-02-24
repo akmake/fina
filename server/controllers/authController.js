@@ -57,8 +57,11 @@ export const loginUser = async (req, res) => {
 };
 
 export const logout = async (req, res) => {
-    res.clearCookie('jwt');
-    res.clearCookie('refreshToken');
+    const secure = process.env.NODE_ENV === 'production';
+    const sameSite = process.env.NODE_ENV === 'production' ? 'none' : 'lax';
+    
+    res.clearCookie('jwt', { httpOnly: true, sameSite, secure });
+    res.clearCookie('refreshToken', { httpOnly: true, sameSite, secure });
     return res.sendStatus(204);
 };
 

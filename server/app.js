@@ -4,7 +4,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import mongoSanitize from 'express-mongo-sanitize';
-import csurf from 'csurf';
 import mongoose from 'mongoose';
 
 // ייבוא נתיבים
@@ -29,6 +28,7 @@ import rateRoutes from './routes/rateRoutes.js';
 import rateLimiter from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
 import { requestLogger, errorHandler } from './middlewares/errorHandler.js';
+import { csrfTokenHandler, csrfProtection } from './middlewares/csrf.js';
 import logger from './utils/logger.js';
 
 // חיבור למסד הנתונים
@@ -81,25 +81,17 @@ app.use(cookieParser());
 app.use(mongoSanitize());
 app.use(requestLogger); // Request logging middleware
 
-// --- הגדרת CSRF ---
-const csrfProtection = csurf({
-  cookie: { 
-    httpOnly: true, 
-    secure: process.env.NODE_ENV === 'production', // ב-Production חייב להיות True
-    // קריטי: 'none' מאפשר עוגיות בין דומיינים שונים (Client ו-Server ב-Render הם שונים)
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' 
-  },
+// --- Health check (לבדיקת תקינות השרת) ---
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', env: process.env.NODE_ENV, timestamp: new Date().toISOString() });
 });
 
 // --- נתיבים ציבוריים (ללא CSRF) ---
-// הערה: נתיבי ייבוא לפעמים צריכים להיות פתוחים, תלוי איך הם נקראים
 app.use('/api/import', importRoutes); 
 app.use('/api/auth', authRoutes);
 
 // --- Endpoint לקבלת ה-CSRF Token ---
-app.get('/api/csrf-token', rateLimiter, csrfProtection, (req, res) => {
-  res.json({ csrfToken: req.csrfToken() });
-});
+app.get('/api/csrf-token', rateLimiter, csrfTokenHandler);
 
 // --- הפעלת הגנת CSRF על כל הנתיבים מכאן ומטה ---
 app.use(csrfProtection);
