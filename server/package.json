@@ -14,7 +14,7 @@
     "cheerio": "^1.1.2",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
-    "csurf": "^1.11.0",
+    "date-fns": "^2.30.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-mongo-sanitize": "^2.2.0",
@@ -26,7 +26,6 @@
     "mongoose": "^8.4.0",
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
-    "pasover-monorepo": "file:..",
     "sqlite3": "^5.1.7",
     "yahoo-finance2": "^2.13.3"
   },
