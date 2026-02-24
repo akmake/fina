@@ -13,12 +13,9 @@ export function injectAuthStore(store) {
   authStoreApi = store;
 }
 
-// --- הגדרת כתובות (התיקון לבעיית התקשורת) ---
-const DEV_URL = 'http://localhost:5000/api'; // כתובת לפיתוח מקומי
-const PROD_URL = 'https://english-t9tj.onrender.com/api'; // כתובת השרת ברנדר
-
-// בדיקה: אם אנחנו ב-Production (רנדר), נשתמש בכתובת השרת. אחרת ב-Localhost.
-const BASE_URL = import.meta.env.MODE === 'production' ? PROD_URL : DEV_URL;
+// --- הגדרת כתובות עם משתני סביבה (env variables) ---
+// VITE_API_URL צריך להיות מוגדר ב-.env או .env.production
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
 console.log('API Base URL:', BASE_URL); // לוג כדי שתוכל לראות בקונסול לאן הוא פונה
 

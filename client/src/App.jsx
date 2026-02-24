@@ -21,6 +21,7 @@ import ProjectPage        from "@/pages/ProjectPage";
 import NewProjectPage     from "@/pages/NewProjectPage";
 import TransactionsTab    from "@/pages/Transactions_tab";
 import FinanceDashboard   from "@/pages/FinanceDashboard";
+import SmartAnalyticsDashboard from "@/pages/SmartAnalyticsDashboard";
 import InvestmentsPage    from "@/pages/InvestmentsPage";
 import DepositsPage       from '@/pages/DepositsPage';
 import FundsPage          from '@/pages/FundsPage'; // ייבוא העמוד החדש
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="portfolio"          element={<TransactionsTab />}    />
           <Route path="investments"        element={<InvestmentsPage />}    />
           <Route path="finance-dashboard"  element={<FinanceDashboard />}   />
+          <Route path="smart-analytics"    element={<SmartAnalyticsDashboard />} />
           <Route path="/deposits"          element={<DepositsPage/>} />
           <Route path="/funds"             element={<FundsPage />} /> 
           <Route path="/my-loans"          element={<MyLoansPage />} />

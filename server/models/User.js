@@ -72,6 +72,12 @@ userSchema.methods.incrementLoginAttempts = async function () {
   await this.save();
 };
 
+// --- Indexes ---
+// email index is automatically created by "unique: true" in schema
+userSchema.index({ role: 1 }); // For filtering by role
+userSchema.index({ createdAt: -1 }); // For sorting by creation date
+userSchema.index({ lockUntil: 1 }, { sparse: true }); // Sparse index for locked accounts
+
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
 export default User;

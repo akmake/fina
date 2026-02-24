@@ -12,7 +12,7 @@ export const getManagementData = async (req, res) => {
     const [categories, merchantMaps, categoryRules] = await Promise.all([
       Category.find().sort({ name: 1 }),
       MerchantMap.find().populate('category', 'name').sort({ newName: 1 }),
-      CategoryRule.find().populate('category', 'name').sort({ keyword: 1 }),
+      CategoryRule.find().populate('category', 'name').sort({ searchString: 1 }),
     ]);
 
     res.json({ categories, merchantMaps, categoryRules });
@@ -51,9 +51,14 @@ export const deleteMerchantMap = async (req, res) => {
 // --- ניהול חוקי קטגוריה (Category Rules) ---
 
 export const createCategoryRule = async (req, res) => {
-  const { keyword, category } = req.body;
+  const { keyword, searchString, category } = req.body;
+  const finalSearchString = searchString || keyword;
   try {
-    const newRule = await CategoryRule.create({ keyword, category });
+    const newRule = await CategoryRule.create({
+      searchString: finalSearchString,
+      category,
+      user: req.user._id || req.user.id
+    });
     const populatedRule = await newRule.populate('category', 'name');
     res.status(201).json(populatedRule);
   } catch (error) {
@@ -124,7 +129,8 @@ export const applyRulesRetroactively = async (req, res) => {
       // שלב 2: אם המיפוי לא קבע קטגוריה, בדוק חוקים
       if (!categoryFound) {
         for (const rule of rules) {
-          if (newDescription.toLowerCase().includes(rule.keyword.toLowerCase())) {
+          const keyword = rule.searchString || rule.keyword || '';
+          if (keyword && newDescription.toLowerCase().includes(keyword.toLowerCase())) {
             if (rule.category) {
               newCategoryName = rule.category.name;
               break;

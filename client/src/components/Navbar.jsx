@@ -2,7 +2,7 @@ import { useState, Fragment } from "react";
 import { Link, NavLink } from "react-router-dom";
 import {
   Menu, X, LogOut, LayoutDashboard, Wrench, FileText, User, Landmark,
-  TrendingUp, Home, Settings, UserCircle,PieChart, Briefcase, ChevronDown, Cpu 
+  TrendingUp, Home, Settings, UserCircle,PieChart, Briefcase, ChevronDown, Cpu, BarChart3
 } from "lucide-react"; // הוספנו את Cpu לאייקונים
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -22,6 +22,7 @@ import {
 const navItems = [
     { to: '/', label: 'בית', icon: Home, type: 'link' },
     { to: '/finance-dashboard', label: 'דשבורד פיננסי', icon: LayoutDashboard, type: 'link', auth: true },
+    { to: '/smart-analytics', label: 'ניתוח חכם', icon: BarChart3, type: 'link', auth: true },
     { to: '/investments', label: 'ניהול השקעות', icon: TrendingUp, type: 'link', auth: true },
     { to: '/portfolio', label: 'דף עסקאות', icon: FileText, type: 'link', auth: true },
     { to: '/projects', label: 'פרויקטים', icon: Briefcase, type: 'link', auth: true },
@@ -29,7 +30,7 @@ const navItems = [
     // --- הקישור החדש למרכז האוטומציה (לכל משתמש רשום) ---
     { to: '/management', label: 'אוטומציה', icon: Cpu, type: 'link', auth: true },
     
-    //{ to: '/tzitzit', label: 'ציציות/טלית', icon: () => <span className="font-bold text-lg h-5 w-5 flex items-center justify-center">צ</span>, type: 'link', auth: true },
+    { to: '/tzitzit', label: 'ציציות/טלית', icon: () => <span className="font-bold text-lg h-5 w-5 flex items-center justify-center">צ</span>, type: 'link', auth: true },
     { to: '/deposits', label: 'פיקדונות', icon: Landmark, type: 'link', auth: true },
     { to: '/funds', label: 'קרנות', icon: PieChart, type: 'link', auth: true },
 

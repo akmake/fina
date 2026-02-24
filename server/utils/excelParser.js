@@ -124,7 +124,8 @@ export async function parseTransactions(cleanedData, fileType, userId) {
         // שלב 2: חוקים אוטומטיים (רק אם לא מצאנו קטגוריה טובה עדיין)
         if (!categoryFound) {
             for (const rule of categoryRules) {
-                if (finalDescription.toLowerCase().includes(rule.keyword.toLowerCase())) {
+                const keyword = rule.searchString || rule.keyword || '';
+                if (keyword && finalDescription.toLowerCase().includes(keyword.toLowerCase())) {
                     if (rule.category) {
                         finalCategoryName = rule.category.name;
                         categoryFound = true;

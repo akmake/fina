@@ -26,3 +26,19 @@ yarn-error.log*
 *.sln
 *.sw?
 .DS_Store
+
+# Sensitive credentials
+credentials/
+server/credentials/
+*.key
+*.pem
+*.crt
+
+# Uploads & Media
+uploads/
+tmp/
+temp/
+
+# Testing
+coverage/
+.nyc_output/

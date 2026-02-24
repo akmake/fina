@@ -21,7 +21,7 @@ function findTableData(data, keyHeaders) {
   return { headers, dataRows };
 }
 
-export function cleanMaxFile(data) {
+const cleanMaxFile = (data) => {
   // מחפש את הכותרות המדויקות שמופיעות בקובץ ששלחת
   const { headers, dataRows } = findTableData(data, ['תאריך עסקה', 'שם בית העסק', 'סכום חיוב']);
 
@@ -38,9 +38,9 @@ export function cleanMaxFile(data) {
     });
     return rowObject;
   });
-}
+};
 
-export function cleanCalFile(data) {
+const cleanCalFile = (data) => {
     const headerRowIndex = data.findIndex(row =>
         Array.isArray(row) &&
         row.some(cell => typeof cell === 'string' && cell.includes('תאריך')) &&
@@ -67,4 +67,6 @@ export function cleanCalFile(data) {
             "סכום חיוב": rowArray[2]
         };
     });
-}
+};
+
+export { cleanCalFile, cleanMaxFile };

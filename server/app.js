@@ -10,6 +10,7 @@ import mongoose from 'mongoose';
 // ייבוא נתיבים
 import authRoutes from './routes/auth.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
 import fundRoutes from './routes/fundRoutes.js';
 import tzitzitRoutes from './routes/tzitzitCreate.js';
 import projectRoutes from './routes/projectRoutes.js';
@@ -27,14 +28,16 @@ import rateRoutes from './routes/rateRoutes.js';
 // ייבוא מידלוור
 import rateLimiter from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
+import { requestLogger, errorHandler } from './middlewares/errorHandler.js';
+import logger from './utils/logger.js';
 
 // חיבור למסד הנתונים
 const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGO_URI);
-    console.log(`✔ MongoDB Connected: ${conn.connection.host}`);
+    logger.info(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
-    console.error(`❌ MongoDB Connection Error: ${error.message}`);
+    logger.error(`MongoDB Connection Error: ${error.message}`);
     process.exit(1);
   }
 };
@@ -50,10 +53,11 @@ app.use(helmet({
 
 // --- הגדרות CORS (החלק הקריטי לתקשורת ברנדר) ---
 const allowedOrigins = [
-  'http://localhost:5173',                  // לפיתוח מקומי
-  'https://english-1-hwkw.onrender.com',    // הכתובת של הקליינט ברנדר
-  process.env.CLIENT_URL                    // משתנה סביבה לגיבוי
-];
+  'http://localhost:5173',                    // לפיתוח מקומי
+  'http://localhost:3000',                    // לפיתוח חלופי
+  process.env.CLIENT_URL,                     // כתובת לקוח מ-.env
+  process.env.DEPLOYMENT_URL,                 // כתובת development/staging
+].filter(Boolean); // הסר null/undefined values
 
 app.use(cors({ 
   origin: function (origin, callback) {
@@ -75,6 +79,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 app.use(cookieParser());
 app.use(mongoSanitize());
+app.use(requestLogger); // Request logging middleware
 
 // --- הגדרת CSRF ---
 const csrfProtection = csurf({
@@ -101,6 +106,7 @@ app.use(csrfProtection);
 
 // --- נתיבים מוגנים (דורשים התחברות) ---
 app.use('/api/dashboard', requireAuth, dashboardRoutes);
+app.use('/api/analytics', requireAuth, analyticsRoutes);
 app.use('/api/tzitzit', requireAuth, tzitzitRoutes);
 app.use('/api/projects', requireAuth, projectRoutes);
 app.use("/api/data", requireAuth, dataRoutes);
@@ -118,21 +124,14 @@ app.use('/api/rates', requireAuth, rateRoutes);
 
 // 404 - לא נמצא
 app.use('*', (req, res) => {
+  logger.warn('404 Not Found', { method: req.method, path: req.path });
   res.status(404).json({ message: 'API endpoint not found' });
 });
 
 // טיפול שגיאות גלובלי
-app.use((err, req, res, next) => {
-  // טיפול ספציפי לשגיאת CSRF
-  if (err.code === 'EBADCSRFTOKEN') {
-    return res.status(403).json({ message: 'Form has been tampered with (CSRF Invalid)' });
-  }
-  
-  console.error(err);
-  res.status(500).json({ message: 'Internal Server Error' });
-});
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
 
 export default app;

@@ -104,8 +104,9 @@ export const processTransactions = async (req, res, next) => {
             const result = await Transaction.insertMany(processedTransactions, { ordered: false });
             insertedCount = result.length;
         } catch (error) {
-            if (error.code === 11000 && error.result && Array.isArray(error.result.insertedDocs)) {
-                insertedCount = error.result.insertedDocs.length;
+            if (error.code === 11000) {
+                // Handle duplicate key errors gracefully when ordered: false
+                insertedCount = error.insertedDocs?.length || error.result?.insertedCount || error.result?.nInserted || 0;
             } else {
                 throw error;
             }

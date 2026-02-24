@@ -57,4 +57,10 @@ const transactionSchema = new mongoose.Schema({
 // אינדקס למניעת כפילויות זהות לחלוטין
 transactionSchema.index({ user: 1, date: 1, description: 1, amount: 1, type: 1 }, { unique: true });
 
+// Additional indexes for common queries
+transactionSchema.index({ user: 1, date: -1 }); // For user transactions sorted by date
+transactionSchema.index({ user: 1, category: 1 }); // For filtering by category
+transactionSchema.index({ user: 1, type: 1 }); // For filtering by transaction type
+transactionSchema.index({ date: -1 }); // For sorting all transactions by date
+
 export default mongoose.model('Transaction', transactionSchema);

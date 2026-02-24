@@ -146,32 +146,39 @@ export const deleteRule = async (req, res, next) => {
 
 export const applyRulesToTransactions = async (req, res, next) => {
   try {
-    const rules = await CategoryRule.find({ user: req.user._id });
+    const rules = await CategoryRule.find({ user: req.user._id }).populate('category');
     let total = 0;
     for (const rule of rules) {
-      const regex = new RegExp(rule.matchType === 'starts_with' ? `^${rule.searchString}` : rule.searchString, 'i');
+      // בניית regex בטוח - escape תווים מיוחדים
+      const escaped = rule.searchString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(rule.matchType === 'starts_with' ? `^${escaped}` : escaped, 'i');
       
       const filter = { 
         user: req.user._id,
         $or: [
-          { originalDescription: { $regex: regex } },
-          { originalDescription: { $exists: false }, description: { $regex: regex } }
+          { rawDescription: { $regex: regex } },
+          { rawDescription: { $in: [null, ''] }, description: { $regex: regex } }
         ]
       };
 
       if (rule.matchType === 'exact') {
          filter.$or = [
-            { originalDescription: rule.searchString },
-            { originalDescription: { $exists: false }, description: rule.searchString }
+            { rawDescription: rule.searchString },
+            { rawDescription: { $in: [null, ''] }, description: rule.searchString }
         ];
       }
 
-      const update = { category: rule.category };
+      // category הוא שדה String במודל Transaction - צריך את שם הקטגוריה
+      const categoryName = rule.category?.name || 'כללי';
+      const update = { category: categoryName };
       if (rule.newName) update.description = rule.newName;
       
-      const res = await Transaction.updateMany(filter, update);
-      total += res.modifiedCount;
+      const result = await Transaction.updateMany(filter, update);
+      total += result.modifiedCount;
     }
     res.json({ message: `עודכנו ${total} עסקאות.` });
-  } catch (error) { next(new AppError('שגיאה בהחלת חוקים', 500)); }
+  } catch (error) {
+    console.error('Error applying rules:', error);
+    next(new AppError('שגיאה בהחלת חוקים', 500));
+  }
 };
