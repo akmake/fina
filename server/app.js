@@ -11,7 +11,7 @@ import authRoutes from './routes/auth.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import fundRoutes from './routes/fundRoutes.js';
-import tzitzitRoutes from './routes/tzitzitCreate.js';
+
 import projectRoutes from './routes/projectRoutes.js';
 import dataRoutes from "./routes/dataRoutes.js";
 import financeRoutes from './routes/financeRoutes.js';
@@ -99,7 +99,6 @@ app.use(csrfProtection);
 // --- נתיבים מוגנים (דורשים התחברות) ---
 app.use('/api/dashboard', requireAuth, dashboardRoutes);
 app.use('/api/analytics', requireAuth, analyticsRoutes);
-app.use('/api/tzitzit', requireAuth, tzitzitRoutes);
 app.use('/api/projects', requireAuth, projectRoutes);
 app.use("/api/data", requireAuth, dataRoutes);
 app.use(["/api/finance", "/api/finances"], requireAuth, financeRoutes);

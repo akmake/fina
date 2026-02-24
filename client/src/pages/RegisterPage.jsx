@@ -59,7 +59,7 @@ export default function RegisterPage() {
         },
         { withCredentials: true }
       );
-      navigate("/tzitzit");
+      navigate("/finance-dashboard");
     } catch (err) {
       setError(err.response?.data?.message || "אירעה שגיאה בהרשמה");
     } finally {

@@ -37,7 +37,6 @@ import ProfilePage  from "@/pages/ProfilePage";
 import SettingsPage from "@/pages/SettingsPage";
 
 /* Misc */
-import TzitzitFormPage from "@/pages/TzitzitFormPage";
 import NotFoundPage    from "@/pages/NotFoundPage";
 
 export default function App() {
@@ -82,9 +81,6 @@ export default function App() {
           {/* Account */}
           <Route path="profile"  element={<ProfilePage />}  />
           <Route path="settings" element={<SettingsPage />} />
-
-          {/* Misc */}
-          <Route path="tzitzit" element={<TzitzitFormPage />} />
         </Route>
 
         {/* ── 404 ────────────────────────────────────────────── */}

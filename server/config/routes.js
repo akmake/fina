@@ -1,5 +1,4 @@
 import authRoutes         from '../routes/auth.js';
-import tzitzitRoutes      from '../routes/tzitzitRoutes.js';
 
 /* חדש */
 import projectRoutes      from '../routes/projectRoutes.js';
@@ -19,8 +18,6 @@ export const configureRoutes = (app) => {
   app.use(csrfProtection);
 
   /* ---------- מסלולים מוגנים ---------- */
-  app.use('/api/tzitzit',  requireAuth, tzitzitRoutes);
-
   /* ---------- מסלול מוגן חדש: פרויקטים כספיים ---------- */
   app.use('/api/projects', requireAuth, projectRoutes);
 };

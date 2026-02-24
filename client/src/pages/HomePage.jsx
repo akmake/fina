@@ -24,9 +24,9 @@ export default function HomePage() {
         transition={{ delay: 0.2, duration: 0.6 }}
         className="text-base sm:text-lg md:text-xl text-gray-600 max-w-2xl mb-10"
       >
-        ניהול הוצאות והכנסות בקלות כולל עבודות קבלן מתועדות
+        ניהול הוצאות והכנסות בקלות עם כלים חכמים לתכנון פיננסי
         <br />
-        לחצו על הכפתור ותעברו לטופס ההזמנה תוך שניות.
+        לחצו על הכפתור והתחילו לנהל את הכספים שלכם.
       </motion.p>
 
       <motion.div
@@ -35,7 +35,7 @@ export default function HomePage() {
         transition={{ delay: 0.4, duration: 0.5 }}
       >
         <Button asChild size="lg">
-          <Link to="/tzitzit">התחל הזמנה</Link>
+          <Link to="/finance-dashboard">התחל עכשיו</Link>
         </Button>
       </motion.div>
     </main>
