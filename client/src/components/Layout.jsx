@@ -1,25 +1,42 @@
-// client/src/components/Layout.jsx
+import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
-import Navbar from './Navbar'; // הייבוא של סרגל הניווט שלך
-import { Toaster } from "@/components/ui/toaster";
+import Navbar from './Navbar';
+import { Toaster } from 'react-hot-toast';
+import { useUIStore } from '@/stores/uiStore';
 
 export default function Layout() {
-  return (
-    <div className="flex h-screen bg-slate-50 text-slate-800">
-      {/* Sidebar Navigation */}
-      <aside className="w-64 flex-shrink-0 border-l border-slate-200">
-        {/* הנחה שקובץ ה-Navbar שלך מכיל את סרגל הניווט הצדדי שבתמונה */}
-        <Navbar />
-      </aside>
+  const { isDark } = useUIStore();
 
-      {/* Main Content Area */}
+  // Keep the <html> class in sync whenever the store value changes
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
+
+  return (
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100">
+      {/* Sidebar placeholder — keeps the flex flow intact while the navbar is fixed */}
+      <aside className="hidden md:block w-64 flex-shrink-0" aria-hidden="true" />
+
+      {/* Fixed sidebar rendered by Navbar */}
+      <Navbar />
+
+      {/* Main content */}
       <main className="flex-1 overflow-y-auto">
-        {/* ה-Outlet הוא המקום שאליו כל שאר העמודים שלך ייכנסו */}
         <Outlet />
       </main>
 
-      {/* Toaster להודעות קופצות */}
-      <Toaster />
+      {/* Single toast provider for the whole app */}
+      <Toaster
+        position="bottom-center"
+        toastOptions={{
+          className: 'font-sans text-sm',
+          duration: 4000,
+        }}
+      />
     </div>
   );
 }

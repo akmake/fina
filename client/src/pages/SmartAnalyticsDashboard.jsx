@@ -1,147 +1,150 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  ComposedChart,
-  Area,
-  AreaChart,
+  BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, ComposedChart, Area, Line,
 } from 'recharts';
-import { AlertCircle, TrendingUp, TrendingDown, Lightbulb, Zap } from 'lucide-react';
+import {
+  AlertCircle, TrendingDown, Lightbulb,
+  Loader2, Zap, CalendarRange,
+} from 'lucide-react';
+import toast from 'react-hot-toast';
+
 import api from '@/utils/api';
+import { formatCurrency } from '@/utils/formatters';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/Button';
-import { toast } from 'sonner';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
-export default function SmartAnalyticsDashboard() {
-  const [dateRange, setDateRange] = useState('3months');
-  const [autoCategorizingCount, setAutoCategorizingCount] = useState(0);
+// ---------------------------------------------------------------------------
+// Date-range buttons
+// ---------------------------------------------------------------------------
+const RANGES = [
+  { value: 'month',   label: 'חודש'     },
+  { value: '3months', label: '3 חודשים' },
+  { value: 'year',    label: 'שנה'      },
+];
 
-  // Fetch analytics
+function RangeSelector({ value, onChange }) {
+  return (
+    <div className="flex gap-2">
+      {RANGES.map((r) => (
+        <Button
+          key={r.value}
+          size="sm"
+          variant={value === r.value ? 'default' : 'outline'}
+          onClick={() => onChange(r.value)}
+        >
+          {r.label}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+export default function SmartAnalyticsDashboard() {
+  const [dateRange, setDateRange]               = useState('3months');
+  const [autoCategorizingCount, setAutoCount]   = useState(0);
+
+  // --- Analytics ---
   const { data: analyticsData, isLoading: analyticsLoading, refetch: refetchAnalytics } = useQuery({
     queryKey: ['analytics', dateRange],
     queryFn: async () => {
-      const endDate = new Date();
+      const endDate   = new Date();
       const startDate = new Date();
+      if (dateRange === 'month')   startDate.setMonth(startDate.getMonth() - 1);
+      if (dateRange === '3months') startDate.setMonth(startDate.getMonth() - 3);
+      if (dateRange === 'year')    startDate.setFullYear(startDate.getFullYear() - 1);
 
-      if (dateRange === 'month') startDate.setMonth(startDate.getMonth() - 1);
-      else if (dateRange === '3months') startDate.setMonth(startDate.getMonth() - 3);
-      else if (dateRange === 'year') startDate.setFullYear(startDate.getFullYear() - 1);
-
-      const response = await api.get('/analytics/smart-analytics', {
-        params: {
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
-        },
+      const res = await api.get('/analytics/smart-analytics', {
+        params: { startDate: startDate.toISOString(), endDate: endDate.toISOString() },
       });
-      return response.data.data;
+      return res.data.data;
     },
   });
 
-  // Fetch recommendations
+  // --- Recommendations ---
   const { data: recommendationsData, isLoading: recommendationsLoading } = useQuery({
     queryKey: ['recommendations'],
     queryFn: async () => {
-      const response = await api.get('/analytics/recommendations');
-      return response.data.data;
+      const res = await api.get('/analytics/recommendations');
+      return res.data.data;
     },
   });
 
-  // Fetch predictions
-  const { data: predictionsData, isLoading: predictionsLoading } = useQuery({
-    queryKey: ['predictions'],
-    queryFn: async () => {
-      const response = await api.get('/analytics/predictions', {
-        params: { months: 3 },
-      });
-      return response.data.data;
-    },
-  });
-
-  // Auto-categorize transactions
+  // --- Auto-categorize ---
   const handleAutoCategories = useCallback(async () => {
     try {
-      setAutoCategorizingCount(1);
-      const response = await api.post('/analytics/auto-categorize', {}, {
-        params: { limit: 100 },
-      });
-
-      toast.success(`✅ ${response.data.data.categorized.length} עסקאות סווגו אוטומטית`, {
-        description: `${response.data.data.skipped.length} עסקאות דרשו סקירה ידנית`,
-      });
-
-      setAutoCategorizingCount(0);
+      setAutoCount(1);
+      const res = await api.post('/analytics/auto-categorize', {}, { params: { limit: 100 } });
+      const { categorized = [], skipped = [] } = res.data.data || {};
+      toast.success(`${categorized.length} עסקאות סווגו אוטומטית (${skipped.length} דרשו סקירה ידנית)`);
+      setAutoCount(0);
       refetchAnalytics();
-    } catch (error) {
+    } catch {
       toast.error('שגיאה בסיווג אוטומטי');
-      setAutoCategorizingCount(0);
+      setAutoCount(0);
     }
   }, [refetchAnalytics]);
 
-  if (analyticsLoading || recommendationsLoading || predictionsLoading) {
+  if (analyticsLoading || recommendationsLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <Zap className="w-12 h-12 animate-spin mx-auto mb-2 text-blue-500" />
-          <p>טוען דוחות חכמים...</p>
-        </div>
+      <div className="flex flex-col items-center justify-center h-screen gap-4">
+        <Loader2 className="w-12 h-12 animate-spin text-blue-500" />
+        <p className="text-gray-500 dark:text-slate-400">טוען דוחות חכמים...</p>
       </div>
     );
   }
 
-  const analytics = analyticsData || {};
+  const analytics       = analyticsData || {};
   const recommendations = recommendationsData?.recommendations || [];
-  const predictions = predictionsData?.predictions || {};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-6">
       <div className="max-w-7xl mx-auto">
+
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            🧠 דוחות חכמים
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            ניתוח מתקדם של תבנית ההוצאות שלך עם תחזוקות מבוססות AI
-          </p>
+        <div className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              דוחות חכמים
+            </h1>
+            <p className="text-gray-600 dark:text-gray-300 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-blue-500" />
+              ניתוח מתקדם של תבנית ההוצאות שלך עם תחזיות מבוססות AI
+            </p>
+          </div>
+          <RangeSelector value={dateRange} onChange={setDateRange} />
         </div>
 
-        {/* Summary Cards */}
+        {/* Summary cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Card className="hover:shadow-lg transition">
+          <Card className="hover:shadow-lg transition dark:bg-slate-900">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">הכנסה כוללת</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-green-600">
-                ₪{analytics.summary?.totalIncome?.toLocaleString()}
+                {formatCurrency(analytics.summary?.totalIncome)}
               </div>
               <p className="text-xs text-gray-500 mt-1">בתקופה הנבחרת</p>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition">
+          <Card className="hover:shadow-lg transition dark:bg-slate-900">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">הוצאות כוללות</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-red-600">
-                ₪{analytics.summary?.totalExpense?.toLocaleString()}
+                {formatCurrency(analytics.summary?.totalExpense)}
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 {analytics.summary?.expenseRatio}% מהכנסות
@@ -149,27 +152,25 @@ export default function SmartAnalyticsDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition">
+          <Card className="hover:shadow-lg transition dark:bg-slate-900">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">זרימת נטו</CardTitle>
+              <CardTitle className="text-sm font-medium">תזרים נטו</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`text-3xl font-bold ${
-                analytics.summary?.netFlow >= 0 ? 'text-green-600' : 'text-red-600'
-              }`}>
-                ₪{analytics.summary?.netFlow?.toLocaleString()}
+              <div className={`text-3xl font-bold ${(analytics.summary?.netFlow ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency(analytics.summary?.netFlow)}
               </div>
-              <p className="text-xs text-gray-500 mt-1">הכנסה - הוצאות</p>
+              <p className="text-xs text-gray-500 mt-1">הכנסה פחות הוצאות</p>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition">
+          <Card className="hover:shadow-lg transition dark:bg-slate-900">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">ממוצע עסקה</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-blue-600">
-                ₪{analytics.summary?.avgTransaction?.toLocaleString()}
+                {formatCurrency(analytics.summary?.avgTransaction)}
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 {analytics.summary?.transactionCount} עסקאות
@@ -178,67 +179,44 @@ export default function SmartAnalyticsDashboard() {
           </Card>
         </div>
 
-        {/* Main Charts */}
+        {/* Tabs */}
         <Tabs defaultValue="trends" className="mb-8">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="trends">מגמות</TabsTrigger>
             <TabsTrigger value="categories">קטגוריות</TabsTrigger>
-            <TabsTrigger value="predictions">תחזוקות</TabsTrigger>
+            <TabsTrigger value="predictions">תחזיות</TabsTrigger>
             <TabsTrigger value="patterns">דפוסים</TabsTrigger>
           </TabsList>
 
-          {/* Trends Tab */}
+          {/* Trends */}
           <TabsContent value="trends" className="mt-4">
-            <Card>
+            <Card className="dark:bg-slate-900">
               <CardHeader>
                 <CardTitle>מגמות הכנסה והוצאות</CardTitle>
-                <CardDescription>
-                  <div className="flex gap-4 mt-2">
-                    <button
-                      onClick={() => setDateRange('month')}
-                      className={`px-3 py-1 rounded text-sm ${dateRange === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-                    >
-                      חודש
-                    </button>
-                    <button
-                      onClick={() => setDateRange('3months')}
-                      className={`px-3 py-1 rounded text-sm ${dateRange === '3months' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-                    >
-                      3 חודשים
-                    </button>
-                    <button
-                      onClick={() => setDateRange('year')}
-                      className={`px-3 py-1 rounded text-sm ${dateRange === 'year' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-                    >
-                      שנה
-                    </button>
-                  </div>
-                </CardDescription>
+                <CardDescription>השוואה חודשית לפי תקופה נבחרת</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
                   <ComposedChart data={analytics.trends || []}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => `₪${value.toLocaleString()}`} />
+                    <YAxis tickFormatter={(v) => `₪${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip formatter={(value) => formatCurrency(value)} />
                     <Legend />
-                    <Bar dataKey="income" fill="#10b981" />
-                    <Bar dataKey="expense" fill="#ef4444" />
-                    <Line type="monotone" dataKey="net" stroke="#3b82f6" strokeWidth={2} />
+                    <Bar  dataKey="income"  fill="#10b981" name="הכנסות" />
+                    <Bar  dataKey="expense" fill="#ef4444" name="הוצאות" />
+                    <Line type="monotone" dataKey="net" stroke="#3b82f6" strokeWidth={2} name="נטו" />
                   </ComposedChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Categories Tab */}
+          {/* Categories */}
           <TabsContent value="categories" className="mt-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>קטגוריות (עוגה)</CardTitle>
-                </CardHeader>
+              <Card className="dark:bg-slate-900">
+                <CardHeader><CardTitle>פילוח לפי קטגוריה</CardTitle></CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
@@ -249,30 +227,28 @@ export default function SmartAnalyticsDashboard() {
                         cx="50%"
                         cy="50%"
                         outerRadius={100}
-                        label
+                        label={({ category, percent }) => `${category} ${(percent * 100).toFixed(0)}%`}
                       >
-                        {(analytics.topCategories || []).map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        {(analytics.topCategories || []).map((_, i) => (
+                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value) => `₪${value.toLocaleString()}`} />
+                      <Tooltip formatter={(v) => formatCurrency(v)} />
                     </PieChart>
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>קטגוריות גדולות</CardTitle>
-                </CardHeader>
+              <Card className="dark:bg-slate-900">
+                <CardHeader><CardTitle>קטגוריות מובילות</CardTitle></CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={analytics.topCategories?.slice(0, 8) || []}>
+                    <BarChart data={analytics.topCategories?.slice(0, 8) || []} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="category" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => `₪${value.toLocaleString()}`} />
-                      <Bar dataKey="total" fill="#3b82f6" />
+                      <XAxis type="number" tickFormatter={(v) => `₪${(v / 1000).toFixed(0)}k`} />
+                      <YAxis type="category" dataKey="category" width={80} tick={{ fontSize: 12 }} />
+                      <Tooltip formatter={(v) => formatCurrency(v)} />
+                      <Bar dataKey="total" fill="#3b82f6" name="סכום" />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -280,61 +256,67 @@ export default function SmartAnalyticsDashboard() {
             </div>
           </TabsContent>
 
-          {/* Predictions Tab */}
+          {/* Predictions */}
           <TabsContent value="predictions" className="mt-4">
-            <Card>
+            <Card className="dark:bg-slate-900">
               <CardHeader>
-                <CardTitle>תחזוקות הוצאות</CardTitle>
-                <CardDescription>תחזוקה של 3 חודשים לפי קטגוריה</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarRange className="h-5 w-5 text-blue-500" />
+                  תחזיות הוצאות
+                </CardTitle>
+                <CardDescription>מגמת הוצאות והכנסות כבסיס לתחזית קדימה</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
-                  <ComposedChart data={analyticsData?.trends || []}>
+                  <ComposedChart data={analytics.trends || []}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => `₪${value.toLocaleString()}`} />
+                    <YAxis tickFormatter={(v) => `₪${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip formatter={(v) => formatCurrency(v)} />
                     <Legend />
-                    <Area type="monotone" dataKey="expense" fill="#fee2e2" stroke="#ef4444" />
-                    <Line type="monotone" dataKey="net" stroke="#3b82f6" strokeWidth={2} />
+                    <Area type="monotone" dataKey="expense" fill="#fee2e2" stroke="#ef4444" name="הוצאות" />
+                    <Line type="monotone" dataKey="net"     stroke="#3b82f6" strokeWidth={2} name="נטו" />
                   </ComposedChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Patterns Tab */}
+          {/* Patterns */}
           <TabsContent value="patterns" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>דפוסים וחריגויות</CardTitle>
-              </CardHeader>
+            <Card className="dark:bg-slate-900">
+              <CardHeader><CardTitle>דפוסים וחריגויות</CardTitle></CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {analytics.patterns?.map((pattern, idx) => (
-                    <div key={idx} className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  {(analytics.patterns || []).map((p, i) => (
+                    <div key={i} className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                       <h3 className="font-semibold text-blue-900 dark:text-blue-200">
-                        {pattern.type === 'day_of_week' && `📅 יום הפעיל ביותר: ${pattern.mostCommon}`}
+                        {p.type === 'day_of_week' ? `יום הפעיל ביותר: ${p.mostCommon}` : p.type}
                       </h3>
-                      <p className="text-sm text-gray-700 dark:text-gray-300">
-                        {pattern.frequency} עסקאות
-                      </p>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">{p.frequency} עסקאות</p>
                     </div>
                   ))}
 
-                  {analytics.anomalies?.length > 0 && (
+                  {(analytics.anomalies || []).length > 0 && (
                     <div>
-                      <h3 className="font-semibold mb-2 text-red-600 dark:text-red-400">🚨 חריגויות</h3>
-                      {analytics.anomalies.map((anomaly, idx) => (
-                        <div key={idx} className="p-3 bg-red-50 dark:bg-red-900/20 rounded mb-2">
+                      <h3 className="font-semibold mb-3 text-red-600 dark:text-red-400 flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        חריגויות שזוהו
+                      </h3>
+                      {analytics.anomalies.map((a, i) => (
+                        <div key={i} className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg mb-2">
                           <p className="text-sm">
-                            <span className="font-semibold">{anomaly.description}</span>
-                            {' - '}
-                            <span className="text-red-600 dark:text-red-400 font-bold">₪{anomaly.amount}</span>
+                            <span className="font-semibold">{a.description}</span>
+                            {' — '}
+                            <span className="text-red-600 dark:text-red-400 font-bold">{formatCurrency(a.amount)}</span>
                           </p>
                         </div>
                       ))}
                     </div>
+                  )}
+
+                  {!(analytics.patterns?.length) && !(analytics.anomalies?.length) && (
+                    <p className="text-center text-gray-400 dark:text-slate-500 py-8">אין מספיק נתונים לזיהוי דפוסים</p>
                   )}
                 </div>
               </CardContent>
@@ -342,9 +324,9 @@ export default function SmartAnalyticsDashboard() {
           </TabsContent>
         </Tabs>
 
-        {/* Recommendations Section */}
+        {/* Recommendations + Efficiency */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <Card className="lg:col-span-2">
+          <Card className="lg:col-span-2 dark:bg-slate-900">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Lightbulb className="w-5 h-5 text-yellow-500" />
@@ -352,34 +334,34 @@ export default function SmartAnalyticsDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {recommendations.slice(0, 5).map((rec, idx) => (
-                  <Alert key={idx} className={
-                    rec.priority === 'high'
-                      ? 'border-red-300 bg-red-50 dark:bg-red-900/20'
-                      : rec.priority === 'medium'
-                      ? 'border-yellow-300 bg-yellow-50 dark:bg-yellow-900/20'
-                      : 'border-blue-300 bg-blue-50 dark:bg-blue-900/20'
-                  }>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      <p className="font-semibold">{rec.suggestion}</p>
-                      {rec.type === 'high_frequency' && (
-                        <p className="text-xs mt-1">הופיע {rec.frequency} פעמים</p>
-                      )}
-                      {rec.type === 'savings_opportunity' && (
-                        <p className="text-xs mt-1">
-                          🎯 חיסכון פוטנציאלי: ₪{rec.potentialSavings}/שנה
-                        </p>
-                      )}
-                    </AlertDescription>
-                  </Alert>
-                ))}
-              </div>
+              {recommendations.length === 0 ? (
+                <p className="text-center text-gray-400 dark:text-slate-500 py-6">אין המלצות כרגע</p>
+              ) : (
+                <div className="space-y-3">
+                  {recommendations.slice(0, 5).map((rec, i) => (
+                    <Alert key={i} className={
+                      rec.priority === 'high'   ? 'border-red-300    bg-red-50    dark:bg-red-900/20'    :
+                      rec.priority === 'medium' ? 'border-yellow-300 bg-yellow-50 dark:bg-yellow-900/20' :
+                                                  'border-blue-300   bg-blue-50   dark:bg-blue-900/20'
+                    }>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        <p className="font-semibold">{rec.suggestion}</p>
+                        {rec.type === 'high_frequency' && (
+                          <p className="text-xs mt-1">הופיע {rec.frequency} פעמים</p>
+                        )}
+                        {rec.type === 'savings_opportunity' && (
+                          <p className="text-xs mt-1">חיסכון פוטנציאלי: {formatCurrency(rec.potentialSavings)}/שנה</p>
+                        )}
+                      </AlertDescription>
+                    </Alert>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="dark:bg-slate-900">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingDown className="w-5 h-5 text-green-500" />
@@ -388,55 +370,41 @@ export default function SmartAnalyticsDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                <div className="text-5xl font-bold text-green-600 mb-2">
-                  {Math.round(analytics.efficiency?.efficiency || 0)}%
+                <div className="text-6xl font-bold text-green-600 mb-1">
+                  {Math.round(analytics.efficiency?.efficiency || 0)}
+                  <span className="text-3xl">%</span>
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  {analytics.efficiency?.efficiency >= 70 ? '✅ מעולה!' : '⚠️ יש מקום לשיפור'}
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                  {(analytics.efficiency?.efficiency || 0) >= 70 ? '✅ מעולה!' : '⚠️ יש מקום לשיפור'}
                 </p>
-
-                <Button
-                  onClick={handleAutoCategories}
-                  disabled={autoCategorizingCount > 0}
-                  className="w-full"
-                >
-                  {autoCategorizingCount > 0 ? 'סיווג בתהליך...' : '⚡ סווג עסקאות אוטומטית'}
+                <Button onClick={handleAutoCategories} disabled={autoCategorizingCount > 0} className="w-full">
+                  <Zap className="me-2 h-4 w-4" />
+                  {autoCategorizingCount > 0 ? 'סיווג בתהליך...' : 'סווג עסקאות אוטומטית'}
                 </Button>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Efficiency Breakdown */}
-        <Card>
-          <CardHeader>
-            <CardTitle>פירוט יעילות הוצאות</CardTitle>
-          </CardHeader>
+        {/* Efficiency breakdown */}
+        <Card className="dark:bg-slate-900">
+          <CardHeader><CardTitle>פירוט יעילות הוצאות</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-gradient-to-br from-green-100 to-green-50 dark:from-green-900/20 dark:to-green-900/10 rounded-lg">
-                <p className="text-2xl font-bold text-green-600">
-                  ₪{analytics.summary?.totalIncome?.toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-700 dark:text-gray-300">הכנסה</p>
-              </div>
-
-              <div className="text-center p-4 bg-gradient-to-br from-red-100 to-red-50 dark:from-red-900/20 dark:to-red-900/10 rounded-lg">
-                <p className="text-2xl font-bold text-red-600">
-                  ₪{analytics.summary?.totalExpense?.toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-700 dark:text-gray-300">הוצאות</p>
-              </div>
-
-              <div className="text-center p-4 bg-gradient-to-br from-blue-100 to-blue-50 dark:from-blue-900/20 dark:to-blue-900/10 rounded-lg">
-                <p className="text-2xl font-bold text-blue-600">
-                  ₪{analytics.summary?.netFlow?.toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-700 dark:text-gray-300">זמין לחיסכון</p>
-              </div>
+              {[
+                { value: analytics.summary?.totalIncome,  label: 'הכנסה',          color: 'green' },
+                { value: analytics.summary?.totalExpense, label: 'הוצאות',         color: 'red'   },
+                { value: analytics.summary?.netFlow,      label: 'זמין לחיסכון',  color: 'blue'  },
+              ].map(({ value, label, color }) => (
+                <div key={label} className={`text-center p-4 bg-gradient-to-br from-${color}-100 to-${color}-50 dark:from-${color}-900/20 dark:to-${color}-900/10 rounded-lg`}>
+                  <p className={`text-2xl font-bold text-${color}-600`}>{formatCurrency(value)}</p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">{label}</p>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
+
       </div>
     </div>
   );
