@@ -188,7 +188,8 @@ function StocksManager() {
             <DialogTrigger asChild>
               <Button>
                 <PlusCircle className="h-4 w-4 me-2" />
-                הוסף מניה
+                <span className="hidden sm:inline">הוסף מניה</span>
+                <span className="sm:hidden">הוסף</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
@@ -231,7 +232,7 @@ function StocksManager() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {[
           { title: 'שווי תיק נוכחי',  value: formatCurrency(stats.totalValue),    icon: Briefcase,  sub: 'ערך כולל בשקלים'           },
           { title: 'סך הכל השקעה',    value: formatCurrency(stats.totalInvested), icon: DollarSign, sub: 'עלות בשקלים'                },
@@ -259,8 +260,8 @@ function StocksManager() {
           <CardTitle className="dark:text-slate-100">המניות שלי</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border dark:border-slate-700">
-            <Table>
+          <div className="rounded-md border dark:border-slate-700 overflow-x-auto -mx-4 sm:mx-0">
+            <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow className="bg-slate-50 dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800">
                   <TableHead>Ticker</TableHead>
@@ -375,7 +376,7 @@ function StocksManager() {
 // ---------------------------------------------------------------------------
 export default function InvestmentsPage() {
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8 bg-slate-50 dark:bg-slate-950 min-h-screen">
+    <div className="container mx-auto p-3 sm:p-4 md:p-6 lg:p-8 bg-slate-50 dark:bg-slate-950 min-h-screen">
       <StocksErrorBoundary>
         <StocksManager />
       </StocksErrorBoundary>

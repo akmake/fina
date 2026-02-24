@@ -18,12 +18,12 @@ const LoanSummaryCard = ({ loan }) => {
   // --- סוף השינוי ---
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow border flex flex-col justify-between">
+    <div className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow border dark:border-slate-800 flex flex-col justify-between">
       <div>
-        <h3 className="font-bold text-lg">{loan.name}</h3>
-        <p className="text-sm text-gray-600">סכום מקורי: {formatCurrency(loan.principal)}</p>
+        <h3 className="font-bold text-base sm:text-lg dark:text-slate-100">{loan.name}</h3>
+        <p className="text-xs sm:text-sm text-gray-600 dark:text-slate-400">סכום מקורי: {formatCurrency(loan.principal)}</p>
         {/* מציגים את היתרה העדכנית שחישבנו */}
-        <p className="text-sm text-gray-600">יתרה נוכחית לסילוק: <span className="font-semibold">{formatCurrency(currentBalance)}</span></p>
+        <p className="text-xs sm:text-sm text-gray-600 dark:text-slate-400">יתרה נוכחית לסילוק: <span className="font-semibold">{formatCurrency(currentBalance)}</span></p>
       </div>
       <div className="pt-2 mt-2">
         <Button asChild variant="outline" size="sm" className="w-full">

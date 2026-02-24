@@ -18,10 +18,10 @@ const AmortizationTable = ({ schedule }) => {
   const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('he-IL', { year: 'numeric', month: '2-digit' });
 
   return (
-    <div className="mt-8 bg-white rounded-lg shadow border overflow-hidden">
-      <h3 className="text-lg font-bold p-4 border-b">לוח סילוקין</h3>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm text-left">
+    <div className="mt-6 sm:mt-8 bg-white rounded-lg shadow border overflow-hidden">
+      <h3 className="text-base sm:text-lg font-bold p-3 sm:p-4 border-b">לוח סילוקין</h3>
+      <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
+        <table className="w-full text-xs sm:text-sm text-left min-w-[500px]">
           {/* ... thead ... */}
           <thead className="bg-gray-50 text-gray-600">
             <tr>

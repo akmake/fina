@@ -17,15 +17,15 @@ export default function Layout() {
   }, [isDark]);
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100">
+    <div className="flex flex-col md:flex-row h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100">
       {/* Sidebar placeholder — keeps the flex flow intact while the navbar is fixed */}
       <aside className="hidden md:block w-64 flex-shrink-0" aria-hidden="true" />
 
       {/* Fixed sidebar rendered by Navbar */}
       <Navbar />
 
-      {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
+      {/* Main content — pt-16 on mobile accounts for the sticky top bar */}
+      <main className="flex-1 overflow-y-auto pt-16 md:pt-0 overscroll-contain">
         <Outlet />
       </main>
 

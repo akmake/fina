@@ -78,14 +78,14 @@ function FinancePage() {
   if (error) return <p className="p-6 text-center text-red-600">שגיאה: {error}</p>;
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+    <div className="container mx-auto p-3 sm:p-4 md:p-6 lg:p-8 space-y-6 sm:space-y-8">
       <header>
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-900">ניהול פיננסי</h1>
-        <p className="mt-2 text-lg text-gray-600">סקירה וניהול של כל הנכסים שלך.</p>
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">ניהול פיננסי</h1>
+        <p className="mt-2 text-sm sm:text-lg text-gray-600">סקירה וניהול של כל הנכסים שלך.</p>
       </header>
 
       <section>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
           {Object.entries(ACCOUNTS).map(([key, { label, icon }]) => (
             <StatCard key={key} title={label} value={profile?.[key]} icon={icon} loading={loading} />
           ))}

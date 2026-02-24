@@ -78,7 +78,7 @@ const TransactionCard = ({ transaction, onClick }) => {
 
 // --- כרטיס KPI ---
 const KpiCard = ({ title, value, icon: Icon, trend }) => (
-    <div className="bg-white/60 backdrop-blur-xl p-6 rounded-[32px] border border-white/50 shadow-sm flex flex-col justify-between h-36 relative overflow-hidden group hover:bg-white/80 transition-all">
+    <div className="bg-white/60 backdrop-blur-xl p-4 sm:p-6 rounded-[24px] sm:rounded-[32px] border border-white/50 shadow-sm flex flex-col justify-between h-28 sm:h-36 relative overflow-hidden group hover:bg-white/80 transition-all">
         <div className="flex justify-between items-start z-10">
             <span className="text-sm font-semibold text-slate-500">{title}</span>
             <div className="p-2 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
@@ -86,7 +86,7 @@ const KpiCard = ({ title, value, icon: Icon, trend }) => (
             </div>
         </div>
         <div className="z-10">
-            <h3 className="text-3xl font-extrabold text-slate-900 tracking-tight">{formatCurrency(value)}</h3>
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{formatCurrency(value)}</h3>
             {trend && <p className="text-xs text-slate-400 mt-1 font-medium">{trend}</p>}
         </div>
     </div>
@@ -250,40 +250,40 @@ export default function FinanceDashboardPage() {
         <div className="min-h-screen bg-[#F2F4F8] font-sans text-slate-900 pb-20">
             
             {/* Top Navigation */}
-            <header className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-white/50 px-8 py-5 flex justify-between items-center shadow-sm">
+            <header className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-white/50 px-4 sm:px-8 py-4 sm:py-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-sm">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-slate-900">הארנק שלי</h1>
+                    <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">הארנק שלי</h1>
                 </div>
-                <div className="flex gap-3">
-                    <Button variant="outline" className="rounded-full h-10 px-6 bg-white/50 border-slate-200 text-slate-700 hover:bg-white hover:shadow-md transition-all" onClick={() => handleImportButtonClick('max')}>
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <Button variant="outline" className="rounded-full h-9 sm:h-10 px-4 sm:px-6 bg-white/50 border-slate-200 text-slate-700 hover:bg-white hover:shadow-md transition-all flex-1 sm:flex-none text-sm" onClick={() => handleImportButtonClick('max')}>
                         <Upload className="ml-2 h-4 w-4" /> Max
                     </Button>
-                    <Button variant="outline" className="rounded-full h-10 px-6 bg-white/50 border-slate-200 text-slate-700 hover:bg-white hover:shadow-md transition-all" onClick={() => handleImportButtonClick('cal')}>
+                    <Button variant="outline" className="rounded-full h-9 sm:h-10 px-4 sm:px-6 bg-white/50 border-slate-200 text-slate-700 hover:bg-white hover:shadow-md transition-all flex-1 sm:flex-none text-sm" onClick={() => handleImportButtonClick('cal')}>
                         <Upload className="ml-2 h-4 w-4" /> Cal
                     </Button>
                     <input type="file" ref={fileInputRef} onChange={handleFileSelected} accept=".xlsx, .xls, .csv" className="hidden" />
                 </div>
             </header>
 
-            <div className="max-w-6xl mx-auto px-6 py-10">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
                 
                 {/* KPI Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-8 mb-8 sm:mb-12">
                     <KpiCard title="יתרה חודשית" value={summary.income - summary.expense} icon={Wallet} trend="מאזן נוכחי" />
                     <KpiCard title="הכנסות" value={summary.income} icon={ArrowUpRight} trend="נכנס לחשבון" />
                     <KpiCard title="הוצאות" value={summary.expense} icon={ArrowDownLeft} trend="יצא מהחשבון" />
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12">
                     
                     {/* Main Feed */}
                     <main className="lg:col-span-8">
-                        <div className="flex items-center justify-between mb-8">
-                            <h2 className="text-xl font-bold text-slate-900">פעילות אחרונה</h2>
-                            <div className="flex gap-2 bg-white/60 p-1 rounded-full border border-white/50 shadow-sm">
-                                <Badge variant="secondary" className="bg-white hover:bg-slate-50 text-slate-900 shadow-sm cursor-pointer px-4 py-1.5 rounded-full font-medium">הכל</Badge>
-                                <Badge variant="ghost" className="text-slate-500 hover:bg-white/50 cursor-pointer px-4 py-1.5 rounded-full font-medium">הוצאות</Badge>
-                                <Badge variant="ghost" className="text-slate-500 hover:bg-white/50 cursor-pointer px-4 py-1.5 rounded-full font-medium">הכנסות</Badge>
+                        <div className="flex items-center justify-between mb-6 sm:mb-8">
+                            <h2 className="text-lg sm:text-xl font-bold text-slate-900">פעילות אחרונה</h2>
+                            <div className="flex gap-1 sm:gap-2 bg-white/60 p-1 rounded-full border border-white/50 shadow-sm">
+                                <Badge variant="secondary" className="bg-white hover:bg-slate-50 text-slate-900 shadow-sm cursor-pointer px-2 sm:px-4 py-1 sm:py-1.5 rounded-full font-medium text-xs sm:text-sm">הכל</Badge>
+                                <Badge variant="ghost" className="text-slate-500 hover:bg-white/50 cursor-pointer px-2 sm:px-4 py-1 sm:py-1.5 rounded-full font-medium text-xs sm:text-sm">הוצאות</Badge>
+                                <Badge variant="ghost" className="text-slate-500 hover:bg-white/50 cursor-pointer px-2 sm:px-4 py-1 sm:py-1.5 rounded-full font-medium text-xs sm:text-sm">הכנסות</Badge>
                             </div>
                         </div>
 
@@ -306,7 +306,7 @@ export default function FinanceDashboardPage() {
                     {/* Sidebar / Quick Actions */}
                     <aside className="lg:col-span-4 space-y-8">
                         {/* Add Transaction Widget */}
-                        <div className="bg-white/70 backdrop-blur-xl p-8 rounded-[40px] shadow-sm border border-white/60 sticky top-28">
+                        <div className="bg-white/70 backdrop-blur-xl p-5 sm:p-8 rounded-[28px] sm:rounded-[40px] shadow-sm border border-white/60 lg:sticky lg:top-28">
                             <div className="flex items-center gap-4 mb-8">
                                 <div className="h-12 w-12 bg-slate-900 rounded-2xl flex items-center justify-center shadow-xl shadow-slate-900/20">
                                     <Plus className="h-6 w-6 text-white" />
@@ -393,7 +393,7 @@ export default function FinanceDashboardPage() {
             </Dialog>
 
             <Dialog open={importState !== 'idle'} onOpenChange={resetImportProcess}>
-                <DialogContent className="max-w-2xl rounded-[40px] p-0 overflow-hidden border-none shadow-2xl">
+                <DialogContent className="max-w-[95vw] sm:max-w-2xl rounded-[28px] sm:rounded-[40px] p-0 overflow-hidden border-none shadow-2xl">
                     <div className="p-8 bg-slate-50 border-b border-slate-100 flex items-center gap-4">
                         <div className="h-12 w-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
                             {importState === 'processing' && <Loader2 className="animate-spin text-blue-500" />}

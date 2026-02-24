@@ -293,10 +293,10 @@ export default function DepositsPage() {
     };
 
     return (
-        <div className="container mx-auto p-4 md:p-6 lg:p-8 bg-muted/20 min-h-screen">
+        <div className="container mx-auto p-3 sm:p-4 md:p-6 lg:p-8 bg-muted/20 min-h-screen">
 
 
-            <main className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            <main className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 items-start">
                 
                 <div className="lg:col-span-2 space-y-6">
                     <h2 className="text-2xl font-bold text-foreground">הפיקדונות שלי</h2>
@@ -323,7 +323,7 @@ export default function DepositsPage() {
                     )}
                 </div>
 
-                <aside className="lg:col-span-1 space-y-6 sticky top-8">
+                <aside className="lg:col-span-1 space-y-6 lg:sticky lg:top-8">
                     {!loading && <SummaryStatsCard deposits={deposits} />}
 
                     <Card>

@@ -57,14 +57,14 @@ const LoanDetailPage = () => {
   const formatCurrency = (num) => (num || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <div className="max-w-6xl mx-auto p-4 space-y-6">
-      <Link to="/my-loans" className="text-blue-600 hover:underline">
+    <div className="max-w-6xl mx-auto p-3 sm:p-4 space-y-4 sm:space-y-6">
+      <Link to="/my-loans" className="text-blue-600 hover:underline text-sm sm:text-base">
         &larr; חזרה לכל ההלוואות
       </Link>
       
-      <div className="bg-white p-6 rounded-lg shadow border">
-        <h1 className="text-2xl font-bold">{loan.name}</h1>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-sm">
+      <div className="bg-white p-4 sm:p-6 rounded-lg shadow border">
+        <h1 className="text-xl sm:text-2xl font-bold">{loan.name}</h1>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mt-4 text-xs sm:text-sm">
           <div><span className="font-semibold text-gray-600">סכום מקורי:</span> {formatCurrency(loan.principal)} ₪</div>
           <div><span className="font-semibold text-gray-600">ריבית התחלתית:</span> {loan.interestRate.primeRateOnStart}%</div>
           <div><span className="font-semibold text-gray-600">תקופה:</span> {loan.termInMonths} חודשים</div>
@@ -73,9 +73,9 @@ const LoanDetailPage = () => {
       </div>
 
       {/* --- 👇 This is the new summary section 👇 --- */}
-      <div className="bg-white p-6 rounded-lg shadow border space-y-4">
-        <h2 className="text-xl font-bold">התקדמות ההלוואה (נכון להיום)</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="bg-white p-4 sm:p-6 rounded-lg shadow border space-y-4">
+        <h2 className="text-lg sm:text-xl font-bold">התקדמות ההלוואה (נכון להיום)</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
           <div><span className="font-semibold text-gray-600">יתרה נוכחית לסילוק:</span> {formatCurrency(progressData.currentBalance)} ₪</div>
           <div><span className="font-semibold text-gray-600">סה"כ שולם עד כה:</span> {formatCurrency(progressData.totalPaid)} ₪</div>
           <div><span className="font-semibold text-gray-600">התקדמות החזר הקרן:</span> {progressData.progressPercentage.toFixed(1)}%</div>

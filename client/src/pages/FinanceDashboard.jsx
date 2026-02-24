@@ -20,15 +20,15 @@ import { Button } from '@/components/ui/Button';
 // ---------------------------------------------------------------------------
 const StatCard = ({ title, value, change, changeType, icon: Icon, subText }) => (
   <Card className="overflow-hidden border-none shadow-md hover:shadow-lg transition-shadow duration-200 dark:bg-slate-900">
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gray-50/50 dark:bg-slate-800/50">
-      <CardTitle className="text-sm font-semibold text-gray-600 dark:text-slate-400">{title}</CardTitle>
-      {Icon && <Icon className="h-4 w-4 text-blue-500" />}
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gray-50/50 dark:bg-slate-800/50 p-3 sm:p-4">
+      <CardTitle className="text-xs sm:text-sm font-semibold text-gray-600 dark:text-slate-400">{title}</CardTitle>
+      {Icon && <Icon className="h-4 w-4 text-blue-500 flex-shrink-0" />}
     </CardHeader>
-    <CardContent className="pt-4">
-      <div className="text-2xl font-bold tracking-tight text-gray-900 dark:text-slate-100">
+    <CardContent className="pt-3 sm:pt-4 p-3 sm:p-4">
+      <div className="text-lg sm:text-2xl font-bold tracking-tight text-gray-900 dark:text-slate-100">
         {formatCurrency(value)}
       </div>
-      <div className="mt-2 flex items-center text-xs">
+      <div className="mt-1 sm:mt-2 flex items-center text-xs">
         {change !== undefined && (
           <span className={`flex items-center font-medium ${changeType === 'increase' ? 'text-green-600' : 'text-red-600'}`}>
             {changeType === 'increase'
@@ -110,15 +110,15 @@ export default function FinanceDashboard() {
   const netChange     = calcChange(thisMonthNet,     prevMonthNet);
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 font-sans">
+    <div className="p-3 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-8 font-sans">
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">לוח בקרה</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-slate-100">לוח בקרה</h1>
           <p className="text-gray-500 dark:text-slate-400 mt-1">סקירה כללית של המצב הפיננסי שלך</p>
         </div>
-        <Button asChild className="bg-blue-600 hover:bg-blue-700 self-start md:self-auto">
+        <Button asChild className="bg-blue-600 hover:bg-blue-700 self-start sm:self-auto">
           <Link to="/portfolio">
             <Plus className="me-2 h-4 w-4" />
             הוסף תנועה
@@ -127,7 +127,7 @@ export default function FinanceDashboard() {
       </div>
 
       {/* Stats grid */}
-      <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-3 sm:gap-6 grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="יתרה כוללת"
           value={totalBalance}
@@ -159,7 +159,7 @@ export default function FinanceDashboard() {
       </section>
 
       {/* Chart + side panel */}
-      <section className="grid gap-6 lg:grid-cols-3">
+      <section className="grid gap-4 sm:gap-6 lg:grid-cols-3">
 
         {/* Balance trend chart */}
         <Card className="lg:col-span-2 shadow-md border-none dark:bg-slate-900">
@@ -168,9 +168,9 @@ export default function FinanceDashboard() {
             <CardDescription>התפתחות העו״ש ב-30 הימים האחרונים</CardDescription>
           </CardHeader>
           <CardContent className="ps-0">
-            <div className="h-[350px] w-full">
+            <div className="h-[250px] sm:h-[350px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={balanceChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <AreaChart data={balanceChartData} margin={{ top: 10, right: 15, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%"  stopColor="#2563eb" stopOpacity={0.1} />
@@ -180,17 +180,18 @@ export default function FinanceDashboard() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 12, fill: '#6b7280' }}
+                    tick={{ fontSize: 10, fill: '#6b7280' }}
                     axisLine={false}
                     tickLine={false}
                     dy={10}
                   />
                   <YAxis
                     tickFormatter={(val) => `₪${(val / 1000).toFixed(0)}k`}
-                    tick={{ fontSize: 12, fill: '#6b7280' }}
+                    tick={{ fontSize: 10, fill: '#6b7280' }}
                     axisLine={false}
                     tickLine={false}
-                    dx={-10}
+                    dx={-5}
+                    width={45}
                   />
                   <Tooltip
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}

@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/Button';
 
 export default function HomePage() {
   return (
-    <main className="min-h-[calc(100vh-4rem)] flex flex-col justify-center items-center px-6 text-center">
+    <main className="min-h-[calc(100vh-4rem)] flex flex-col justify-center items-center px-4 sm:px-6 text-center">
       {/* ── Hero ── */}
       <motion.h1
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7 }}
-        className="text-4xl sm:text-5xl font-extrabold mb-6 leading-tight text-gray-800"
+        className="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-6 leading-tight text-gray-800"
       >
         ברוכים הבאים לאתר&nbsp;
         <span className="text-primary-600">ניהול פיננסי אישי מקיף</span>
@@ -22,7 +22,7 @@ export default function HomePage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2, duration: 0.6 }}
-        className="text-lg sm:text-xl text-gray-600 max-w-2xl mb-10"
+        className="text-base sm:text-lg md:text-xl text-gray-600 max-w-2xl mb-10"
       >
         ניהול הוצאות והכנסות בקלות כולל עבודות קבלן מתועדות
         <br />

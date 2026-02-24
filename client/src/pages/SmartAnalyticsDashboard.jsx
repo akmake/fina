@@ -107,13 +107,13 @@ export default function SmartAnalyticsDashboard() {
   const recommendations = recommendationsData?.recommendations || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
 
         {/* Header */}
-        <div className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div className="mb-6 sm:mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
               דוחות חכמים
             </h1>
             <p className="text-gray-600 dark:text-gray-300 flex items-center gap-2">
@@ -125,13 +125,13 @@ export default function SmartAnalyticsDashboard() {
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <Card className="hover:shadow-lg transition dark:bg-slate-900">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">הכנסה כוללת</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-green-600">
+              <div className="text-xl sm:text-3xl font-bold text-green-600">
                 {formatCurrency(analytics.summary?.totalIncome)}
               </div>
               <p className="text-xs text-gray-500 mt-1">בתקופה הנבחרת</p>
@@ -143,7 +143,7 @@ export default function SmartAnalyticsDashboard() {
               <CardTitle className="text-sm font-medium">הוצאות כוללות</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-red-600">
+              <div className="text-xl sm:text-3xl font-bold text-red-600">
                 {formatCurrency(analytics.summary?.totalExpense)}
               </div>
               <p className="text-xs text-gray-500 mt-1">
@@ -157,7 +157,7 @@ export default function SmartAnalyticsDashboard() {
               <CardTitle className="text-sm font-medium">תזרים נטו</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`text-3xl font-bold ${(analytics.summary?.netFlow ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <div className={`text-xl sm:text-3xl font-bold ${(analytics.summary?.netFlow ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {formatCurrency(analytics.summary?.netFlow)}
               </div>
               <p className="text-xs text-gray-500 mt-1">הכנסה פחות הוצאות</p>
@@ -169,7 +169,7 @@ export default function SmartAnalyticsDashboard() {
               <CardTitle className="text-sm font-medium">ממוצע עסקה</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-blue-600">
+              <div className="text-xl sm:text-3xl font-bold text-blue-600">
                 {formatCurrency(analytics.summary?.avgTransaction)}
               </div>
               <p className="text-xs text-gray-500 mt-1">
@@ -180,8 +180,8 @@ export default function SmartAnalyticsDashboard() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="trends" className="mb-8">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="trends" className="mb-6 sm:mb-8">
+          <TabsList className="grid w-full grid-cols-4 text-xs sm:text-sm">
             <TabsTrigger value="trends">מגמות</TabsTrigger>
             <TabsTrigger value="categories">קטגוריות</TabsTrigger>
             <TabsTrigger value="predictions">תחזיות</TabsTrigger>
@@ -196,11 +196,11 @@ export default function SmartAnalyticsDashboard() {
                 <CardDescription>השוואה חודשית לפי תקופה נבחרת</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
+                <ResponsiveContainer width="100%" height={300}>
                   <ComposedChart data={analytics.trends || []}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis tickFormatter={(v) => `₪${(v / 1000).toFixed(0)}k`} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                    <YAxis tickFormatter={(v) => `₪${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10 }} />
                     <Tooltip formatter={(value) => formatCurrency(value)} />
                     <Legend />
                     <Bar  dataKey="income"  fill="#10b981" name="הכנסות" />
@@ -267,11 +267,11 @@ export default function SmartAnalyticsDashboard() {
                 <CardDescription>מגמת הוצאות והכנסות כבסיס לתחזית קדימה</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
+                <ResponsiveContainer width="100%" height={300}>
                   <ComposedChart data={analytics.trends || []}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis tickFormatter={(v) => `₪${(v / 1000).toFixed(0)}k`} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                    <YAxis tickFormatter={(v) => `₪${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10 }} />
                     <Tooltip formatter={(v) => formatCurrency(v)} />
                     <Legend />
                     <Area type="monotone" dataKey="expense" fill="#fee2e2" stroke="#ef4444" name="הוצאות" />
@@ -325,7 +325,7 @@ export default function SmartAnalyticsDashboard() {
         </Tabs>
 
         {/* Recommendations + Efficiency */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Card className="lg:col-span-2 dark:bg-slate-900">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -390,7 +390,7 @@ export default function SmartAnalyticsDashboard() {
         <Card className="dark:bg-slate-900">
           <CardHeader><CardTitle>פירוט יעילות הוצאות</CardTitle></CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
                 { value: analytics.summary?.totalIncome,  label: 'הכנסה',          color: 'green' },
                 { value: analytics.summary?.totalExpense, label: 'הוצאות',         color: 'red'   },

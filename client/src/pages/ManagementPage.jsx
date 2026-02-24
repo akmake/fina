@@ -4,10 +4,10 @@ import { Bot, Sparkles } from 'lucide-react';
 
 export default function ManagementPage() {
   return (
-    <div className="p-4 md:p-8 space-y-8 bg-slate-50 dark:bg-slate-950 min-h-screen" dir="rtl">
+    <div className="p-3 sm:p-4 md:p-8 space-y-6 sm:space-y-8 bg-slate-50 dark:bg-slate-950 min-h-screen" dir="rtl">
       
       {/* כותרת הדף */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 sm:mb-8 bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-3 rounded-xl shadow-inner">
             <Bot className="h-8 w-8 text-white" aria-hidden="true" />

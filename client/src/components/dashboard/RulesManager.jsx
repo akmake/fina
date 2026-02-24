@@ -354,7 +354,7 @@ const RulesManager = ({ onRulesApplied }) => {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 p-4 sm:p-6">
                 {categories.map(cat => (
                   <div key={cat._id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm hover:shadow-md transition-all">
                     <div 

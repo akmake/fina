@@ -119,10 +119,10 @@ export default function FundsPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8 p-3 sm:p-4 md:p-6 lg:p-8">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-800">ניהול קרנות נאמנות</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">ניהול קרנות נאמנות</h1>
         <Button onClick={refreshPrices} disabled={loading} variant="outline">
           <RefreshCw className={`ml-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           {loading ? 'מעדכן...' : 'עדכן מחירים'}
@@ -133,7 +133,7 @@ export default function FundsPage() {
       <Card className="shadow-lg border-blue-500/20">
          <CardHeader><CardTitle className="flex items-center gap-2"><PlusCircle size={22} /> הוספת קרן חדשה</CardTitle></CardHeader>
          <CardContent>
-            <form ref={formRef} onSubmit={handleAddFund} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 items-end">
+            <form ref={formRef} onSubmit={handleAddFund} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end">
                 <div>
                     <label htmlFor="fund_number" className="text-sm font-medium">מספר קרן</label>
                     <Input name="fund_number" id="fund_number" placeholder="לדוגמה: 5113617" required />

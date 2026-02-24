@@ -41,7 +41,7 @@ function NewLoanPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white shadow-md rounded-lg">
+    <div className="max-w-2xl mx-auto p-3 sm:p-6 bg-white shadow-md rounded-lg">
       <h1 className="text-2xl font-bold mb-6 text-center">יצירת הלוואה חדשה</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* שדות שם, קרן, תקופה ותאריך נשארים זהים */}

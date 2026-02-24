@@ -99,7 +99,7 @@ export default function Navbar() {
       </div>
 
       {/* Mobile top bar */}
-      <div className="md:hidden flex items-center justify-between bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 h-16 px-4 sticky top-0 z-30">
+      <div className="md:hidden flex items-center justify-between bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 h-16 px-4 fixed top-0 left-0 right-0 z-30">
         <Link
           to="/"
           className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent"
@@ -128,7 +128,7 @@ export default function Navbar() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", stiffness: 320, damping: 32 }}
-              className="fixed inset-y-0 right-0 z-50 w-72 md:hidden"
+              className="fixed inset-y-0 right-0 z-50 w-[280px] max-w-[85vw] md:hidden"
             >
               <SidebarContent
                 groups={visibleGroups}

@@ -68,7 +68,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex w-full bg-white font-sans" dir="rtl">
+    <div className="min-h-[calc(100vh-4rem)] md:min-h-screen flex w-full bg-white font-sans" dir="rtl">
       
       {/* צד ימין: אזור הטופס */}
       <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-20 xl:px-24 bg-white z-10">
