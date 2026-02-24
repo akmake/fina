@@ -30,7 +30,6 @@ import rateLimiter from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
 import { requestLogger, errorHandler } from './middlewares/errorHandler.js';
 import { csrfTokenHandler, csrfProtection } from './middlewares/csrf.js';
-import { originGuard } from './middlewares/originGuard.js';
 import logger from './utils/logger.js';
 
 // חיבור למסד הנתונים
@@ -94,9 +93,6 @@ app.use('/api/auth', authRoutes);
 
 // --- Endpoint לקבלת ה-CSRF Token ---
 app.get('/api/csrf-token', rateLimiter, csrfTokenHandler);
-
-// --- הגנת Origin: חוסם בקשות שלא מגיעות מהאתר ---
-app.use(originGuard);
 
 // --- הפעלת הגנת CSRF על כל הנתיבים מכאן ומטה ---
 app.use(csrfProtection);

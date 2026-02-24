@@ -44,7 +44,11 @@ export function csrfProtection(req, res, next) {
   const headerToken = req.headers['x-csrf-token'] || req.headers['x-xsrf-token'];
 
   if (!cookieToken || !headerToken || cookieToken !== headerToken) {
-    return res.status(403).json({ message: 'Invalid or missing CSRF token.' });
+    console.warn('[CSRF] Blocked:', req.method, req.originalUrl,
+      '| cookie:', cookieToken ? 'present' : 'MISSING',
+      '| header:', headerToken ? 'present' : 'MISSING',
+      '| match:', cookieToken && headerToken ? cookieToken === headerToken : 'N/A');
+    return res.status(403).json({ message: 'Invalid or missing CSRF token.', _debug: { hasCookie: !!cookieToken, hasHeader: !!headerToken } });
   }
 
   next();

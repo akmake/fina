@@ -32,9 +32,8 @@ const api = axios.create({
 let csrfTokenPromise = null;
 
 // פונקציה להשגת טוקן CSRF (מונעת קריאות כפולות)
-const getCsrfToken = () => {
-  if (!csrfTokenPromise) {
-    // בגלל ש-baseURL מוגדר, זה יפנה לכתובת הנכונה (למשל: https://english-t9tj.../api/csrf-token)
+const getCsrfToken = (forceRefresh = false) => {
+  if (!csrfTokenPromise || forceRefresh) {
     csrfTokenPromise = api.get('/csrf-token')
       .then(response => {
         const csrfToken = response.data.csrfToken;
@@ -90,7 +89,21 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // אם קיבלנו 401 וזו לא בקשה שכבר ניסינו לחדש
+    // --- טיפול ב-CSRF 403: חידוש טוקן CSRF ושליחה מחדש ---
+    if (error.response?.status === 403 && !originalRequest._csrfRetry) {
+      const msg = error.response?.data?.message || '';
+      if (msg.includes('CSRF')) {
+        originalRequest._csrfRetry = true;
+        try {
+          await getCsrfToken(true); // force refresh
+          return api(originalRequest);
+        } catch (csrfErr) {
+          return Promise.reject(csrfErr);
+        }
+      }
+    }
+
+    // --- טיפול ב-401: חידוש access token ---
     if (error.response?.status === 401 && !originalRequest._retry) {
       
       // אם אנחנו כבר באמצע תהליך חידוש, הכנס לתור

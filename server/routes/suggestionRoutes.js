@@ -7,12 +7,11 @@ import {
   toggleVote,
   deleteSuggestion,
 } from '../controllers/suggestionController.js';
-import { requireAuth, requireAdmin } from '../middlewares/authMiddleware.js';
+import { requireAdmin } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
-// כל הנתיבים דורשים אימות
-router.use(requireAuth);
+// requireAuth כבר מופעל ב-app.js — אין צורך בכפילות
 
 // GET / POST הצעות
 router.route('/')

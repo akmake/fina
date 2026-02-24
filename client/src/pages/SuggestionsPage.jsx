@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog, DialogContent, DialogFooter,
-  DialogHeader, DialogTitle
+  DialogHeader, DialogTitle, DialogDescription
 } from '@/components/ui/dialog';
 import {
   Select, SelectContent, SelectItem,
@@ -203,6 +203,7 @@ export default function SuggestionsPage() {
         <DialogContent className="rounded-[32px] p-8 border-none shadow-2xl max-w-md">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-center">הצעה חדשה</DialogTitle>
+            <DialogDescription className="text-sm text-slate-400 text-center">שתפו את הרעיון שלכם</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
