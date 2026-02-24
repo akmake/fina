@@ -13,17 +13,24 @@ export const createAndSendTokens = (user, res) => {
   const secure = process.env.NODE_ENV === 'production';
   const sameSite = process.env.NODE_ENV === 'production' ? 'none' : 'lax';
 
+  // partitioned נדרש עבור Safari/iOS (CHIPS) כשעובדים cross-site
+  const partitioned = secure; // רק בפרודקשן
+
   res
     .cookie('jwt', accessToken, {
       httpOnly: true,
       sameSite,
       secure,
+      path: '/',
+      partitioned,
       maxAge: 15 * 60 * 1000,
     })
     .cookie('refreshToken', refreshToken, {
       httpOnly: true,
       sameSite,
       secure,
+      path: '/',
+      partitioned,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 };

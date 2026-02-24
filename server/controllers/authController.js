@@ -73,9 +73,11 @@ export const loginUser = async (req, res) => {
 export const logout = async (req, res) => {
     const secure = process.env.NODE_ENV === 'production';
     const sameSite = process.env.NODE_ENV === 'production' ? 'none' : 'lax';
+    const partitioned = secure;
     
-    res.clearCookie('jwt', { httpOnly: true, sameSite, secure });
-    res.clearCookie('refreshToken', { httpOnly: true, sameSite, secure });
+    // path ו-partitioned חייבים להתאים להגדרות שבהן ה-cookie נוצר
+    res.clearCookie('jwt', { httpOnly: true, sameSite, secure, path: '/', partitioned });
+    res.clearCookie('refreshToken', { httpOnly: true, sameSite, secure, path: '/', partitioned });
     return res.sendStatus(204);
 };
 
