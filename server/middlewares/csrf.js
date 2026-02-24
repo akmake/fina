@@ -1,54 +1,48 @@
 import crypto from 'crypto';
 
 /**
- * Custom CSRF protection middleware (replaces deprecated csurf package).
- * Uses the "Double Submit Cookie" pattern:
- *  1. Server generates a random token and stores it in an httpOnly cookie.
- *  2. Client reads the token from /api/csrf-token and sends it in X-CSRF-Token header.
- *  3. Server compares cookie value to header value on state-changing requests.
+ * CSRF Protection Middleware
+ * 
+ * גישה: Custom Header Verification
+ * 
+ * למה זה עובד:
+ * - CSRF attacks מגיעים מטפסי HTML רגילים שלא יכולים לשלוח custom headers
+ * - בקשות XHR/fetch מאתרים אחרים נחסמות ע"י CORS preflight (רק ה-origin שלנו מותר)
+ * - לכן, עצם הנוכחות של custom header (X-Fina-Client) מוכיחה שהבקשה מגיעה מהקליינט שלנו
+ * 
+ * הגישה הישנה (Double Submit Cookie) נשברה כי cross-origin cookies נחסמים בדפדפנים מודרניים.
  */
 
 const isProduction = () => process.env.NODE_ENV === 'production';
 
-// Cookie options for the CSRF cookie
-const getCookieOptions = () => ({
-  httpOnly: true,
-  secure: isProduction(),
-  sameSite: isProduction() ? 'none' : 'lax',
-  maxAge: 24 * 60 * 60 * 1000, // 24 hours
-  path: '/',
-  partitioned: isProduction(), // תמיכה ב-Safari/iOS (CHIPS)
-});
-
 /**
  * Route handler for GET /api/csrf-token
- * Generates a new CSRF token, sets it as a cookie, and returns it in JSON.
+ * נשאר לתאימות אחורה — הקליינט קורא לו בטעינה.
  */
 export function csrfTokenHandler(req, res) {
   const token = crypto.randomBytes(32).toString('hex');
-  res.cookie('_csrf', token, getCookieOptions());
   res.json({ csrfToken: token });
 }
 
 /**
- * Middleware that verifies CSRF token on state-changing requests.
- * Safe methods (GET, HEAD, OPTIONS) are skipped.
+ * Middleware שמוודא שהבקשה מגיעה מהקליינט שלנו.
+ * בודק נוכחות של custom header שרק הקליינט שולח.
+ * CORS preflight מונע מאתרים אחרים לשלוח custom headers.
  */
 export function csrfProtection(req, res, next) {
-  // Skip safe/read-only methods
+  // GET, HEAD, OPTIONS — read-only, לא מסוכנות
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
     return next();
   }
 
-  const cookieToken = req.cookies?._csrf;
-  const headerToken = req.headers['x-csrf-token'] || req.headers['x-xsrf-token'];
-
-  if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+  // בדיקה: custom header שרק הקליינט שלנו שולח
+  const clientHeader = req.headers['x-fina-client'];
+  
+  if (clientHeader !== 'web-app') {
     console.warn('[CSRF] Blocked:', req.method, req.originalUrl,
-      '| cookie:', cookieToken ? 'present' : 'MISSING',
-      '| header:', headerToken ? 'present' : 'MISSING',
-      '| match:', cookieToken && headerToken ? cookieToken === headerToken : 'N/A');
-    return res.status(403).json({ message: 'Invalid or missing CSRF token.', _debug: { hasCookie: !!cookieToken, hasHeader: !!headerToken } });
+      '| X-Fina-Client:', clientHeader || 'MISSING',
+      '| Origin:', req.headers.origin || 'none');
+    return res.status(403).json({ message: 'Access denied — missing security header.' });
   }
 
   next();

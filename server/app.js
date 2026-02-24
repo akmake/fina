@@ -71,7 +71,8 @@ app.use(cors({
     }
   },
   credentials: true, // חובה להעברת עוגיות
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-XSRF-Token', 'X-Fina-Client'],
 }));
 
 // --- הגדרות גודל גוף הבקשה ---
