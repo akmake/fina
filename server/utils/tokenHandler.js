@@ -11,17 +11,18 @@ export const createAndSendTokens = (user, res) => {
   const refreshToken = signRefreshToken({ id: user._id, v: user.tokenVersion });
 
   const secure = process.env.NODE_ENV === 'production';
+  const sameSite = process.env.NODE_ENV === 'production' ? 'none' : 'lax';
 
   res
     .cookie('jwt', accessToken, {
       httpOnly: true,
-      sameSite: 'strict',
+      sameSite,
       secure,
       maxAge: 15 * 60 * 1000,
     })
     .cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      sameSite: 'strict',
+      sameSite,
       secure,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
