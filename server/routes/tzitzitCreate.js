@@ -1,6 +1,5 @@
 import express from 'express';
 import { body, param } from 'express-validator';
-import csrf from 'csurf';
 
 import requireAuth from '../middlewares/requireAuth.js';
 import { publicLimiter } from '../middlewares/rateLimiter.js';
@@ -8,7 +7,6 @@ import TzitzitOrder from '../models/TzitzitOrder.js';
 import { appendOrder } from '../utils/googleSheets.js';
 
 const router = express.Router();
-const csrfProtection = csrf({ cookie: true });
 
 /* ---------- GET ---------- */
 router.get('/', publicLimiter, requireAuth, async (req, res, next) => {
@@ -25,7 +23,6 @@ router.post(
   '/',
   publicLimiter,
   requireAuth,
-  csrfProtection,
   body('supplier').notEmpty(),
   body('date').isISO8601().toDate(),
   body('type').isIn(['ציצית', 'טלית']),
@@ -57,7 +54,6 @@ router.patch(
   '/pay-supplier-partial',
   publicLimiter,
   requireAuth,
-  csrfProtection, // הוספנו הגנת CSRF גם לכאן
   body('supplier').notEmpty(),
   body('amount').isFloat({ min: 0.01 }),
   async (req, res, next) => {
@@ -97,7 +93,6 @@ router.patch(
   '/:id([0-9a-fA-F]{24})',
   publicLimiter,
   requireAuth,
-  csrfProtection, // הוספנו הגנת CSRF גם לכאן
   param('id').isMongoId(),
   async (req, res, next) => {
     try {
@@ -123,7 +118,6 @@ router.delete(
   '/:id([0-9a-fA-F]{24})',
   publicLimiter,
   requireAuth,
-  csrfProtection, // הוספנו הגנת CSRF גם לכאן
   param('id').isMongoId(),
   async (req, res, next) => {
     try {

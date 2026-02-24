@@ -1,4 +1,3 @@
-import csurf              from 'csurf';
 import authRoutes         from '../routes/auth.js';
 import tzitzitRoutes      from '../routes/tzitzitRoutes.js';
 
@@ -6,24 +5,15 @@ import tzitzitRoutes      from '../routes/tzitzitRoutes.js';
 import projectRoutes      from '../routes/projectRoutes.js';
 
 import { requireAuth }    from '../middlewares/authMiddleware.js';
+import { csrfTokenHandler, csrfProtection } from '../middlewares/csrf.js';
 
 export const configureRoutes = (app) => {
   /* ---------- מסלולים ציבוריים ---------- */
   app.use('/api/auth', authRoutes);
 
   /* ---------- הגנת CSRF ---------- */
-  const csrfProtection = csurf({
-    cookie: {
-      httpOnly : true,
-      secure   : process.env.NODE_ENV === 'production',
-      sameSite : 'strict',
-    },
-  });
-
   // נקודת קבלת טוקן
-  app.get('/api/csrf-token', csrfProtection, (req, res) => {
-    res.json({ csrfToken: req.csrfToken() });
-  });
+  app.get('/api/csrf-token', csrfTokenHandler);
 
   // להחיל CSRF על כל מה שמתחת
   app.use(csrfProtection);
