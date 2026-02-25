@@ -1,91 +1,174 @@
 import mongoose from 'mongoose';
 
-const logSchema = new mongoose.Schema({
-  // --- User Info ---
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null,
+const logSchema = new mongoose.Schema(
+  {
+    // User info (if logged in)
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+
+    // Visitor info
+    ipAddress: String,
+    userAgent: String,
+
+    // Browser/Device info (parsed from userAgent)
+    browser: {
+      name: String,
+      version: String,
+    },
+
+    os: {
+      name: String,
+      version: String,
+      architecture: String,
+    },
+
+    device: {
+      type: String,
+      enum: ['desktop', 'mobile', 'tablet', 'unknown'],
+      default: 'unknown',
+    },
+
+    // Screen/Display info
+    screen: {
+      width: Number,
+      height: Number,
+      availWidth: Number,
+      availHeight: Number,
+      viewportWidth: Number,
+      viewportHeight: Number,
+      colorDepth: Number,
+      pixelDepth: Number,
+      pixelRatio: Number,
+      refreshRate: Number,
+      isRetina: Boolean,
+      orientation: String,
+    },
+
+    // Processor info
+    processor: {
+      cores: Number,
+      threads: Number,
+      memory: Number,
+      maxTouchPoints: Number,
+    },
+
+    // Cookies & Storage
+    cookies: {
+      enabled: Boolean,
+      count: Number,
+    },
+
+    localStorage: {
+      enabled: Boolean,
+      size: Number,
+    },
+
+    // Page visited
+    page: String,
+    method: String,
+    statusCode: Number,
+
+    // Timing
+    responseTime: Number,
+
+    // Headers & Request Info
+    referer: String,
+    userLanguage: String,
+    languages: [String],
+    timezone: String,
+
+    // Location (from IP geolocation)
+    location: {
+      country: String,
+      city: String,
+      region: String,
+      latitude: Number,
+      longitude: Number,
+    },
+
+    // Connection Info
+    connection: {
+      effectiveType: String,
+      rtt: Number,
+      downlink: Number,
+      saveData: Boolean,
+    },
+
+    // More Device Details
+    platform: String,
+    hardwareConcurrency: Number,
+    deviceMemory: Number,
+
+    // ★ GPU Info
+    gpu: {
+      vendor: String,
+      renderer: String,
+    },
+
+    // ★ Battery Info
+    battery: {
+      level: Number,     // 0-100
+      charging: Boolean,
+    },
+
+    // ★ User Preferences
+    prefersDarkMode: Boolean,
+    prefersReducedMotion: Boolean,
+    doNotTrack: Boolean,
+    isTouchDevice: Boolean,
+
+    // ★ Session Tracking
+    session: {
+      pageViews: Number,
+      durationSeconds: Number,
+      isNewSession: Boolean,
+    },
+
+    // ★ Media Devices
+    mediaDevices: {
+      cameras: Number,
+      microphones: Number,
+      speakers: Number,
+    },
+
+    // ★ Detection Flags
+    adBlocker: Boolean,
+    webdriver: Boolean,          // automation/bot flag
+    isOnline: Boolean,
+    pdfViewerEnabled: Boolean,
+    pluginsCount: Number,
+
+    // ★ Fingerprinting
+    fingerprint: String,
+    canvasFingerprint: String,
+    webglFingerprint: String,
+
+    // ★ Browser Capabilities
+    webGLSupported: Boolean,
+    serviceWorkerSupported: Boolean,
+    notificationPermission: String,
+
+    timestamp: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
   },
-  userName: { type: String, default: null },
+  {
+    timestamps: true,
+    collection: 'logs',
+  }
+);
 
-  // --- Visitor Info ---
-  ipAddress: { type: String, default: 'unknown' },
-  userAgent: { type: String, default: '' },
-
-  // --- Browser Data ---
-  browser: {
-    name: { type: String, default: 'unknown' },
-    version: { type: String, default: '' },
-  },
-
-  // --- OS Data ---
-  os: {
-    name: { type: String, default: 'unknown' },
-    version: { type: String, default: '' },
-  },
-
-  // --- Device ---
-  device: {
-    type: { type: String, enum: ['desktop', 'mobile', 'tablet', 'unknown'], default: 'unknown' },
-    vendor: { type: String, default: '' },
-    model: { type: String, default: '' },
-  },
-
-  // --- Screen (from client-side header) ---
-  screen: {
-    width: { type: Number, default: null },
-    height: { type: Number, default: null },
-    colorDepth: { type: Number, default: null },
-  },
-
-  // --- Processor ---
-  processor: {
-    cores: { type: Number, default: null },
-    memory: { type: Number, default: null }, // navigator.deviceMemory (GB)
-  },
-
-  // --- Request Info ---
-  page: { type: String, default: '/' },
-  method: { type: String, default: 'GET' },
-  statusCode: { type: Number, default: 200 },
-  responseTime: { type: Number, default: 0 }, // in ms
-
-  // --- Referrer ---
-  referrer: { type: String, default: '' },
-
-  // --- Language ---
-  language: { type: String, default: '' },
-
-  // --- Connection Info ---
-  connection: {
-    type: { type: String, default: '' }, // 4g, 3g, wifi, etc.
-    downlink: { type: Number, default: null }, // Mbps
-    rtt: { type: Number, default: null }, // round-trip time ms
-  },
-
-  // --- Location (future enhancement / from IP) ---
-  location: {
-    country: { type: String, default: '' },
-    city: { type: String, default: '' },
-  },
-
-  // --- Session ---
-  sessionId: { type: String, default: '' },
-
-  // --- Timestamp ---
-  timestamp: { type: Date, default: Date.now },
-}, {
-  timestamps: false,
-  versionKey: false,
-});
-
-// --- Indices for performance ---
 logSchema.index({ timestamp: -1 });
 logSchema.index({ userId: 1, timestamp: -1 });
 logSchema.index({ ipAddress: 1 });
-logSchema.index({ 'device.type': 1 });
-logSchema.index({ method: 1, page: 1 });
+logSchema.index({ 'browser.name': 1 });
+logSchema.index({ device: 1 });
+// TTL: מחיקה אוטומטית של לוגים אחרי 90 יום
+logSchema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
 
-const Log = mongoose.model('Log', logSchema);
-export default Log;
+export default mongoose.model('Log', logSchema);

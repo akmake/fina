@@ -40,6 +40,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import NotFoundPage    from "@/pages/NotFoundPage";
 import SuggestionsPage from "@/pages/SuggestionsPage";
 import AdminLogsPage   from "@/pages/AdminLogsPage";
+import UserActivityPage from "@/pages/UserActivityPage";
 
 export default function App() {
   return (
@@ -87,6 +88,7 @@ export default function App() {
 
           {/* Admin */}
           <Route path="admin/logs" element={<AdminLogsPage />} />
+          <Route path="admin/user-activity" element={<UserActivityPage />} />
         </Route>
 
         {/* ── 404 ────────────────────────────────────────────── */}

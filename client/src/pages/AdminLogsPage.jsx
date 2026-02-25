@@ -1,679 +1,854 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import api from '@/utils/api';
+import { toast } from 'react-hot-toast';
 import {
-  BarChart3, RefreshCw, Download, Trash2, Clock, Users, Globe, Monitor,
-  Smartphone, Tablet, Activity, Eye, Filter, ChevronLeft, ChevronRight,
-  Wifi, Zap, Languages, ExternalLink, TrendingUp,
-} from "lucide-react";
-import {
-  BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, AreaChart, Area,
-} from "recharts";
-import api from "@/utils/api";
+  Eye, EyeOff, Download, Trash2, RefreshCw, Activity,
+  Monitor, Smartphone, Tablet, HelpCircle, Globe, Clock,
+  Wifi, Cpu, ChevronDown, ChevronUp, Users, Zap, Search, X, Power, Cookie, MapPin,
+  BatteryCharging, Shield, Fingerprint, MousePointer, Sun, Moon, Bot, Video, Mic,
+  FileText, Layers, Bell, BellOff, Gauge, HardDrive,
+  BarChart3, TrendingUp, Hash, Plug, ScreenShare
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
 
-// ── Colors ─────────────────────────────────────────
-const COLORS = [
-  "#3b82f6", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b",
-  "#ef4444", "#ec4899", "#6366f1", "#14b8a6", "#f97316",
-];
+// ════════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════════
 
-const DEVICE_ICONS = {
-  desktop: Monitor,
-  mobile: Smartphone,
-  tablet: Tablet,
-  unknown: Globe,
+const DeviceIcon = ({ type, size = 16 }) => {
+  const map = { desktop: <Monitor size={size} />, mobile: <Smartphone size={size} />, tablet: <Tablet size={size} /> };
+  return map[type] || <HelpCircle size={size} />;
 };
 
-// ── Main Page ─────────────────────────────────────
-export default function AdminLogsPage() {
-  const [tab, setTab] = useState("overview");
-  const [summary, setSummary] = useState(null);
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [logsLoading, setLogsLoading] = useState(false);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(0);
-  const [limit, setLimit] = useState(50);
-  const [filters, setFilters] = useState({
-    startDate: "",
-    endDate: "",
-    device: "",
-    method: "",
-    browser: "",
-    ipAddress: "",
-  });
-  const [showFilters, setShowFilters] = useState(false);
+const OSIcon = ({ name }) => {
+  const n = (name || '').toLowerCase();
+  if (n.includes('windows')) return '🪟';
+  if (n.includes('mac') || n.includes('ios')) return '🍎';
+  if (n.includes('android')) return '🤖';
+  if (n.includes('linux') || n.includes('ubuntu')) return '🐧';
+  return '💻';
+};
 
-  // ── Fetch Summary ──
-  const fetchSummary = useCallback(async () => {
-    try {
-      setLoading(true);
-      const { data } = await api.get("/logs/admin/summary");
-      setSummary(data);
-    } catch (err) {
-      console.error("Failed to load summary", err);
-    } finally {
-      setLoading(false);
+const StatusDot = ({ code }) => {
+  if (code >= 200 && code < 300) return <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]" />;
+  if (code >= 400 && code < 500) return <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.7)]" />;
+  if (code >= 500) return <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.7)]" />;
+  return <span className="inline-block w-2.5 h-2.5 rounded-full bg-gray-400" />;
+};
+
+const timeAgo = (date) => {
+  const diff = Math.floor((Date.now() - new Date(date)) / 1000);
+  if (diff < 60) return `לפני ${diff} שניות`;
+  if (diff < 3600) return `לפני ${Math.floor(diff / 60)} דקות`;
+  if (diff < 86400) return `לפני ${Math.floor(diff / 3600)} שעות`;
+  return new Date(date).toLocaleDateString('he-IL') + ' ' + new Date(date).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatDuration = (seconds) => {
+  if (!seconds || seconds < 0) return '0 שנ׳';
+  if (seconds < 60) return `${seconds} שנ׳`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} דק׳`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return `${h} שע׳ ${m} דק׳`;
+};
+
+const yn = (v) => v === true ? 'כן' : v === false ? 'לא' : '—';
+const ynCSV = (v) => v === true ? 'Yes' : v === false ? 'No' : '';
+
+// ════════════════════════════════════════════════════════════
+//  SUB COMPONENTS
+// ════════════════════════════════════════════════════════════
+
+const StatCard = ({ icon, label, value, color = 'blue', subtitle }) => {
+  const c = {
+    blue:   'from-blue-500/10 to-blue-600/5 border-blue-500/20 text-blue-400',
+    green:  'from-emerald-500/10 to-emerald-600/5 border-emerald-500/20 text-emerald-400',
+    purple: 'from-purple-500/10 to-purple-600/5 border-purple-500/20 text-purple-400',
+    amber:  'from-amber-500/10 to-amber-600/5 border-amber-500/20 text-amber-400',
+    cyan:   'from-cyan-500/10 to-cyan-600/5 border-cyan-500/20 text-cyan-400',
+    rose:   'from-rose-500/10 to-rose-600/5 border-rose-500/20 text-rose-400',
+    indigo: 'from-indigo-500/10 to-indigo-600/5 border-indigo-500/20 text-indigo-400',
+    teal:   'from-teal-500/10 to-teal-600/5 border-teal-500/20 text-teal-400',
+  }[color] || 'from-blue-500/10 to-blue-600/5 border-blue-500/20 text-blue-400';
+
+  return (
+    <div className={`bg-gradient-to-br ${c} border rounded-2xl p-5 transition-all hover:scale-[1.02] hover:shadow-lg`}>
+      <div className="opacity-70 mb-3">{icon}</div>
+      <div className="text-3xl font-black text-slate-100 tracking-tight">{value}</div>
+      <div className="text-sm text-slate-400 mt-1 font-medium">{label}</div>
+      {subtitle && <div className="text-[10px] text-slate-500 mt-0.5">{subtitle}</div>}
+    </div>
+  );
+};
+
+const MiniBar = ({ items = [], color = 'blue' }) => {
+  const max = items[0]?.count || 1;
+  const barColor = {
+    blue: 'bg-blue-500', green: 'bg-emerald-500', purple: 'bg-purple-500',
+    amber: 'bg-amber-500', cyan: 'bg-cyan-500', rose: 'bg-rose-500',
+  }[color] || 'bg-blue-500';
+
+  const getLabel = (id) => {
+    if (!id) return 'Unknown';
+    if (typeof id === 'object') {
+      return id.type || id.vendor || id.model || 'Unknown';
     }
-  }, []);
-
-  // ── Fetch Logs ──
-  const fetchLogs = useCallback(async () => {
-    try {
-      setLogsLoading(true);
-      const params = { limit, skip: page * limit };
-      if (filters.startDate) params.startDate = filters.startDate;
-      if (filters.endDate) params.endDate = filters.endDate;
-      if (filters.device) params.device = filters.device;
-      if (filters.method) params.method = filters.method;
-      if (filters.browser) params.browser = filters.browser;
-      if (filters.ipAddress) params.ipAddress = filters.ipAddress;
-
-      const { data } = await api.get("/logs/admin/all", { params });
-      setLogs(data.data);
-      setTotal(data.total);
-    } catch (err) {
-      console.error("Failed to load logs", err);
-    } finally {
-      setLogsLoading(false);
-    }
-  }, [page, limit, filters]);
-
-  useEffect(() => { fetchSummary(); }, [fetchSummary]);
-  useEffect(() => { if (tab === "logs") fetchLogs(); }, [tab, fetchLogs]);
-
-  // ── Cleanup ──
-  const handleCleanup = async (days) => {
-    if (!confirm(`האם למחוק לוגים ישנים מלפני ${days} ימים?`)) return;
-    try {
-      const { data } = await api.delete("/logs/admin/cleanup", { params: { days } });
-      alert(data.message);
-      fetchSummary();
-      if (tab === "logs") fetchLogs();
-    } catch (err) {
-      alert("שגיאה במחיקה");
-    }
-  };
-
-  // ── Export CSV ──
-  const exportCSV = () => {
-    if (!logs.length) return;
-    const headers = ["IP", "דפדפן", "מערכת הפעלה", "מכשיר", "דף", "Method", "סטטוס", "זמן תגובה (ms)", "תאריך"];
-    const rows = logs.map((l) => [
-      l.ipAddress,
-      `${l.browser?.name || ""} ${l.browser?.version || ""}`,
-      `${l.os?.name || ""} ${l.os?.version || ""}`,
-      l.device?.type || "",
-      l.page,
-      l.method,
-      l.statusCode,
-      l.responseTime,
-      new Date(l.timestamp).toLocaleString("he-IL"),
-    ]);
-
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `visitor-logs-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    return String(id);
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-6" dir="rtl">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <BarChart3 className="h-7 w-7 text-blue-500" />
-            דוח מבקרים ואנליטיקס
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            מעקב אחר כל התנועה באתר — דפדפנים, מכשירים, זמני תגובה ועוד
-          </p>
+    <div className="space-y-2.5">
+      {items.slice(0, 6).map((item, idx) => (
+        <div key={idx} className="flex items-center gap-3">
+          <span className="text-sm text-slate-300 w-28 truncate text-left font-medium" title={getLabel(item._id)}>
+            {getLabel(item._id)}
+          </span>
+          <div className="flex-1 h-2 bg-slate-700/50 rounded-full overflow-hidden">
+            <div className={`h-full ${barColor} rounded-full transition-all duration-500`} style={{ width: `${Math.max((item.count / max) * 100, 4)}%` }} />
+          </div>
+          <span className="text-xs text-slate-400 font-mono w-8 text-left">{item.count}</span>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => { fetchSummary(); if (tab === "logs") fetchLogs(); }}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-950/60 transition"
-          >
-            <RefreshCw className="h-4 w-4" /> רענון
-          </button>
-          <button
-            onClick={() => handleCleanup(90)}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-950/60 transition"
-          >
-            <Trash2 className="h-4 w-4" /> ניקוי ישנים
-          </button>
+      ))}
+    </div>
+  );
+};
+
+const SectionHeader = ({ icon, title, color = 'text-blue-400' }) => (
+  <div className="flex items-center gap-2 pb-2 mb-3 border-b border-slate-700/40">
+    <span className={color}>{icon}</span>
+    <span className="text-xs font-bold text-slate-300 tracking-wide uppercase">{title}</span>
+  </div>
+);
+
+const Detail = ({ icon, label, value, mono, small, className = '' }) => (
+  <div className={className}>
+    <div className="flex items-center gap-1 text-slate-500 text-[11px] mb-0.5">{icon}<span>{label}</span></div>
+    <div className={`text-slate-200 ${mono ? 'font-mono' : ''} ${small ? 'text-[11px] break-all' : 'text-sm'}`}>
+      {value ?? '—'}
+    </div>
+  </div>
+);
+
+const Badge = ({ icon, text, color }) => (
+  <span className={`inline-flex items-center gap-1 ${color} px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap`}>
+    {icon} {text}
+  </span>
+);
+
+// ════════════════════════════════════════════════════════════
+//  LOG ROW — Collapsed + expanded detail view
+// ════════════════════════════════════════════════════════════
+
+const LogRow = ({ log, isExpanded, onToggle }) => {
+  const hasFP = log.fingerprint || log.canvasFingerprint || log.webglFingerprint;
+
+  return (
+    <div className={`border-b border-slate-700/50 transition-all cursor-pointer ${isExpanded ? 'bg-slate-800/80' : 'hover:bg-slate-800/40'}`} onClick={onToggle}>
+      {/* ── Collapsed row ── */}
+      <div className="px-5 py-3.5 flex items-center gap-4">
+        <div className="text-slate-400 shrink-0"><DeviceIcon type={log.device} size={20} /></div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono text-sm font-bold text-slate-200">{log.ipAddress}</span>
+            <span className="text-slate-500 text-xs">•</span>
+            <span className="text-sm text-slate-400">{log.browser?.name || '?'} {log.browser?.version?.split('.')[0] || ''}</span>
+            <span className="text-slate-500 text-xs">•</span>
+            <span className="text-sm text-slate-400"><OSIcon name={log.os?.name} /> {log.os?.name || '?'}</span>
+            {log.location?.city && log.location.city !== 'Unknown' && (
+              <>
+                <span className="text-slate-500 text-xs">•</span>
+                <span className="text-sm text-slate-500 flex items-center gap-0.5"><MapPin size={11} /> {log.location.city}</span>
+              </>
+            )}
+            {hasFP && <Fingerprint size={12} className="text-indigo-400 opacity-60" />}
+          </div>
+          <div className="text-xs text-slate-500 mt-0.5 truncate">
+            <span className={`font-bold mr-1 ${log.method === 'GET' ? 'text-emerald-500/70' : log.method === 'POST' ? 'text-amber-500/70' : log.method === 'DELETE' ? 'text-red-500/70' : 'text-blue-500/70'}`}>
+              {log.method}
+            </span>
+            {log.page}
+          </div>
+        </div>
+        <div className="flex items-center gap-4 shrink-0">
+          {/* Quick mini badges */}
+          <div className="hidden lg:flex items-center gap-1.5">
+            {log.webdriver && <span title="בוט / אוטומציה" className="w-5 h-5 rounded bg-orange-500/20 flex items-center justify-center"><Bot size={10} className="text-orange-300" /></span>}
+            {log.adBlocker && <span title="Ad Blocker" className="w-5 h-5 rounded bg-red-500/20 flex items-center justify-center"><Shield size={10} className="text-red-300" /></span>}
+            {log.isTouchDevice && <span title="Touch" className="w-5 h-5 rounded bg-purple-500/20 flex items-center justify-center"><MousePointer size={10} className="text-purple-300" /></span>}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <StatusDot code={log.statusCode} />
+            <span className="text-xs font-mono text-slate-400">{log.statusCode}</span>
+          </div>
+          <span className="text-xs text-slate-500 font-mono">{log.responseTime}ms</span>
+          <span className="text-xs text-slate-500 hidden sm:block">{timeAgo(log.timestamp)}</span>
+          {isExpanded ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-700">
-        {[
-          { key: "overview", label: "📈 סקירה כללית" },
-          { key: "logs", label: "📋 לוגים מפורטים" },
-        ].map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-5 py-3 text-sm font-medium border-b-2 transition ${
-              tab === t.key
-                ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* ── Expanded detail ── */}
+      {isExpanded && (
+        <div className="px-5 pb-5 pt-1 border-t border-slate-700/30" onClick={(e) => e.stopPropagation()}>
 
-      {/* Content */}
-      {tab === "overview" ? (
-        <OverviewTab summary={summary} loading={loading} />
-      ) : (
-        <LogsTab
-          logs={logs}
-          total={total}
-          page={page}
-          setPage={setPage}
-          limit={limit}
-          setLimit={setLimit}
-          filters={filters}
-          setFilters={setFilters}
-          showFilters={showFilters}
-          setShowFilters={setShowFilters}
-          loading={logsLoading}
-          exportCSV={exportCSV}
-          fetchLogs={fetchLogs}
-        />
+          {/* ★ BADGES */}
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {log.userId && <Badge icon={<Users size={10} />} text={log.userId?.name || 'משתמש רשום'} color="bg-blue-500/15 text-blue-300 border border-blue-500/25" />}
+            {log.session?.isNewSession && <Badge icon="✨" text="סשן חדש" color="bg-emerald-500/15 text-emerald-300 border border-emerald-500/25" />}
+            {log.isTouchDevice && <Badge icon={<MousePointer size={10} />} text="מסך מגע" color="bg-purple-500/15 text-purple-300 border border-purple-500/25" />}
+            {log.prefersDarkMode === true && <Badge icon={<Moon size={10} />} text="מצב כהה" color="bg-slate-500/20 text-slate-300 border border-slate-500/25" />}
+            {log.prefersDarkMode === false && <Badge icon={<Sun size={10} />} text="מצב בהיר" color="bg-amber-500/15 text-amber-300 border border-amber-500/25" />}
+            {log.doNotTrack && <Badge icon={<Shield size={10} />} text="DNT" color="bg-rose-500/15 text-rose-300 border border-rose-500/25" />}
+            {log.adBlocker && <Badge icon={<Shield size={10} />} text="Ad Blocker" color="bg-red-500/15 text-red-300 border border-red-500/25" />}
+            {log.webdriver && <Badge icon={<Bot size={10} />} text="בוט/אוטומציה" color="bg-orange-500/15 text-orange-300 border border-orange-500/25" />}
+            {log.battery?.charging && <Badge icon={<BatteryCharging size={10} />} text="בטעינה" color="bg-green-500/15 text-green-300 border border-green-500/25" />}
+            {log.isOnline === false && <Badge icon={<Wifi size={10} />} text="אופליין" color="bg-red-500/15 text-red-300 border border-red-500/25" />}
+            {log.prefersReducedMotion && <Badge icon={<Gauge size={10} />} text="אנימציות מופחתות" color="bg-teal-500/15 text-teal-300 border border-teal-500/25" />}
+            {log.connection?.saveData && <Badge icon={<Wifi size={10} />} text="חיסכון בנתונים" color="bg-yellow-500/15 text-yellow-300 border border-yellow-500/25" />}
+            {log.webGLSupported === false && <Badge icon={<Layers size={10} />} text="ללא WebGL" color="bg-gray-500/15 text-gray-300 border border-gray-500/25" />}
+            {log.pdfViewerEnabled && <Badge icon={<FileText size={10} />} text="PDF Viewer" color="bg-indigo-500/15 text-indigo-300 border border-indigo-500/25" />}
+            {log.serviceWorkerSupported && <Badge icon={<Zap size={10} />} text="SW" color="bg-cyan-500/15 text-cyan-300 border border-cyan-500/25" />}
+            {log.notificationPermission === 'granted' && <Badge icon={<Bell size={10} />} text="התראות מאושרות" color="bg-emerald-500/15 text-emerald-300 border border-emerald-500/25" />}
+            {log.notificationPermission === 'denied' && <Badge icon={<BellOff size={10} />} text="התראות חסומות" color="bg-red-500/15 text-red-300 border border-red-500/25" />}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+            {/* ── LEFT COLUMN ── */}
+            <div className="space-y-4">
+
+              {/* 🌐 Network & Location */}
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
+                <SectionHeader icon={<Globe size={14} />} title="רשת ומיקום" color="text-blue-400" />
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                  <Detail icon={<Globe size={12} />} label="IP" value={log.ipAddress} mono />
+                  {log.location?.country && (
+                    <Detail icon={<MapPin size={12} />} label="מיקום" value={`${log.location.city || ''} ${log.location.region ? `· ${log.location.region}` : ''} ${log.location.country ? `(${log.location.country})` : ''}`.trim()} />
+                  )}
+                  {log.location?.latitude != null && log.location?.longitude != null && (
+                    <Detail icon={<MapPin size={12} />} label="קואורדינטות" value={`${log.location.latitude?.toFixed(4)}, ${log.location.longitude?.toFixed(4)}`} mono small />
+                  )}
+                  {log.connection?.effectiveType && <Detail icon={<Wifi size={12} />} label="חיבור" value={log.connection.effectiveType.toUpperCase()} />}
+                  {log.connection?.rtt != null && <Detail icon={<Zap size={12} />} label="RTT" value={`${log.connection.rtt}ms`} mono />}
+                  {log.connection?.downlink != null && <Detail icon={<Zap size={12} />} label="Downlink" value={`${log.connection.downlink} Mbps`} mono />}
+                  <Detail icon={<Wifi size={12} />} label="אונליין" value={yn(log.isOnline)} />
+                </div>
+              </div>
+
+              {/* 🖥️ System */}
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
+                <SectionHeader icon={<Monitor size={14} />} title="מערכת" color="text-emerald-400" />
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                  <Detail icon={<Monitor size={12} />} label="מערכת הפעלה" value={`${log.os?.name || '?'} ${log.os?.version || ''}`} />
+                  <Detail icon={<Globe size={12} />} label="דפדפן" value={`${log.browser?.name || '?'} ${log.browser?.version || ''}`} />
+                  <Detail icon={<DeviceIcon type={log.device} size={12} />} label="סוג התקן" value={log.device} />
+                  {log.platform && <Detail label="פלטפורמה" value={log.platform} />}
+                  {log.os?.architecture && <Detail label="ארכיטקטורה" value={log.os.architecture} />}
+                </div>
+              </div>
+
+              {/* 📺 Screen */}
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
+                <SectionHeader icon={<ScreenShare size={14} />} title="תצוגה / מסך" color="text-purple-400" />
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                  <Detail icon={<Monitor size={12} />} label="רזולוציה" value={log.screen?.width ? `${log.screen.width} × ${log.screen.height}` : '—'} />
+                  {log.screen?.availWidth && <Detail label="שטח זמין" value={`${log.screen.availWidth} × ${log.screen.availHeight}`} />}
+                  {log.screen?.colorDepth && <Detail label="Color Depth" value={`${log.screen.colorDepth} bit`} mono />}
+                  {log.screen?.pixelDepth && <Detail label="Pixel Depth" value={`${log.screen.pixelDepth} bit`} mono />}
+                  {log.screen?.pixelRatio && <Detail label="Pixel Ratio" value={`${log.screen.pixelRatio}x`} mono />}
+                  {log.screen?.isRetina != null && <Detail label="רטינה" value={yn(log.screen.isRetina)} />}
+                  {log.screen?.refreshRate && <Detail label="קצב רענון" value={`${log.screen.refreshRate} Hz`} mono />}
+                  {log.screen?.orientation && (
+                    <Detail label="כיוון מסך" value={log.screen.orientation.includes('landscape') ? 'לרוחב' : log.screen.orientation.includes('portrait') ? 'לאורך' : log.screen.orientation} />
+                  )}
+                  {log.screen?.viewportWidth && <Detail label="Viewport" value={`${log.screen.viewportWidth} × ${log.screen.viewportHeight}`} mono />}
+                </div>
+              </div>
+            </div>
+
+            {/* ── RIGHT COLUMN ── */}
+            <div className="space-y-4">
+
+              {/* ⚙️ Hardware */}
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
+                <SectionHeader icon={<Cpu size={14} />} title="חומרה" color="text-amber-400" />
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                  {(log.processor?.cores || log.hardwareConcurrency) && (
+                    <Detail icon={<Cpu size={12} />} label="ליבות CPU" value={log.processor?.cores || log.hardwareConcurrency} />
+                  )}
+                  {log.deviceMemory && <Detail icon={<HardDrive size={12} />} label="זיכרון RAM" value={`${log.deviceMemory} GB`} />}
+                  {log.gpu?.vendor && <Detail icon={<Layers size={12} />} label="GPU יצרן" value={log.gpu.vendor} />}
+                  {log.gpu?.renderer && <Detail icon={<Layers size={12} />} label="GPU" value={log.gpu.renderer} small />}
+                  {log.battery?.level != null && (
+                    <Detail icon={<BatteryCharging size={12} />} label="סוללה" value={`${log.battery.level}%${log.battery.charging ? ' ⚡' : ''}`} />
+                  )}
+                  {log.processor?.maxTouchPoints != null && (
+                    <Detail label="Touch Points" value={log.processor.maxTouchPoints} mono />
+                  )}
+                </div>
+              </div>
+
+              {/* 🔐 Storage & Cookies */}
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
+                <SectionHeader icon={<Cookie size={14} />} title="אחסון ועוגיות" color="text-cyan-400" />
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                  <Detail icon={<Cookie size={12} />} label="עוגיות" value={log.cookies?.enabled != null ? `${log.cookies.enabled ? 'מופעל' : 'חסום'} · ${log.cookies.count ?? 0}` : '—'} />
+                  <Detail icon={<HardDrive size={12} />} label="LocalStorage" value={yn(log.localStorage?.enabled)} />
+                  {log.pluginsCount != null && <Detail icon={<Plug size={12} />} label="תוספים" value={log.pluginsCount} />}
+                </div>
+              </div>
+
+              {/* 🎯 Session */}
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
+                <SectionHeader icon={<Activity size={14} />} title="סשן" color="text-rose-400" />
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                  {log.session?.pageViews != null && <Detail icon={<FileText size={12} />} label="דפים" value={log.session.pageViews} />}
+                  {log.session?.durationSeconds != null && <Detail icon={<Clock size={12} />} label="משך" value={formatDuration(log.session.durationSeconds)} />}
+                  {log.session?.isNewSession != null && <Detail label="סשן חדש" value={yn(log.session.isNewSession)} />}
+                </div>
+              </div>
+
+              {/* 🎤 Media Devices */}
+              {log.mediaDevices && (
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
+                  <SectionHeader icon={<Video size={14} />} title="מכשירי מדיה" color="text-indigo-400" />
+                  <div className="grid grid-cols-3 gap-x-4 gap-y-2.5">
+                    <Detail icon={<Video size={12} />} label="מצלמות" value={log.mediaDevices.cameras ?? 0} />
+                    <Detail icon={<Mic size={12} />} label="מיקרופונים" value={log.mediaDevices.microphones ?? 0} />
+                    <Detail label="רמקולים" value={log.mediaDevices.speakers ?? 0} />
+                  </div>
+                </div>
+              )}
+
+              {/* 🌍 Language / Timezone */}
+              <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
+                <SectionHeader icon={<Globe size={14} />} title="שפה ואזור זמן" color="text-teal-400" />
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                  {log.userLanguage && <Detail label="שפה ראשית" value={log.userLanguage} />}
+                  {log.languages?.length > 1 && <Detail label="שפות" value={log.languages.join(', ')} small />}
+                  {log.timezone && <Detail icon={<Clock size={12} />} label="אזור זמן" value={log.timezone} />}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ★ FINGERPRINTS — Full width */}
+          {hasFP && (
+            <div className="mt-4 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 rounded-xl p-4 border border-indigo-500/20">
+              <SectionHeader icon={<Fingerprint size={14} />} title="טביעות אצבע דיגיטליות" color="text-indigo-400" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {log.fingerprint && (
+                  <div className="bg-slate-800/60 rounded-lg px-3 py-2">
+                    <div className="text-[10px] text-slate-500 mb-0.5">Visitor Fingerprint</div>
+                    <div className="font-mono text-sm text-indigo-300 font-bold">{log.fingerprint}</div>
+                  </div>
+                )}
+                {log.canvasFingerprint && (
+                  <div className="bg-slate-800/60 rounded-lg px-3 py-2">
+                    <div className="text-[10px] text-slate-500 mb-0.5">Canvas Fingerprint</div>
+                    <div className="font-mono text-sm text-purple-300 font-bold">{log.canvasFingerprint}</div>
+                  </div>
+                )}
+                {log.webglFingerprint && (
+                  <div className="bg-slate-800/60 rounded-lg px-3 py-2">
+                    <div className="text-[10px] text-slate-500 mb-0.5">WebGL Fingerprint</div>
+                    <div className="font-mono text-sm text-violet-300 font-bold">{log.webglFingerprint}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ★ Browser Capabilities */}
+          <div className="mt-4 bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
+            <SectionHeader icon={<Zap size={14} />} title="יכולות דפדפן" color="text-yellow-400" />
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+              {[
+                { label: 'WebGL', val: log.webGLSupported },
+                { label: 'Service Worker', val: log.serviceWorkerSupported },
+                { label: 'PDF Viewer', val: log.pdfViewerEnabled },
+                { label: 'עוגיות', val: log.cookies?.enabled },
+                { label: 'LocalStorage', val: log.localStorage?.enabled },
+              ].map(({ label, val }) => (
+                <div key={label} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold ${val === true ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : val === false ? 'bg-red-500/10 text-red-300 border border-red-500/20' : 'bg-slate-700/30 text-slate-500 border border-slate-600/20'}`}>
+                  {val === true ? <Eye size={12} /> : val === false ? <EyeOff size={12} /> : <HelpCircle size={12} />}
+                  {label}
+                </div>
+              ))}
+            </div>
+            {log.notificationPermission && (
+              <div className="mt-2 text-xs text-slate-400">
+                התראות: <span className={`font-bold ${log.notificationPermission === 'granted' ? 'text-emerald-300' : log.notificationPermission === 'denied' ? 'text-red-300' : 'text-slate-300'}`}>{log.notificationPermission}</span>
+              </div>
+            )}
+          </div>
+
+          {/* ★ Request Info */}
+          <div className="mt-4 bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
+            <SectionHeader icon={<FileText size={14} />} title="פרטי בקשה" color="text-slate-400" />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2.5">
+              <Detail icon={<Clock size={12} />} label="זמן מדויק" value={new Date(log.timestamp).toLocaleString('he-IL')} />
+              <Detail icon={<Zap size={12} />} label="זמן תגובה" value={`${log.responseTime}ms`} mono />
+              <Detail label="סטטוס" value={log.statusCode} mono />
+              <Detail label="Method" value={log.method} mono />
+              {log.referer && <Detail label="הגיע מ-" value={log.referer} className="col-span-2" small />}
+            </div>
+            <div className="mt-2">
+              <Detail label="User Agent" value={log.userAgent} className="col-span-full" mono small />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
-}
+};
 
-// ═══════════════════════════════════════════════════
-// Overview Tab
-// ═══════════════════════════════════════════════════
-function OverviewTab({ summary, loading }) {
-  if (loading || !summary) {
+// ════════════════════════════════════════════════════════════
+//  MAIN PAGE
+// ════════════════════════════════════════════════════════════
+
+const AdminLogsPage = () => {
+  const [logs, setLogs] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loggingEnabled, setLoggingEnabled] = useState(false);
+  const [togglingLogging, setTogglingLogging] = useState(false);
+  const [statusLoaded, setStatusLoaded] = useState(false);
+  const [filterDevice, setFilterDevice] = useState('all');
+  const [searchIP, setSearchIP] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
+  const [expandedLog, setExpandedLog] = useState(null);
+
+  // ★ Computed stats from loaded logs
+  const computedStats = useMemo(() => {
+    if (!logs.length) return null;
+    const fps = new Set();
+    const canvasFPs = new Set();
+    let bots = 0, adBlock = 0, touch = 0, dark = 0, dnt = 0;
+    let withGPU = 0, withBattery = 0, withSession = 0;
+
+    logs.forEach(l => {
+      if (l.fingerprint) fps.add(l.fingerprint);
+      if (l.canvasFingerprint) canvasFPs.add(l.canvasFingerprint);
+      if (l.webdriver) bots++;
+      if (l.adBlocker) adBlock++;
+      if (l.isTouchDevice) touch++;
+      if (l.prefersDarkMode) dark++;
+      if (l.doNotTrack) dnt++;
+      if (l.gpu?.renderer) withGPU++;
+      if (l.battery?.level != null) withBattery++;
+      if (l.session?.pageViews) withSession++;
+    });
+
+    return {
+      uniqueFingerprints: fps.size,
+      uniqueCanvasFingerprints: canvasFPs.size,
+      bots, adBlock, touch, dark, dnt, withGPU, withBattery, withSession,
+      dataQuality: Math.round((withSession / logs.length) * 100),
+    };
+  }, [logs]);
+
+  // ★ Status fetch
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await api.get('/logs/admin/status');
+        setLoggingEnabled(res.data.loggingEnabled);
+      } catch (err) {
+        console.error('Error fetching logging status:', err);
+      } finally {
+        setStatusLoaded(true);
+      }
+    };
+    fetchStatus();
+  }, []);
+
+  // ★ Toggle logging
+  const handleToggleLogging = async () => {
+    setTogglingLogging(true);
+    try {
+      const res = await api.post('/logs/admin/toggle', { enabled: !loggingEnabled });
+      setLoggingEnabled(res.data.loggingEnabled);
+      toast.success(res.data.loggingEnabled ? '✅ המעקב הופעל — כל כניסה תירשם' : '⛔ המעקב כבוי — לא נשמר כלום');
+    } catch (err) {
+      toast.error('שגיאה בשינוי ההגדרה');
+    } finally {
+      setTogglingLogging(false);
+    }
+  };
+
+  // Fetch summary
+  useEffect(() => {
+    if (!loggingEnabled || !statusLoaded) return;
+    const fetchSummary = async () => {
+      try {
+        const res = await api.get('/logs/admin/summary');
+        setSummary(res.data);
+      } catch (err) { console.error(err); }
+    };
+    fetchSummary();
+    const interval = setInterval(fetchSummary, 15000);
+    return () => clearInterval(interval);
+  }, [loggingEnabled, statusLoaded]);
+
+  // Fetch logs
+  const fetchLogs = useCallback(async () => {
+    if (!loggingEnabled) return;
+    setLoading(true);
+    try {
+      const params = { limit: 200 };
+      if (filterDevice !== 'all') params.device = filterDevice;
+      if (searchIP) params.ipAddress = searchIP;
+
+      const res = await api.get('/logs/admin/all', { params });
+      let data = res.data.data;
+
+      if (sortBy === 'newest') data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      if (sortBy === 'oldest') data.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      if (sortBy === 'slowest') data.sort((a, b) => (b.responseTime || 0) - (a.responseTime || 0));
+
+      setLogs(data);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  }, [loggingEnabled, filterDevice, searchIP, sortBy]);
+
+  useEffect(() => {
+    if (!loggingEnabled || !statusLoaded) return;
+    fetchLogs();
+    const interval = setInterval(fetchLogs, 10000);
+    return () => clearInterval(interval);
+  }, [fetchLogs, statusLoaded]);
+
+  // ★ CSV Export — all 60+ columns
+  const handleExportCSV = () => {
+    if (!logs.length) return toast.error('אין לוגים');
+
+    const headers = [
+      'Time', 'IP', 'Country', 'City', 'Region', 'Lat', 'Lon',
+      'Browser', 'Browser Version', 'OS', 'OS Version', 'Device', 'Platform', 'Architecture',
+      'Screen W', 'Screen H', 'Avail W', 'Avail H', 'Color Depth', 'Pixel Ratio', 'Retina', 'Refresh Rate', 'Orientation',
+      'CPU Cores', 'RAM (GB)', 'GPU Vendor', 'GPU Renderer', 'Touch Points',
+      'Battery %', 'Charging',
+      'Connection', 'RTT (ms)', 'Downlink (Mbps)', 'Save Data',
+      'Cookies', 'Cookie Count', 'LocalStorage',
+      'Language', 'Languages', 'Timezone',
+      'Dark Mode', 'Touch', 'DNT', 'Reduced Motion', 'Online',
+      'Ad Blocker', 'Bot/Webdriver', 'PDF Viewer', 'Plugins',
+      'WebGL', 'Service Worker', 'Notifications',
+      'Fingerprint', 'Canvas FP', 'WebGL FP',
+      'Session Pages', 'Session Duration (s)', 'New Session',
+      'Cameras', 'Microphones', 'Speakers',
+      'Page', 'Method', 'Status', 'Response (ms)',
+      'Referer', 'User Agent',
+    ];
+
+    const escCSV = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+
+    let csv = headers.map(h => escCSV(h)).join(',') + '\n';
+
+    logs.forEach((l) => {
+      const row = [
+        new Date(l.timestamp).toLocaleString('he-IL'),
+        l.ipAddress,
+        l.location?.country || '', l.location?.city || '', l.location?.region || '',
+        l.location?.latitude || '', l.location?.longitude || '',
+        l.browser?.name || '', l.browser?.version || '',
+        l.os?.name || '', l.os?.version || '', l.device || '', l.platform || '', l.os?.architecture || '',
+        l.screen?.width || '', l.screen?.height || '', l.screen?.availWidth || '', l.screen?.availHeight || '',
+        l.screen?.colorDepth || '', l.screen?.pixelRatio || '', ynCSV(l.screen?.isRetina),
+        l.screen?.refreshRate || '', l.screen?.orientation || '',
+        l.processor?.cores || l.hardwareConcurrency || '', l.deviceMemory || '',
+        l.gpu?.vendor || '', l.gpu?.renderer || '', l.processor?.maxTouchPoints ?? '',
+        l.battery?.level != null ? l.battery.level : '', ynCSV(l.battery?.charging),
+        l.connection?.effectiveType || '', l.connection?.rtt ?? '', l.connection?.downlink ?? '', ynCSV(l.connection?.saveData),
+        ynCSV(l.cookies?.enabled), l.cookies?.count ?? '', ynCSV(l.localStorage?.enabled),
+        l.userLanguage || '', (l.languages || []).join('; '), l.timezone || '',
+        ynCSV(l.prefersDarkMode), ynCSV(l.isTouchDevice), ynCSV(l.doNotTrack),
+        ynCSV(l.prefersReducedMotion), ynCSV(l.isOnline),
+        ynCSV(l.adBlocker), ynCSV(l.webdriver), ynCSV(l.pdfViewerEnabled), l.pluginsCount ?? '',
+        ynCSV(l.webGLSupported), ynCSV(l.serviceWorkerSupported), l.notificationPermission || '',
+        l.fingerprint || '', l.canvasFingerprint || '', l.webglFingerprint || '',
+        l.session?.pageViews ?? '', l.session?.durationSeconds ?? '', ynCSV(l.session?.isNewSession),
+        l.mediaDevices?.cameras ?? '', l.mediaDevices?.microphones ?? '', l.mediaDevices?.speakers ?? '',
+        l.page || '', l.method || '', l.statusCode || '', l.responseTime || '',
+        l.referer || '', l.userAgent || '',
+      ];
+      csv += row.map(v => escCSV(v)).join(',') + '\n';
+    });
+
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    Object.assign(document.createElement('a'), { href: url, download: `visitor_logs_${new Date().toISOString().split('T')[0]}.csv` }).click();
+    URL.revokeObjectURL(url);
+    toast.success(`CSV יורד — ${logs.length} רשומות · ${headers.length} עמודות`);
+  };
+
+  const handleDeleteOld = async () => {
+    if (!confirm('למחוק לוגים ישנים מ-30 יום?')) return;
+    try {
+      const res = await api.delete('/logs/admin/cleanup', { data: { days: 30 } });
+      toast.success(res.data.message || 'הלוגים נמחקו');
+      fetchLogs();
+    } catch (err) {
+      toast.error(`שגיאה: ${err.response?.data?.message || err.message || 'שגיאה'}`);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!confirm('⚠️ הודעה חשובה!\n\nהפעולה הזו תמחק את כל הלוגים במערכת — הפעולה בלתי הפיכה!\n\nהאם אתה בטוח?')) return;
+    if (!confirm('🚨 אתה בטוח לגמרי? לא ניתן לשחזר לוגים שנמחקו!')) return;
+    try {
+      setLoading(true);
+      const res = await api.delete('/logs/admin/delete-all');
+      toast.success(`✅ נמחקו ${res.data.deletedCount} לוגים בהצלחה`);
+      setLogs([]);
+    } catch (err) {
+      toast.error(`שגיאה: ${err.response?.data?.message || err.message || 'שגיאה'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ────────────────────────────────────────────────────────────
+  if (!statusLoaded) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <RefreshCw className="h-8 w-8 text-blue-500 animate-spin" />
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-2 border-blue-500 border-t-transparent mb-3" />
+          <p className="text-slate-500 text-sm">טוען סטטוס מעקב...</p>
+        </div>
       </div>
     );
   }
 
-  const { summary: s, analytics: a } = summary;
-
-  const statCards = [
-    { label: "סה\"כ לוגים", value: s.totalLogs.toLocaleString(), icon: Activity, color: "blue" },
-    { label: "24 שעות אחרונות", value: s.last24Hours.toLocaleString(), icon: Clock, color: "green" },
-    { label: "7 ימים אחרונים", value: s.last7Days.toLocaleString(), icon: TrendingUp, color: "purple" },
-    { label: "30 ימים אחרונים", value: s.last30Days.toLocaleString(), icon: Eye, color: "orange" },
-    { label: "IP ייחודיים", value: s.uniqueIPs.toLocaleString(), icon: Globe, color: "cyan" },
-    { label: "משתמשים ייחודיים", value: s.uniqueUsers.toLocaleString(), icon: Users, color: "pink" },
-    { label: "זמן תגובה ממוצע", value: `${s.avgResponseTime}ms`, icon: Zap, color: "yellow" },
-  ];
-
-  const colorMap = {
-    blue: "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400",
-    green: "bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400",
-    purple: "bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400",
-    orange: "bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400",
-    cyan: "bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400",
-    pink: "bg-pink-50 dark:bg-pink-950/30 text-pink-600 dark:text-pink-400",
-    yellow: "bg-yellow-50 dark:bg-yellow-950/30 text-yellow-600 dark:text-yellow-400",
-  };
-
   return (
-    <div className="space-y-8">
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        {statCards.map((card, i) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={i}
-              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 space-y-2"
+    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans" dir="rtl">
+      <div className="max-w-[1500px] mx-auto p-4 md:p-6 lg:p-8">
+
+        {/* ═══ HEADER ═══ */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-100 flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-blue-500/30 shadow-lg shadow-blue-500/10">
+                <Activity size={24} className="text-blue-400" />
+              </div>
+              מעקב מבקרים
+              <span className="text-sm font-normal text-slate-500 hidden md:inline">Visitor Intelligence</span>
+            </h1>
+            <p className="text-slate-500 text-sm mt-1">ניטור מתקדם ואיסוף מודיעין על מבקרי המערכת</p>
+            <Link
+              to="/admin/user-activity"
+              className="inline-flex items-center gap-1.5 mt-2 text-xs text-blue-400 hover:text-blue-300 transition font-medium"
             >
-              <div className="flex items-center gap-2">
-                <div className={`p-2 rounded-lg ${colorMap[card.color]}`}>
-                  <Icon className="h-4 w-4" />
+              <Users size={14} /> סיכום פעילות לפי משתמש →
+            </Link>
+          </div>
+
+          <button
+            onClick={handleToggleLogging}
+            disabled={togglingLogging}
+            className={`group relative flex items-center gap-3 px-6 py-3 rounded-2xl font-bold text-sm transition-all disabled:opacity-60
+              ${loggingEnabled
+                ? 'bg-emerald-500/15 text-emerald-300 border-2 border-emerald-500/40 hover:bg-emerald-500/25 shadow-[0_0_20px_rgba(52,211,153,0.15)]'
+                : 'bg-slate-800 text-slate-400 border-2 border-slate-600/40 hover:bg-slate-700 hover:text-slate-300'
+              }`}
+          >
+            <div className={`relative w-3 h-3 rounded-full transition-all ${loggingEnabled ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : 'bg-slate-600'}`}>
+              {loggingEnabled && <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-40" />}
+            </div>
+            <Power size={16} />
+            {togglingLogging ? 'מעדכן...' : loggingEnabled ? 'מעקב פעיל — לוגים נשמרים' : 'מעקב כבוי — לא נשמר כלום'}
+          </button>
+        </div>
+
+        {/* ═══ OFF STATE ═══ */}
+        {!loggingEnabled && (
+          <div className="mt-16 text-center">
+            <div className="inline-flex p-6 rounded-full bg-slate-800 border border-slate-700 mb-6">
+              <EyeOff size={48} className="text-slate-600" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-400 mb-2">המעקב כבוי</h2>
+            <p className="text-slate-600 max-w-md mx-auto">
+              כרגע לא נשמרים לוגים של מבקרים. לחץ על הכפתור למעלה כדי להתחיל לאסוף נתונים.
+            </p>
+            {logs.length > 0 && (
+              <div className="mt-8">
+                <p className="text-slate-500 text-sm mb-4">יש {logs.length} לוגים ישנים שנשמרו קודם</p>
+                <div className="flex justify-center gap-3">
+                  <button onClick={handleExportCSV} className="flex items-center gap-1.5 bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-500/25 transition">
+                    <Download size={14} /> ייצוא CSV
+                  </button>
+                  <button onClick={handleDeleteAll} disabled={!logs.length} className="flex items-center gap-1.5 bg-rose-600/20 text-rose-300 border border-rose-500/50 px-4 py-2 rounded-xl text-sm font-bold hover:bg-rose-600/30 transition disabled:opacity-50">
+                    <Trash2 size={14} /> מחק הכל
+                  </button>
                 </div>
-                <span className="text-xs text-slate-500 dark:text-slate-400">{card.label}</span>
               </div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{card.value}</p>
-            </div>
-          );
-        })}
-      </div>
+            )}
+          </div>
+        )}
 
-      {/* Charts Row 1 — Browsers + Devices */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="דפדפנים מובילים">
-          {a.topBrowsers?.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={a.topBrowsers} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#3b82f6" radius={[0, 6, 6, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <EmptyChart />}
-        </ChartCard>
+        {/* ═══ ON STATE ═══ */}
+        {loggingEnabled && (
+          <>
+            {/* ★ STAT CARDS — 8 columns */}
+            {summary && (
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-8">
+                <StatCard icon={<Users size={18} />} color="blue" value={summary.summary?.last24Hours || 0} label="כניסות היום" />
+                <StatCard icon={<Globe size={18} />} color="green" value={summary.summary?.uniqueIPsToday || 0} label="IP ייחודי היום" />
+                <StatCard icon={<Activity size={18} />} color="purple" value={summary.summary?.last7Days || 0} label="כניסות בשבוע" />
+                <StatCard icon={<Zap size={18} />} color="amber" value={`${summary.summary?.avgResponseTime || 0}ms`} label="ממוצע תגובה" />
+                <StatCard icon={<Users size={18} />} color="cyan" value={summary.summary?.uniqueUsers || 0} label="משתמשים רשומים" />
+                <StatCard icon={<Globe size={18} />} color="rose" value={summary.summary?.uniqueIPs || 0} label="IP סה״כ" />
+                <StatCard icon={<Fingerprint size={18} />} color="indigo" value={computedStats?.uniqueFingerprints || 0} label="טביעות ייחודיות" subtitle="מזוהים ע״י FP" />
+                <StatCard icon={<TrendingUp size={18} />} color="teal" value={`${computedStats?.dataQuality || 0}%`} label="איכות נתונים" subtitle="עם Session בלבד" />
+              </div>
+            )}
 
-        <ChartCard title="התפלגות מכשירים">
-          {a.topDevices?.length > 0 ? (
-            <div className="flex items-center justify-center gap-8">
-              <ResponsiveContainer width="60%" height={280}>
-                <PieChart>
-                  <Pie data={a.topDevices} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
-                    {a.topDevices.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="space-y-2">
-                {a.topDevices.map((d, i) => {
-                  const DevIcon = DEVICE_ICONS[d.name] || Globe;
-                  return (
-                    <div key={i} className="flex items-center gap-2 text-sm">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                      <DevIcon className="h-4 w-4 text-slate-500" />
-                      <span className="text-slate-700 dark:text-slate-300">{d.name}</span>
-                      <span className="text-slate-400">({d.count})</span>
+            {/* ★ DETECTION COUNTERS */}
+            {computedStats && logs.length > 0 && (
+              <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <BarChart3 size={16} className="text-amber-400" />
+                  <span className="text-sm font-bold text-slate-300">סטטיסטיקות זיהוי — מתוך {logs.length} ביקורים</span>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-2">
+                  {[
+                    { label: 'טביעות', val: computedStats.uniqueFingerprints, icon: <Fingerprint size={12} />, clr: 'text-indigo-300' },
+                    { label: 'Canvas FP', val: computedStats.uniqueCanvasFingerprints, icon: <Hash size={12} />, clr: 'text-purple-300' },
+                    { label: 'בוטים', val: computedStats.bots, icon: <Bot size={12} />, clr: 'text-orange-300' },
+                    { label: 'AdBlock', val: computedStats.adBlock, icon: <Shield size={12} />, clr: 'text-red-300' },
+                    { label: 'מסך מגע', val: computedStats.touch, icon: <MousePointer size={12} />, clr: 'text-purple-300' },
+                    { label: 'מצב כהה', val: computedStats.dark, icon: <Moon size={12} />, clr: 'text-slate-300' },
+                    { label: 'DNT', val: computedStats.dnt, icon: <Shield size={12} />, clr: 'text-rose-300' },
+                    { label: 'עם GPU', val: computedStats.withGPU, icon: <Layers size={12} />, clr: 'text-cyan-300' },
+                    { label: 'עם סוללה', val: computedStats.withBattery, icon: <BatteryCharging size={12} />, clr: 'text-green-300' },
+                    { label: 'עם סשן', val: computedStats.withSession, icon: <Activity size={12} />, clr: 'text-emerald-300' },
+                  ].map(({ label, val, icon, clr }) => (
+                    <div key={label} className="text-center bg-slate-700/30 rounded-lg py-2 px-1">
+                      <div className={`${clr} flex items-center justify-center gap-1 mb-0.5`}>{icon}</div>
+                      <div className="text-lg font-black text-slate-100">{val}</div>
+                      <div className="text-[10px] text-slate-500 whitespace-nowrap">{label}</div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : <EmptyChart />}
-        </ChartCard>
-      </div>
-
-      {/* Charts Row 2 — OS + Daily Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="מערכות הפעלה מובילות">
-          {a.topOS?.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={a.topOS} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#8b5cf6" radius={[0, 6, 6, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <EmptyChart />}
-        </ChartCard>
-
-        <ChartCard title="פעילות יומית (30 ימים אחרונים)">
-          {a.dailyDistribution?.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={a.dailyDistribution}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis />
-                <Tooltip />
-                <Area type="monotone" dataKey="count" stroke="#3b82f6" fill="#3b82f680" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : <EmptyChart />}
-        </ChartCard>
-      </div>
-
-      {/* Charts Row 3 — Hourly + Status Codes */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="התפלגות שעתית (24 שעות)">
-          {a.hourlyDistribution?.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={a.hourlyDistribution}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="hour" tick={{ fontSize: 11 }} />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="count" fill="#06b6d4" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <EmptyChart />}
-        </ChartCard>
-
-        <ChartCard title="קודי סטטוס">
-          {a.statusCodes?.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie data={a.statusCodes.map(s => ({ ...s, name: String(s.code) }))} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
-                  {a.statusCodes.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : <EmptyChart />}
-        </ChartCard>
-      </div>
+                </div>
+              </div>
+            )}
 
-      {/* Charts Row 4 — Top Pages + Methods */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="דפים הנצפים ביותר">
-          {a.topPages?.length > 0 ? (
-            <div className="space-y-2 max-h-[300px] overflow-y-auto">
-              {a.topPages.map((p, i) => {
-                const maxCount = a.topPages[0]?.count || 1;
-                const pct = Math.round((p.count / maxCount) * 100);
-                return (
-                  <div key={i} className="flex items-center gap-3">
-                    <span className="text-xs text-slate-400 w-6 text-left">{i + 1}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-slate-700 dark:text-slate-300 truncate" title={p.name}>
-                          {p.name}
-                        </span>
-                        <span className="text-xs text-slate-400 ml-2">{p.count}</span>
-                      </div>
-                      <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1.5">
-                        <div className="h-1.5 rounded-full bg-blue-500" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
+            {/* ★ CHARTS — 4 columns */}
+            {summary?.analytics && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5">
+                  <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2"><Globe size={16} className="text-blue-400" /> דפדפנים</h3>
+                  <MiniBar items={summary.analytics.topBrowsers} color="blue" />
+                </div>
+                <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5">
+                  <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2"><Monitor size={16} className="text-emerald-400" /> מערכות הפעלה</h3>
+                  <MiniBar items={summary.analytics.topOS} color="green" />
+                </div>
+                <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5">
+                  <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2"><Smartphone size={16} className="text-purple-400" /> התקנים</h3>
+                  <MiniBar items={summary.analytics.topDevices} color="purple" />
+                </div>
+                {summary.analytics.topPages && (
+                  <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5">
+                    <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2"><FileText size={16} className="text-amber-400" /> דפים פופולריים</h3>
+                    <MiniBar items={summary.analytics.topPages} color="amber" />
                   </div>
-                );
-              })}
-            </div>
-          ) : <EmptyChart />}
-        </ChartCard>
+                )}
+              </div>
+            )}
 
-        <ChartCard title="HTTP Methods + שפות + Referrers">
-          <div className="space-y-4">
-            {/* Methods */}
-            {a.methodDistribution?.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Methods</p>
-                <div className="flex flex-wrap gap-2">
-                  {a.methodDistribution.map((m, i) => (
-                    <span key={i} className={`px-3 py-1 text-xs font-medium rounded-full ${getMethodColor(m.method)}`}>
-                      {m.method}: {m.count}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Languages */}
-            {a.topLanguages?.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
-                  <Languages className="h-3 w-3" /> שפות
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {a.topLanguages.slice(0, 6).map((l, i) => (
-                    <span key={i} className="px-3 py-1 text-xs bg-slate-100 dark:bg-slate-700 rounded-full text-slate-600 dark:text-slate-300">
-                      {l.language}: {l.count}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Referrers */}
-            {a.topReferrers?.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
-                  <ExternalLink className="h-3 w-3" /> Referrers
-                </p>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {a.topReferrers.map((r, i) => (
-                    <div key={i} className="flex justify-between text-xs text-slate-600 dark:text-slate-400">
-                      <span className="truncate flex-1">{r.referrer}</span>
-                      <span className="text-slate-400 mr-2">{r.count}</span>
+            {/* ★ TOP IPs */}
+            {summary?.analytics?.topIPs?.length > 0 && (
+              <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5 mb-8">
+                <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2"><Activity size={16} className="text-amber-400" /> IP הכי פעילים (7 ימים)</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                  {summary.analytics.topIPs.slice(0, 10).map((ip, idx) => (
+                    <div key={idx} className="bg-slate-700/30 rounded-xl px-3 py-2 cursor-pointer hover:bg-slate-700/60 transition" onClick={() => setSearchIP(ip._id)}>
+                      <div className="font-mono text-sm text-slate-200 font-bold">{ip._id}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">{ip.count} כניסות · {timeAgo(ip.lastSeen)}</div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-          </div>
-        </ChartCard>
+
+            {/* ★ FILTERS */}
+            <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 mb-6">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex bg-slate-700/40 rounded-lg overflow-hidden border border-slate-600/30">
+                  {['all', 'desktop', 'mobile', 'tablet'].map((d) => (
+                    <button key={d} onClick={() => setFilterDevice(d)}
+                      className={`px-3 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${filterDevice === d ? 'bg-blue-500/20 text-blue-300' : 'text-slate-400 hover:text-slate-200'}`}>
+                      {d === 'all' ? 'הכל' : <DeviceIcon type={d} size={14} />}
+                      {d !== 'all' && <span className="hidden sm:inline">{d === 'desktop' ? 'מחשב' : d === 'mobile' ? 'נייד' : 'טאבלט'}</span>}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center bg-slate-700/40 rounded-lg border border-slate-600/30 px-3 gap-2">
+                  <Search size={14} className="text-slate-500" />
+                  <input type="text" value={searchIP} onChange={(e) => setSearchIP(e.target.value)} placeholder="חפש IP..." className="bg-transparent border-none outline-none text-sm text-slate-200 placeholder:text-slate-500 py-2 w-32" />
+                  {searchIP && <button onClick={() => setSearchIP('')} className="text-slate-500 hover:text-slate-300"><X size={14} /></button>}
+                </div>
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-slate-700/40 border border-slate-600/30 rounded-lg px-3 py-2 text-xs text-slate-300 outline-none">
+                  <option value="newest">חדש ← ישן</option>
+                  <option value="oldest">ישן ← חדש</option>
+                  <option value="slowest">איטי ← מהיר</option>
+                </select>
+                <div className="flex-1" />
+                <button onClick={fetchLogs} disabled={loading} className="flex items-center gap-1.5 bg-blue-500/15 text-blue-300 border border-blue-500/30 px-3 py-2 rounded-lg text-xs font-bold hover:bg-blue-500/25 transition disabled:opacity-50">
+                  <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> רענן
+                </button>
+                <button onClick={handleExportCSV} className="flex items-center gap-1.5 bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-3 py-2 rounded-lg text-xs font-bold hover:bg-emerald-500/25 transition">
+                  <Download size={14} /> CSV
+                </button>
+                <button onClick={handleDeleteOld} className="flex items-center gap-1.5 bg-red-500/15 text-red-300 border border-red-500/30 px-3 py-2 rounded-lg text-xs font-bold hover:bg-red-500/25 transition">
+                  <Trash2 size={14} /> נקה ישנים
+                </button>
+                <button onClick={handleDeleteAll} disabled={loading || !logs.length} className="flex items-center gap-1.5 bg-rose-600/20 text-rose-300 border border-rose-500/50 px-3 py-2 rounded-lg text-xs font-bold hover:bg-rose-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed" title="מחק את כל הלוגים">
+                  <Trash2 size={14} /> מחק הכל
+                </button>
+              </div>
+            </div>
+
+            {/* ★ LOGS TABLE */}
+            <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl overflow-hidden">
+              <div className="bg-slate-800 px-5 py-3 border-b border-slate-700/50 flex items-center justify-between">
+                <span className="text-sm font-bold text-slate-300">📋 {logs.length} ביקורים</span>
+                <div className="flex items-center gap-3">
+                  {computedStats?.uniqueFingerprints > 0 && (
+                    <span className="text-xs text-indigo-400 flex items-center gap-1"><Fingerprint size={12} /> {computedStats.uniqueFingerprints} מבקרים ייחודיים</span>
+                  )}
+                  {loading && <RefreshCw size={14} className="animate-spin text-blue-400" />}
+                </div>
+              </div>
+
+              {loading && !logs.length ? (
+                <div className="flex justify-center py-16">
+                  <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent mb-3" />
+                    <p className="text-slate-500 text-sm">טוען ביקורים...</p>
+                  </div>
+                </div>
+              ) : !logs.length ? (
+                <div className="py-16 text-center">
+                  <Activity size={40} className="mx-auto text-slate-600 mb-4" />
+                  <p className="text-slate-400 font-medium">אין ביקורים עדיין</p>
+                  <p className="text-slate-600 text-sm mt-1">ביקורים חדשים יופיעו כאן אוטומטית כל 10 שניות</p>
+                </div>
+              ) : (
+                <div>
+                  {logs.map((log, idx) => (
+                    <LogRow key={log._id || idx} log={log} isExpanded={expandedLog === idx} onToggle={() => setExpandedLog(expandedLog === idx ? null : idx)} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
-}
+};
 
-// ═══════════════════════════════════════════════════
-// Logs Tab
-// ═══════════════════════════════════════════════════
-function LogsTab({
-  logs, total, page, setPage, limit, setLimit,
-  filters, setFilters, showFilters, setShowFilters,
-  loading, exportCSV, fetchLogs,
-}) {
-  const totalPages = Math.ceil(total / limit);
-
-  return (
-    <div className="space-y-4">
-      {/* Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition ${
-              showFilters
-                ? "bg-blue-100 dark:bg-blue-950/50 text-blue-600"
-                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
-            }`}
-          >
-            <Filter className="h-4 w-4" /> סינון
-          </button>
-          <select
-            value={limit}
-            onChange={(e) => { setLimit(Number(e.target.value)); setPage(0); }}
-            className="px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-          >
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-            <option value={200}>200</option>
-          </select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-500">{total.toLocaleString()} תוצאות</span>
-          <button
-            onClick={exportCSV}
-            className="flex items-center gap-1 px-3 py-2 text-sm bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-100 transition"
-          >
-            <Download className="h-4 w-4" /> CSV
-          </button>
-        </div>
-      </div>
-
-      {/* Filters Panel */}
-      {showFilters && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-          <FilterInput label="מתאריך" type="date" value={filters.startDate} onChange={(v) => setFilters({ ...filters, startDate: v })} />
-          <FilterInput label="עד תאריך" type="date" value={filters.endDate} onChange={(v) => setFilters({ ...filters, endDate: v })} />
-          <FilterSelect label="מכשיר" value={filters.device} onChange={(v) => setFilters({ ...filters, device: v })}
-            options={[{ value: "", label: "הכל" }, { value: "desktop", label: "Desktop" }, { value: "mobile", label: "Mobile" }, { value: "tablet", label: "Tablet" }]}
-          />
-          <FilterSelect label="Method" value={filters.method} onChange={(v) => setFilters({ ...filters, method: v })}
-            options={[{ value: "", label: "הכל" }, { value: "GET", label: "GET" }, { value: "POST", label: "POST" }, { value: "PUT", label: "PUT" }, { value: "DELETE", label: "DELETE" }]}
-          />
-          <FilterInput label="דפדפן" type="text" value={filters.browser} onChange={(v) => setFilters({ ...filters, browser: v })} placeholder="Chrome..." />
-          <FilterInput label="IP" type="text" value={filters.ipAddress} onChange={(v) => setFilters({ ...filters, ipAddress: v })} placeholder="192.168..." />
-          <div className="col-span-full flex justify-end gap-2 mt-1">
-            <button
-              onClick={() => { setFilters({ startDate: "", endDate: "", device: "", method: "", browser: "", ipAddress: "" }); setPage(0); }}
-              className="px-3 py-1.5 text-xs bg-slate-200 dark:bg-slate-700 rounded-lg hover:bg-slate-300 transition"
-            >
-              איפוס
-            </button>
-            <button
-              onClick={() => { setPage(0); fetchLogs(); }}
-              className="px-3 py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-            >
-              חפש
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 dark:bg-slate-800">
-            <tr>
-              {["IP", "דפדפן", "מערכת", "מכשיר", "דף", "Method", "סטטוס", "זמן (ms)", "שפה", "תאריך"].map((h) => (
-                <th key={h} className="px-3 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {loading ? (
-              <tr><td colSpan={10} className="text-center py-12 text-slate-400"><RefreshCw className="h-6 w-6 mx-auto animate-spin" /></td></tr>
-            ) : logs.length === 0 ? (
-              <tr><td colSpan={10} className="text-center py-12 text-slate-400">אין לוגים להצגה</td></tr>
-            ) : (
-              logs.map((log, i) => (
-                <tr key={log._id || i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                  <td className="px-3 py-2.5 font-mono text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">{log.ipAddress}</td>
-                  <td className="px-3 py-2.5 text-xs whitespace-nowrap">{log.browser?.name} {log.browser?.version?.split('.')[0]}</td>
-                  <td className="px-3 py-2.5 text-xs whitespace-nowrap">{log.os?.name} {log.os?.version}</td>
-                  <td className="px-3 py-2.5">
-                    <DeviceBadge type={log.device?.type} />
-                  </td>
-                  <td className="px-3 py-2.5 text-xs max-w-[200px] truncate" title={log.page}>{log.page}</td>
-                  <td className="px-3 py-2.5"><MethodBadge method={log.method} /></td>
-                  <td className="px-3 py-2.5"><StatusBadge code={log.statusCode} /></td>
-                  <td className="px-3 py-2.5 text-xs font-mono">
-                    <span className={log.responseTime > 500 ? "text-red-500" : log.responseTime > 200 ? "text-yellow-500" : "text-green-500"}>
-                      {log.responseTime}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-slate-500">{log.language || "—"}</td>
-                  <td className="px-3 py-2.5 text-xs text-slate-500 whitespace-nowrap">
-                    {new Date(log.timestamp).toLocaleString("he-IL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-slate-500">
-            עמוד {page + 1} מתוך {totalPages}
-          </p>
-          <div className="flex gap-1">
-            <button
-              disabled={page === 0}
-              onClick={() => setPage(page - 1)}
-              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-            <button
-              disabled={page >= totalPages - 1}
-              onClick={() => setPage(page + 1)}
-              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 transition"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════
-// Small reusable components
-// ═══════════════════════════════════════════════════
-
-function ChartCard({ title, children }) {
-  return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5">
-      <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">{title}</h3>
-      {children}
-    </div>
-  );
-}
-
-function EmptyChart() {
-  return <p className="text-center text-sm text-slate-400 py-10">אין נתונים עדיין</p>;
-}
-
-function StatusBadge({ code }) {
-  let cls = "bg-slate-100 text-slate-600";
-  if (code >= 200 && code < 300) cls = "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400";
-  else if (code >= 300 && code < 400) cls = "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400";
-  else if (code >= 400 && code < 500) cls = "bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400";
-  else if (code >= 500) cls = "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400";
-  return <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${cls}`}>{code}</span>;
-}
-
-function MethodBadge({ method }) {
-  return <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getMethodColor(method)}`}>{method}</span>;
-}
-
-function DeviceBadge({ type }) {
-  const Icon = DEVICE_ICONS[type] || Globe;
-  const labels = { desktop: "מחשב", mobile: "נייד", tablet: "טאבלט", unknown: "לא ידוע" };
-  return (
-    <span className="inline-flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
-      <Icon className="h-3.5 w-3.5" />
-      {labels[type] || type}
-    </span>
-  );
-}
-
-function FilterInput({ label, type, value, onChange, placeholder }) {
-  return (
-    <div>
-      <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-      />
-    </div>
-  );
-}
-
-function FilterSelect({ label, value, onChange, options }) {
-  return (
-    <div>
-      <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">{label}</label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function getMethodColor(method) {
-  const map = {
-    GET: "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400",
-    POST: "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400",
-    PUT: "bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400",
-    DELETE: "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400",
-    PATCH: "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-400",
-  };
-  return map[method] || "bg-slate-100 text-slate-600";
-}
+export default AdminLogsPage;

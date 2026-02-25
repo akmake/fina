@@ -76,7 +76,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-XSRF-Token', 'X-Fina-Client',
     'X-Screen-Width', 'X-Screen-Height', 'X-Color-Depth', 'X-HW-Cores', 'X-HW-Memory',
-    'X-Connection-Type', 'X-Connection-Downlink', 'X-Connection-RTT', 'X-Session-Id'],
+    'X-Connection-Type', 'X-Connection-Downlink', 'X-Connection-RTT', 'X-Session-Id', 'X-Device-Info'],
 }));
 
 // --- הגדרות גודל גוף הבקשה ---

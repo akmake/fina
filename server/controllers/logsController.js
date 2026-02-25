@@ -1,293 +1,309 @@
 import Log from '../models/Log.js';
+import SystemConfig from '../models/SystemConfig.js';
+import catchAsync from '../utils/catchAsync.js';
+import { refreshLoggingCache, deviceInfoCache, makeDeviceKey } from '../middlewares/loggingMiddleware.js';
 
-// =============================================
-// GET /api/logs/admin/all — כל הלוגים (אדמין)
-// =============================================
-export const getAllLogs = async (req, res) => {
+// ★ Receive device info ping from client (called once on app load)
+export const receiveDevicePing = (req, res) => {
   try {
-    const {
-      limit = 100,
-      skip = 0,
-      startDate,
-      endDate,
-      userId,
-      ipAddress,
-      device,
-      method,
-      page,
-      statusCode,
-      browser,
-      os,
-    } = req.query;
+    const rawIP = req.headers['cf-connecting-ip']
+               || req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+               || req.headers['x-real-ip']
+               || req.ip
+               || req.connection?.remoteAddress
+               || 'unknown';
+    let ip = rawIP;
+    if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+    if (ip === '::1') ip = '127.0.0.1';
 
-    const filter = {};
+    const ua = req.get('user-agent') || '';
+    const key = makeDeviceKey(ip, ua);
 
-    // Date range filter
-    if (startDate || endDate) {
-      filter.timestamp = {};
-      if (startDate) filter.timestamp.$gte = new Date(startDate);
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        filter.timestamp.$lte = end;
-      }
+    deviceInfoCache.set(key, {
+      data: req.body || {},
+      timestamp: Date.now(),
+    });
+
+    // Cleanup old entries (older than 2 hours)
+    const now = Date.now();
+    for (const [k, v] of deviceInfoCache) {
+      if (now - v.timestamp > 2 * 60 * 60 * 1000) deviceInfoCache.delete(k);
     }
 
-    if (userId) filter.userId = userId;
-    if (ipAddress) filter.ipAddress = { $regex: ipAddress, $options: 'i' };
-    if (device) filter['device.type'] = device;
-    if (method) filter.method = method.toUpperCase();
-    if (page) filter.page = { $regex: page, $options: 'i' };
-    if (statusCode) filter.statusCode = parseInt(statusCode);
-    if (browser) filter['browser.name'] = { $regex: browser, $options: 'i' };
-    if (os) filter['os.name'] = { $regex: os, $options: 'i' };
-
-    const [total, data] = await Promise.all([
-      Log.countDocuments(filter),
-      Log.find(filter)
-        .sort({ timestamp: -1 })
-        .skip(parseInt(skip))
-        .limit(parseInt(limit))
-        .lean(),
-    ]);
-
-    res.json({
-      status: 'success',
-      total,
-      count: data.length,
-      data,
-    });
-  } catch (error) {
-    console.error('[LogsController] getAllLogs error:', error);
-    res.status(500).json({ status: 'error', message: 'שגיאה בטעינת לוגים' });
+    res.status(200).json({ ok: true });
+  } catch (e) {
+    res.status(200).json({ ok: false });
   }
 };
 
-// =============================================
-// GET /api/logs/admin/summary — סיכום אנליטי
-// =============================================
-export const getLogsSummary = async (req, res) => {
-  try {
-    const now = new Date();
-    const last24h = new Date(now - 24 * 60 * 60 * 1000);
-    const last7d = new Date(now - 7 * 24 * 60 * 60 * 1000);
-    const last30d = new Date(now - 30 * 24 * 60 * 60 * 1000);
+// ★ Toggle logging on/off
+export const toggleLogging = catchAsync(async (req, res) => {
+  const { enabled } = req.body;
 
-    // Basic counts
-    const [last24Hours, last7Days, last30Days, totalLogs] = await Promise.all([
-      Log.countDocuments({ timestamp: { $gte: last24h } }),
-      Log.countDocuments({ timestamp: { $gte: last7d } }),
-      Log.countDocuments({ timestamp: { $gte: last30d } }),
-      Log.countDocuments({}),
-    ]);
+  let config = await SystemConfig.findOne();
+  if (!config) {
+    config = await SystemConfig.create({ loggingEnabled: !!enabled });
+  } else {
+    config.loggingEnabled = !!enabled;
+    await config.save();
+  }
 
-    // Unique IPs & users
-    const [uniqueIPsResult, uniqueUsersResult] = await Promise.all([
-      Log.distinct('ipAddress'),
-      Log.distinct('userId', { userId: { $ne: null } }),
-    ]);
+  // רענון מיידי של ה-cache ב-middleware — בלי לחכות 10 שניות
+  refreshLoggingCache(config.loggingEnabled);
 
-    // Top browsers
-    const topBrowsers = await Log.aggregate([
-      { $group: { _id: '$browser.name', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 10 },
-      { $project: { name: '$_id', count: 1, _id: 0 } },
-    ]);
+  console.log(`📊 Logging ${config.loggingEnabled ? 'ENABLED ✅' : 'DISABLED ❌'}`);
 
-    // Top devices
-    const topDevices = await Log.aggregate([
-      { $group: { _id: '$device.type', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 5 },
-      { $project: { name: '$_id', count: 1, _id: 0 } },
-    ]);
+  res.status(200).json({
+    status: 'success',
+    loggingEnabled: config.loggingEnabled,
+  });
+});
 
-    // Top OS
-    const topOS = await Log.aggregate([
-      { $group: { _id: '$os.name', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 10 },
-      { $project: { name: '$_id', count: 1, _id: 0 } },
-    ]);
+// ★ Get logging status
+export const getLoggingStatus = catchAsync(async (req, res) => {
+  const config = await SystemConfig.findOne().lean();
+  res.status(200).json({
+    status: 'success',
+    loggingEnabled: config?.loggingEnabled === true,
+  });
+});
 
-    // Top pages
-    const topPages = await Log.aggregate([
-      { $group: { _id: '$page', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 15 },
-      { $project: { name: '$_id', count: 1, _id: 0 } },
-    ]);
+// Get all logs (admin only)
+export const getAllLogs = catchAsync(async (req, res) => {
+  const { limit = 100, skip = 0, startDate, endDate, userId, ipAddress, device } = req.query;
 
-    // Hourly distribution (last 24h)
-    const hourlyDistribution = await Log.aggregate([
-      { $match: { timestamp: { $gte: last24h } } },
-      {
-        $group: {
-          _id: { $hour: '$timestamp' },
-          count: { $sum: 1 },
-        },
+  const filter = {};
+
+  if (startDate || endDate) {
+    filter.timestamp = {};
+    if (startDate) filter.timestamp.$gte = new Date(startDate);
+    if (endDate) filter.timestamp.$lte = new Date(endDate);
+  }
+
+  if (userId) filter.userId = userId;
+
+  // חיפוש חלקי של IP
+  if (ipAddress) {
+    filter.ipAddress = { $regex: ipAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+  }
+
+  if (device && device !== 'all') filter.device = device;
+
+  const logs = await Log.find(filter)
+    .populate('userId', 'name email')
+    .sort({ timestamp: -1 })
+    .limit(parseInt(limit))
+    .skip(parseInt(skip));
+
+  const total = await Log.countDocuments(filter);
+
+  res.status(200).json({
+    status: 'success',
+    total,
+    count: logs.length,
+    data: logs,
+  });
+});
+
+// Get logs summary/analytics
+export const getLogsSummary = catchAsync(async (req, res) => {
+  const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const last7Days = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const last30Days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const [dailyVisitors, weeklyVisitors, monthlyVisitors] = await Promise.all([
+    Log.countDocuments({ timestamp: { $gte: last24Hours } }),
+    Log.countDocuments({ timestamp: { $gte: last7Days } }),
+    Log.countDocuments({ timestamp: { $gte: last30Days } }),
+  ]);
+
+  const [uniqueIPs, uniqueUsers] = await Promise.all([
+    Log.distinct('ipAddress'),
+    Log.distinct('userId'),
+  ]);
+
+  const topBrowsers = await Log.aggregate([
+    { $group: { _id: '$browser.name', count: { $sum: 1 } } },
+    { $sort: { count: -1 } },
+    { $limit: 10 },
+  ]);
+
+  const topDevices = await Log.aggregate([
+    { $group: { _id: '$device', count: { $sum: 1 } } },
+    { $sort: { count: -1 } },
+  ]);
+
+  const topOS = await Log.aggregate([
+    { $group: { _id: '$os.name', count: { $sum: 1 } } },
+    { $sort: { count: -1 } },
+    { $limit: 10 },
+  ]);
+
+  const topPages = await Log.aggregate([
+    { $group: { _id: '$page', count: { $sum: 1 } } },
+    { $sort: { count: -1 } },
+    { $limit: 10 },
+  ]);
+
+  const uniqueIPsToday = await Log.distinct('ipAddress', { timestamp: { $gte: last24Hours } });
+
+  const avgResponseAgg = await Log.aggregate([
+    { $match: { timestamp: { $gte: last24Hours } } },
+    { $group: { _id: null, avg: { $avg: '$responseTime' } } },
+  ]);
+  const avgResponseTime = avgResponseAgg[0]?.avg || 0;
+
+  const topIPs = await Log.aggregate([
+    { $match: { timestamp: { $gte: last7Days } } },
+    { $group: { _id: '$ipAddress', count: { $sum: 1 }, lastSeen: { $max: '$timestamp' } } },
+    { $sort: { count: -1 } },
+    { $limit: 10 },
+  ]);
+
+  res.status(200).json({
+    status: 'success',
+    summary: {
+      last24Hours: dailyVisitors,
+      last7Days: weeklyVisitors,
+      last30Days: monthlyVisitors,
+      uniqueIPs: uniqueIPs.length,
+      uniqueIPsToday: uniqueIPsToday.length,
+      uniqueUsers: uniqueUsers.filter(Boolean).length,
+      avgResponseTime: Math.round(avgResponseTime),
+    },
+    analytics: {
+      topBrowsers,
+      topDevices,
+      topOS,
+      topPages,
+      topIPs,
+    },
+  });
+});
+
+// Get user's own logs
+export const getMyLogs = catchAsync(async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ status: 'fail', message: 'You are not logged in' });
+  }
+
+  const { limit = 50, skip = 0 } = req.query;
+
+  const logs = await Log.find({ userId: req.user._id })
+    .sort({ timestamp: -1 })
+    .limit(parseInt(limit))
+    .skip(parseInt(skip));
+
+  const total = await Log.countDocuments({ userId: req.user._id });
+
+  res.status(200).json({ status: 'success', total, count: logs.length, data: logs });
+});
+
+// Delete old logs
+export const deleteOldLogs = catchAsync(async (req, res) => {
+  const days = req.body.days || 90;
+  const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  const result = await Log.deleteMany({ timestamp: { $lt: cutoffDate } });
+
+  res.status(200).json({
+    status: 'success',
+    message: `נמחקו ${result.deletedCount} לוגים ישנים מ-${days} ימים`,
+    deletedCount: result.deletedCount,
+  });
+});
+
+// Delete ALL logs
+export const deleteAllLogs = catchAsync(async (req, res) => {
+  const result = await Log.deleteMany({});
+
+  res.status(200).json({
+    status: 'success',
+    message: `נמחקו ${result.deletedCount} לוגים`,
+    deletedCount: result.deletedCount,
+  });
+});
+
+// ★ User Activity Summary — aggregated login/activity data per user
+export const getUserActivitySummary = catchAsync(async (req, res) => {
+  const { days = 30 } = req.query;
+  const since = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000);
+
+  // Aggregate by userId — only logged-in users
+  const userActivity = await Log.aggregate([
+    { $match: { userId: { $ne: null }, timestamp: { $gte: since } } },
+    {
+      $group: {
+        _id: '$userId',
+        totalVisits: { $sum: 1 },
+        firstSeen: { $min: '$timestamp' },
+        lastSeen: { $max: '$timestamp' },
+        uniqueIPs: { $addToSet: '$ipAddress' },
+        devices: { $addToSet: '$device' },
+        browsers: { $addToSet: '$browser.name' },
+        operatingSystems: { $addToSet: '$os.name' },
+        uniqueFingerprints: { $addToSet: '$fingerprint' },
+        avgResponseTime: { $avg: '$responseTime' },
+        pages: { $push: '$page' },
+        locations: { $addToSet: { country: '$location.country', city: '$location.city' } },
       },
-      { $sort: { _id: 1 } },
-      { $project: { hour: '$_id', count: 1, _id: 0 } },
-    ]);
+    },
+    { $sort: { lastSeen: -1 } },
+  ]);
 
-    // Daily distribution (last 30 days)
-    const dailyDistribution = await Log.aggregate([
-      { $match: { timestamp: { $gte: last30d } } },
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-      { $project: { date: '$_id', count: 1, _id: 0 } },
-    ]);
+  // Populate user info
+  const User = (await import('mongoose')).default.model('User');
+  const userIds = userActivity.map(u => u._id);
+  const users = await User.find({ _id: { $in: userIds } }).select('name email role').lean();
+  const userMap = {};
+  users.forEach(u => { userMap[u._id.toString()] = u; });
 
-    // Average response time
-    const avgResponseTime = await Log.aggregate([
-      { $match: { timestamp: { $gte: last24h } } },
-      { $group: { _id: null, avg: { $avg: '$responseTime' } } },
-    ]);
+  const data = userActivity.map(entry => {
+    const user = userMap[entry._id.toString()] || {};
+    // Count unique pages (remove duplicates)
+    const uniquePages = [...new Set(entry.pages)].length;
+    // Clean up locations (remove null entries)
+    const locations = entry.locations.filter(l => l.country && l.country !== 'Unknown');
 
-    // Status code distribution
-    const statusCodes = await Log.aggregate([
-      { $group: { _id: '$statusCode', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 10 },
-      { $project: { code: '$_id', count: 1, _id: 0 } },
-    ]);
+    return {
+      userId: entry._id,
+      name: user.name || 'משתמש לא ידוע',
+      email: user.email || '',
+      role: user.role || '',
+      totalVisits: entry.totalVisits,
+      firstSeen: entry.firstSeen,
+      lastSeen: entry.lastSeen,
+      uniqueIPs: entry.uniqueIPs.filter(Boolean),
+      devices: entry.devices.filter(Boolean),
+      browsers: entry.browsers.filter(Boolean),
+      operatingSystems: entry.operatingSystems.filter(Boolean),
+      uniqueFingerprints: entry.uniqueFingerprints.filter(Boolean).length,
+      avgResponseTime: Math.round(entry.avgResponseTime || 0),
+      uniquePages,
+      locations,
+    };
+  });
 
-    // HTTP method distribution
-    const methodDistribution = await Log.aggregate([
-      { $group: { _id: '$method', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $project: { method: '$_id', count: 1, _id: 0 } },
-    ]);
+  // Summary stats
+  const totalUsers = data.length;
+  const totalVisits = data.reduce((s, d) => s + d.totalVisits, 0);
+  const avgVisitsPerUser = totalUsers > 0 ? Math.round(totalVisits / totalUsers) : 0;
 
-    // Top referrers
-    const topReferrers = await Log.aggregate([
-      { $match: { referrer: { $ne: '' } } },
-      { $group: { _id: '$referrer', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 10 },
-      { $project: { referrer: '$_id', count: 1, _id: 0 } },
-    ]);
+  // Most active users (top 5)
+  const mostActive = [...data].sort((a, b) => b.totalVisits - a.totalVisits).slice(0, 5);
 
-    // Top languages
-    const topLanguages = await Log.aggregate([
-      { $match: { language: { $ne: '' } } },
-      { $group: { _id: '$language', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 10 },
-      { $project: { language: '$_id', count: 1, _id: 0 } },
-    ]);
+  // Device breakdown across all users
+  const deviceBreakdown = {};
+  data.forEach(d => d.devices.forEach(dev => { deviceBreakdown[dev] = (deviceBreakdown[dev] || 0) + 1; }));
 
-    res.json({
-      status: 'success',
-      summary: {
-        totalLogs,
-        last24Hours,
-        last7Days,
-        last30Days,
-        uniqueIPs: uniqueIPsResult.length,
-        uniqueUsers: uniqueUsersResult.length,
-        avgResponseTime: Math.round(avgResponseTime[0]?.avg || 0),
-      },
-      analytics: {
-        topBrowsers,
-        topDevices,
-        topOS,
-        topPages,
-        hourlyDistribution,
-        dailyDistribution,
-        statusCodes,
-        methodDistribution,
-        topReferrers,
-        topLanguages,
-      },
-    });
-  } catch (error) {
-    console.error('[LogsController] getLogsSummary error:', error);
-    res.status(500).json({ status: 'error', message: 'שגיאה בטעינת סיכום' });
-  }
-};
+  res.status(200).json({
+    status: 'success',
+    period: { days: parseInt(days), since },
+    summary: { totalUsers, totalVisits, avgVisitsPerUser },
+    mostActive,
+    deviceBreakdown,
+    data,
+  });
+});
 
-// =============================================
-// GET /api/logs/my-logs — הלוגים של המשתמש
-// =============================================
-export const getMyLogs = async (req, res) => {
-  try {
-    const { limit = 50, skip = 0 } = req.query;
-    const userId = req.user.id || req.user._id;
-
-    const [total, data] = await Promise.all([
-      Log.countDocuments({ userId }),
-      Log.find({ userId })
-        .sort({ timestamp: -1 })
-        .skip(parseInt(skip))
-        .limit(parseInt(limit))
-        .lean(),
-    ]);
-
-    res.json({
-      status: 'success',
-      total,
-      count: data.length,
-      data,
-    });
-  } catch (error) {
-    console.error('[LogsController] getMyLogs error:', error);
-    res.status(500).json({ status: 'error', message: 'שגיאה בטעינת לוגים' });
-  }
-};
-
-// =============================================
-// DELETE /api/logs/admin/cleanup — מחיקת לוגים ישנים
-// =============================================
-export const deleteOldLogs = async (req, res) => {
-  try {
-    const { days = 90 } = req.query;
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - parseInt(days));
-
-    const result = await Log.deleteMany({ timestamp: { $lt: cutoff } });
-
-    res.json({
-      status: 'success',
-      message: `נמחקו ${result.deletedCount} לוגים ישנים מלפני ${days} ימים`,
-      deletedCount: result.deletedCount,
-    });
-  } catch (error) {
-    console.error('[LogsController] deleteOldLogs error:', error);
-    res.status(500).json({ status: 'error', message: 'שגיאה במחיקת לוגים' });
-  }
-};
-
-// =============================================
-// GET /api/logs/admin/live — לוגים חיים (אחרונים)
-// =============================================
-export const getLiveLogs = async (req, res) => {
-  try {
-    const { since } = req.query;
-    const filter = {};
-    if (since) {
-      filter.timestamp = { $gt: new Date(since) };
-    }
-
-    const data = await Log.find(filter)
-      .sort({ timestamp: -1 })
-      .limit(50)
-      .lean();
-
-    res.json({
-      status: 'success',
-      count: data.length,
-      data,
-    });
-  } catch (error) {
-    console.error('[LogsController] getLiveLogs error:', error);
-    res.status(500).json({ status: 'error', message: 'שגיאה בטעינת לוגים חיים' });
-  }
-};
+export default { receiveDevicePing, toggleLogging, getLoggingStatus, getAllLogs, getLogsSummary, getMyLogs, deleteOldLogs, deleteAllLogs, getUserActivitySummary };
