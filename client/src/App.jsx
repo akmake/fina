@@ -42,6 +42,25 @@ import SuggestionsPage from "@/pages/SuggestionsPage";
 import AdminLogsPage   from "@/pages/AdminLogsPage";
 import UserActivityPage from "@/pages/UserActivityPage";
 
+/* New Features */
+import BudgetPage      from "@/pages/BudgetPage";
+import RecurringPage   from "@/pages/RecurringPage";
+import PensionPage     from "@/pages/PensionPage";
+import NetWorthPage    from "@/pages/NetWorthPage";
+import ExcelImportPage from "@/pages/ExcelImportPage";
+
+/* Extended Features */
+import InsurancePage       from "@/pages/InsurancePage";
+import MortgagePage        from "@/pages/MortgagePage";
+import GoalsPage           from "@/pages/GoalsPage";
+import AlertsPage          from "@/pages/AlertsPage";
+import TaxPage             from "@/pages/TaxPage";
+import RealEstatePage      from "@/pages/RealEstatePage";
+import DebtPage            from "@/pages/DebtPage";
+import ChildSavingsPage    from "@/pages/ChildSavingsPage";
+import ForeignCurrencyPage from "@/pages/ForeignCurrencyPage";
+import ReportsPage         from "@/pages/ReportsPage";
+
 export default function App() {
   return (
     <Routes>
@@ -63,13 +82,18 @@ export default function App() {
           <Route path="portfolio"         element={<TransactionsTab />}         />
           <Route path="smart-analytics"   element={<SmartAnalyticsDashboard />} />
           <Route path="finance"           element={<FinancePage />}             />
+          <Route path="budget"            element={<BudgetPage />}              />
+          <Route path="recurring"         element={<RecurringPage />}           />
+          <Route path="net-worth"         element={<NetWorthPage />}            />
           <Route path="import"            element={<ImportPage />}              />
+          <Route path="import/excel"      element={<ExcelImportPage />}         />
           <Route path="management"        element={<ManagementPage />}          />
 
           {/* Investments */}
           <Route path="investments" element={<InvestmentsPage />} />
           <Route path="deposits"    element={<DepositsPage />}    />
           <Route path="funds"       element={<FundsPage />}       />
+          <Route path="pension"     element={<PensionPage />}     />
 
           {/* Loans */}
           <Route path="my-loans"       element={<MyLoansPage />}    />
@@ -85,6 +109,18 @@ export default function App() {
           <Route path="profile"     element={<ProfilePage />}     />
           <Route path="settings"    element={<SettingsPage />}    />
           <Route path="suggestions" element={<SuggestionsPage />} />
+
+          {/* Extended Features */}
+          <Route path="insurance"        element={<InsurancePage />}       />
+          <Route path="mortgage"         element={<MortgagePage />}        />
+          <Route path="goals"            element={<GoalsPage />}           />
+          <Route path="alerts"           element={<AlertsPage />}          />
+          <Route path="tax"              element={<TaxPage />}             />
+          <Route path="real-estate"      element={<RealEstatePage />}      />
+          <Route path="debts"            element={<DebtPage />}            />
+          <Route path="child-savings"    element={<ChildSavingsPage />}    />
+          <Route path="foreign-currency" element={<ForeignCurrencyPage />} />
+          <Route path="reports"          element={<ReportsPage />}         />
 
           {/* Admin */}
           <Route path="admin/logs" element={<AdminLogsPage />} />

@@ -5,6 +5,8 @@ import {
   TrendingUp, Home, Settings, UserCircle, PieChart,
   ChevronDown, Cpu, BarChart3, Receipt,
   CreditCard, Target, Moon, Sun, Lightbulb, Activity,
+  Wallet, RefreshCw, Scale, GraduationCap, FileSpreadsheet, Upload,
+  Shield, Building2, Bell, Calculator, Baby, Globe, FileText,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -35,29 +37,50 @@ const NAV_GROUPS = [
     items: [
       { to: "/finance-dashboard", label: "לוח בקרה", icon: LayoutDashboard, auth: true },
       { to: "/portfolio",         label: "עסקאות",   icon: Receipt,          auth: true },
+      { to: "/budget",            label: "תקציב",    icon: Wallet,           auth: true },
+      { to: "/recurring",         label: "קבועים",   icon: RefreshCw,        auth: true },
       { to: "/smart-analytics",   label: "ניתוח חכם", icon: BarChart3,        auth: true },
+      { to: "/net-worth",         label: "שווי נקי",  icon: Scale,            auth: true },
     ],
   },
   {
-    label: "השקעות",
+    label: "השקעות וחיסכון",
     items: [
-      { to: "/investments", label: "מניות",    icon: TrendingUp, auth: true },
-      { to: "/deposits",    label: "פיקדונות", icon: Landmark,   auth: true },
-      { to: "/funds",       label: "קרנות",    icon: PieChart,   auth: true },
+      { to: "/investments", label: "מניות",    icon: TrendingUp,    auth: true },
+      { to: "/deposits",    label: "פיקדונות", icon: Landmark,      auth: true },
+      { to: "/funds",       label: "קרנות",    icon: PieChart,      auth: true },
+      { to: "/pension",     label: "פנסיוני",  icon: GraduationCap, auth: true },
+      { to: "/foreign-currency", label: "מט\"ח", icon: Globe,       auth: true },
+    ],
+  },
+  {
+    label: "נכסים והתחייבויות",
+    items: [
+      { to: "/real-estate",   label: "נדל\"ן",      icon: Building2,  auth: true },
+      { to: "/mortgage",      label: "משכנתא",      icon: Building2,  auth: true },
+      { to: "/my-loans",      label: "הלוואות",     icon: CreditCard, auth: true },
+      { to: "/debts",         label: "ניהול חובות", icon: CreditCard, auth: true },
+      { to: "/child-savings", label: "חיסכון ילדים", icon: Baby,      auth: true },
     ],
   },
   {
     label: "תכנון",
     items: [
+      { to: "/goals",    label: "יעדים",    icon: Target,     auth: true },
+      { to: "/insurance", label: "ביטוח",   icon: Shield,     auth: true },
+      { to: "/tax",       label: "מחשבון מס", icon: Calculator, auth: true },
       { to: "/projects",  label: "פרויקטים", icon: Target,     auth: true },
-      { to: "/my-loans",  label: "הלוואות",  icon: CreditCard, auth: true },
     ],
   },
   {
     label: "ניהול",
     items: [
-      { to: "/management", label: "אוטומציה", icon: Cpu, auth: true },
-      { to: "/suggestions", label: "הצעות שיפור", icon: Lightbulb, auth: true },
+      { to: "/alerts",        label: "התראות",       icon: Bell,            auth: true },
+      { to: "/reports",        label: "דוחות",        icon: FileText,        auth: true },
+      { to: "/management",     label: "אוטומציה",    icon: Cpu,             auth: true },
+      { to: "/import/excel",   label: "ייבוא אקסל",  icon: FileSpreadsheet, auth: true },
+      { to: "/import",         label: "ייבוא נתונים", icon: Upload,          auth: true },
+      { to: "/suggestions",    label: "הצעות שיפור",  icon: Lightbulb,       auth: true },
     ],
   },
   {

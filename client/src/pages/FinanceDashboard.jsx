@@ -4,7 +4,7 @@ import {
 } from 'recharts';
 import {
   ArrowUp, ArrowDown, Wallet, TrendingUp, Activity, CreditCard,
-  Loader2, AlertCircle, Plus,
+  Loader2, AlertCircle, Plus, Scale, Heart, ChevronLeft, Bell,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
@@ -14,6 +14,8 @@ import { formatCurrency } from '@/utils/formatters';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/Button';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 
 // ---------------------------------------------------------------------------
 // Stat card
@@ -50,13 +52,25 @@ export default function FinanceDashboard() {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
+  const [netWorth, setNetWorth] = useState(null);
+  const [healthScore, setHealthScore] = useState(null);
+  const [alerts, setAlerts] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const { data: dashboardData } = await api.get('/dashboard/summary');
-        setData(dashboardData);
+        const [dashRes, nwRes, hsRes, alertsRes] = await Promise.all([
+          api.get('/dashboard/summary'),
+          api.get('/net-worth').catch(() => ({ data: null })),
+          api.get('/net-worth/health-score').catch(() => ({ data: null })),
+          api.get('/alerts').catch(() => ({ data: [] })),
+        ]);
+        setData(dashRes.data);
+        setNetWorth(nwRes.data);
+        setHealthScore(hsRes.data);
+        const alertsList = Array.isArray(alertsRes.data) ? alertsRes.data : (alertsRes.data?.alerts || []);
+        setAlerts(alertsList.filter(a => !a.isRead).slice(0, 5));
       } catch (err) {
         console.error('Dashboard Error:', err);
         const msg = err.response?.data?.message || 'שגיאה בטעינת הנתונים';
@@ -157,6 +171,94 @@ export default function FinanceDashboard() {
           subText="הכנסות פחות הוצאות"
         />
       </section>
+
+      {/* Net Worth & Health Score Row */}
+      {(netWorth || healthScore) && (
+        <section className="grid gap-3 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+          {netWorth && (
+            <Link to="/net-worth">
+              <Card className="shadow-md border-none dark:bg-slate-900 hover:shadow-lg transition-shadow cursor-pointer">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Scale className="h-5 w-5 text-blue-600" />
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">שווי נקי</span>
+                    </div>
+                    <ChevronLeft className="h-4 w-4 text-slate-400" />
+                  </div>
+                  <p className={`text-2xl sm:text-3xl font-bold ${netWorth.netWorth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatCurrency(netWorth.netWorth)}
+                  </p>
+                  <div className="flex gap-4 mt-2 text-xs text-slate-500">
+                    <span>נכסים: {formatCurrency(netWorth.assets?.total || 0)}</span>
+                    <span>התחייבויות: {formatCurrency(netWorth.liabilities?.total || 0)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+          {healthScore && (
+            <Link to="/net-worth">
+              <Card className="shadow-md border-none dark:bg-slate-900 hover:shadow-lg transition-shadow cursor-pointer">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Heart className="h-5 w-5 text-red-500" />
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">בריאות פיננסית</span>
+                    </div>
+                    <Badge style={{ backgroundColor: healthScore.gradeColor, color: 'white' }}>
+                      {healthScore.grade} – {healthScore.gradeLabel}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-3xl font-extrabold" style={{ color: healthScore.gradeColor }}>
+                      {healthScore.totalScore}
+                    </div>
+                    <div className="flex-1">
+                      <Progress value={(healthScore.totalScore / healthScore.maxPossible) * 100} className="h-3" />
+                      <p className="text-xs text-slate-400 mt-1">מתוך {healthScore.maxPossible} נקודות</p>
+                    </div>
+                  </div>
+                  {healthScore.tips?.[0] && (
+                    <p className="text-xs text-slate-500 mt-2 truncate">💡 {healthScore.tips[0].tip}</p>
+                  )}
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+        </section>
+      )}
+
+      {/* Alerts Widget */}
+      {alerts.length > 0 && (
+        <section>
+          <Card className="shadow-md border-none dark:bg-slate-900 border-r-4 border-r-amber-400">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-5 w-5 text-amber-500" />
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">התראות ({alerts.length})</span>
+                </div>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/alerts">הצג הכל <ChevronLeft className="h-3 w-3 ms-1" /></Link>
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {alerts.map(a => (
+                  <div key={a._id} className={`flex items-start gap-2 text-sm p-2 rounded ${
+                    a.severity === 'danger' ? 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400' :
+                    a.severity === 'warning' ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400' :
+                    'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400'
+                  }`}>
+                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <span>{a.message}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Chart + side panel */}
       <section className="grid gap-4 sm:gap-6 lg:grid-cols-3">

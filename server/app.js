@@ -25,6 +25,20 @@ import loanRoutes from './routes/loanRoutes.js';
 import rateRoutes from './routes/rateRoutes.js';
 import suggestionRoutes from './routes/suggestionRoutes.js';
 import logsRoutes from './routes/logsRoutes.js';
+import budgetRoutes from './routes/budgetRoutes.js';
+import recurringRoutes from './routes/recurringRoutes.js';
+import pensionRoutes from './routes/pensionRoutes.js';
+import netWorthRoutes from './routes/netWorthRoutes.js';
+import insuranceRoutes from './routes/insuranceRoutes.js';
+import mortgageRoutes from './routes/mortgageRoutes.js';
+import goalRoutes from './routes/goalRoutes.js';
+import alertRoutes from './routes/alertRoutes.js';
+import taxRoutes from './routes/taxRoutes.js';
+import realEstateRoutes from './routes/realEstateRoutes.js';
+import debtRoutes from './routes/debtRoutes.js';
+import childSavingsRoutes from './routes/childSavingsRoutes.js';
+import foreignCurrencyRoutes from './routes/foreignCurrencyRoutes.js';
+import reportRoutes from './routes/reportRoutes.js';
 
 // ייבוא מידלוור
 import rateLimiter from './middlewares/rateLimiter.js';
@@ -118,6 +132,20 @@ app.use('/api/funds', requireAuth, fundRoutes);
 app.use('/api/loans', requireAuth, loanRoutes);
 app.use('/api/rates', requireAuth, rateRoutes);
 app.use('/api/suggestions', requireAuth, suggestionRoutes);
+app.use('/api/budgets', requireAuth, budgetRoutes);
+app.use('/api/recurring', requireAuth, recurringRoutes);
+app.use('/api/pension', requireAuth, pensionRoutes);
+app.use('/api/net-worth', requireAuth, netWorthRoutes);
+app.use('/api/insurance', requireAuth, insuranceRoutes);
+app.use('/api/mortgages', requireAuth, mortgageRoutes);
+app.use('/api/goals', requireAuth, goalRoutes);
+app.use('/api/alerts', requireAuth, alertRoutes);
+app.use('/api/tax', requireAuth, taxRoutes);
+app.use('/api/real-estate', requireAuth, realEstateRoutes);
+app.use('/api/debts', requireAuth, debtRoutes);
+app.use('/api/child-savings', requireAuth, childSavingsRoutes);
+app.use('/api/foreign-currency', requireAuth, foreignCurrencyRoutes);
+app.use('/api/reports', requireAuth, reportRoutes);
 app.use('/api/logs', logsRoutes);
 
 // --- טיפול בשגיאות ---
