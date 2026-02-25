@@ -215,7 +215,7 @@ const UserRow = ({ user, isExpanded, onToggle }) => {
                   <div className="flex flex-wrap gap-1.5">
                     {user.uniqueIPs.map((ip, i) => (
                       <span key={i} className="font-mono text-xs bg-slate-700/40 text-slate-300 px-2 py-1 rounded-lg">
-                        {ip}
+                        {typeof ip === 'object' ? ip.ip || String(ip) : String(ip)}
                       </span>
                     ))}
                     {!user.uniqueIPs.length && <span className="text-xs text-slate-600">—</span>}
