@@ -24,6 +24,7 @@ import depositRoutes from './routes/depositRoutes.js';
 import loanRoutes from './routes/loanRoutes.js';
 import rateRoutes from './routes/rateRoutes.js';
 import suggestionRoutes from './routes/suggestionRoutes.js';
+import logsRoutes from './routes/logsRoutes.js';
 
 // ייבוא מידלוור
 import rateLimiter from './middlewares/rateLimiter.js';
@@ -31,6 +32,7 @@ import { requireAuth } from './middlewares/authMiddleware.js';
 import { requestLogger, errorHandler } from './middlewares/errorHandler.js';
 import { csrfTokenHandler, csrfProtection } from './middlewares/csrf.js';
 import logger from './utils/logger.js';
+import loggingMiddleware from './middlewares/loggingMiddleware.js';
 
 // חיבור למסד הנתונים
 const connectDB = async () => {
@@ -72,7 +74,9 @@ app.use(cors({
   },
   credentials: true, // חובה להעברת עוגיות
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-XSRF-Token', 'X-Fina-Client'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-XSRF-Token', 'X-Fina-Client',
+    'X-Screen-Width', 'X-Screen-Height', 'X-Color-Depth', 'X-HW-Cores', 'X-HW-Memory',
+    'X-Connection-Type', 'X-Connection-Downlink', 'X-Connection-RTT', 'X-Session-Id'],
 }));
 
 // --- הגדרות גודל גוף הבקשה ---
@@ -82,6 +86,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 app.use(mongoSanitize());
 app.use(requestLogger); // Request logging middleware
+app.use(loggingMiddleware); // Visitor analytics logging
 
 // --- Health check (לבדיקת תקינות השרת) ---
 app.get('/api/health', (req, res) => {
@@ -113,6 +118,7 @@ app.use('/api/funds', requireAuth, fundRoutes);
 app.use('/api/loans', requireAuth, loanRoutes);
 app.use('/api/rates', requireAuth, rateRoutes);
 app.use('/api/suggestions', requireAuth, suggestionRoutes);
+app.use('/api/logs', logsRoutes);
 
 // --- טיפול בשגיאות ---
 

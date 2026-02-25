@@ -4,7 +4,7 @@ import {
   Menu, X, LogOut, LayoutDashboard, Landmark,
   TrendingUp, Home, Settings, UserCircle, PieChart,
   ChevronDown, Cpu, BarChart3, Receipt,
-  CreditCard, Target, Moon, Sun, Lightbulb,
+  CreditCard, Target, Moon, Sun, Lightbulb, Activity,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -60,15 +60,25 @@ const NAV_GROUPS = [
       { to: "/suggestions", label: "הצעות שיפור", icon: Lightbulb, auth: true },
     ],
   },
+  {
+    label: "אדמין",
+    items: [
+      { to: "/admin/logs", label: "דוח מבקרים", icon: Activity, auth: true, adminOnly: true },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-const getVisibleGroups = (isAuthenticated) =>
+const getVisibleGroups = (isAuthenticated, userRole) =>
   NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => !item.auth || isAuthenticated),
+    items: group.items.filter((item) => {
+      if (item.auth && !isAuthenticated) return false;
+      if (item.adminOnly && userRole !== 'admin') return false;
+      return true;
+    }),
   })).filter((group) => group.items.length > 0);
 
 const getInitials = (name) => {
@@ -85,7 +95,7 @@ const getInitials = (name) => {
 export default function Navbar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isAuthenticated, user, logout } = useAuthStore();
-  const visibleGroups = getVisibleGroups(isAuthenticated);
+  const visibleGroups = getVisibleGroups(isAuthenticated, user?.role);
 
   return (
     <>

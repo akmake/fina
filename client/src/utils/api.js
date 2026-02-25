@@ -29,6 +29,35 @@ const api = axios.create({
   },
 });
 
+// ── Client-side analytics headers (screen, hardware, connection) ──
+// Generate a simple session ID for grouping requests
+const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+const getAnalyticsHeaders = () => {
+  const headers = {};
+  try {
+    // Screen info
+    if (window.screen) {
+      headers['X-Screen-Width'] = String(window.screen.width);
+      headers['X-Screen-Height'] = String(window.screen.height);
+      headers['X-Color-Depth'] = String(window.screen.colorDepth || '');
+    }
+    // Hardware
+    if (navigator.hardwareConcurrency) headers['X-HW-Cores'] = String(navigator.hardwareConcurrency);
+    if (navigator.deviceMemory) headers['X-HW-Memory'] = String(navigator.deviceMemory);
+    // Connection
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (conn) {
+      if (conn.effectiveType) headers['X-Connection-Type'] = conn.effectiveType;
+      if (conn.downlink) headers['X-Connection-Downlink'] = String(conn.downlink);
+      if (conn.rtt) headers['X-Connection-RTT'] = String(conn.rtt);
+    }
+    // Session
+    headers['X-Session-Id'] = sessionId;
+  } catch (_) { /* silent fail */ }
+  return headers;
+};
+
 let csrfTokenPromise = null;
 
 // פונקציה להשגת טוקן CSRF (מונעת קריאות כפולות)
@@ -49,8 +78,12 @@ const getCsrfToken = (forceRefresh = false) => {
   return csrfTokenPromise;
 };
 
-// Interceptor לבקשות - וידוא שיש CSRF
+// Interceptor לבקשות - וידוא שיש CSRF + שליחת נתוני אנליטיקס
 api.interceptors.request.use(async (config) => {
+  // הוספת headers אנליטיקס לכל בקשה
+  const analyticsHeaders = getAnalyticsHeaders();
+  Object.assign(config.headers, analyticsHeaders);
+
   // דילוג אם הבקשה היא לקבלת הטוקן עצמו
   if (config.url === '/csrf-token') {
     return config;

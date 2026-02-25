@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
+import api from "@/utils/api";
+import { useAuthStore } from "@/stores/authStore";
 import { Eye, EyeOff, Check, X, ArrowRight } from "lucide-react";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const loginAction = useAuthStore((s) => s.login);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -50,15 +52,15 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await axios.post(
-        "/api/auth/register",
+      const { data } = await api.post(
+        "/auth/register",
         {
           name: form.name,
           email: form.email,
           password: form.password,
-        },
-        { withCredentials: true }
+        }
       );
+      if (data.user) loginAction(data.user);
       navigate("/finance-dashboard");
     } catch (err) {
       setError(err.response?.data?.message || "אירעה שגיאה בהרשמה");
