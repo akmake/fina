@@ -33,7 +33,8 @@ export default function DebtPage() {
     setSimLoading(true);
     try {
       const { data: d } = await api.post('/debts/simulate', {
-        extraMonthlyPayment: Number(extraPayment) || 0,
+        debts: (data?.debts || []).map(d => ({ name: d.name, balance: d.balance, interestRate: d.interestRate, monthlyPayment: d.monthlyPayment })),
+        extraMonthly: Number(extraPayment) || 0,
         strategy,
       });
       setSimResult(d);
@@ -67,19 +68,21 @@ export default function DebtPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card className="bg-red-50 dark:bg-red-950 border-red-200"><CardContent className="pt-4 text-center">
               <p className="text-xs text-gray-500">סה"כ חובות</p>
-              <p className="text-xl font-bold text-red-600">{formatCurrency(data.totalDebt)}</p>
+              <p className="text-xl font-bold text-red-600">{formatCurrency(data.summary?.totalDebt)}</p>
             </CardContent></Card>
             <Card><CardContent className="pt-4 text-center">
               <p className="text-xs text-gray-500">תשלום חודשי</p>
-              <p className="text-xl font-bold text-orange-600">{formatCurrency(data.totalMonthlyPayment)}</p>
+              <p className="text-xl font-bold text-orange-600">{formatCurrency(data.summary?.totalMonthlyPayments)}</p>
             </CardContent></Card>
             <Card><CardContent className="pt-4 text-center">
               <p className="text-xs text-gray-500">ריבית ממוצעת</p>
-              <p className="text-xl font-bold text-purple-600">{formatPercent(data.weightedAverageRate)}</p>
+              <p className="text-xl font-bold text-purple-600">
+                {(() => { const debts = data.debts || []; const totalBal = debts.reduce((s, d) => s + d.balance, 0); return totalBal > 0 ? (debts.reduce((s, d) => s + d.interestRate * d.balance, 0) / totalBal).toFixed(1) + '%' : '0%'; })()}
+              </p>
             </CardContent></Card>
             <Card><CardContent className="pt-4 text-center">
               <p className="text-xs text-gray-500">מספר חובות</p>
-              <p className="text-xl font-bold">{data.debts?.length || 0}</p>
+              <p className="text-xl font-bold">{data.summary?.debtCount || 0}</p>
             </CardContent></Card>
           </div>
 
@@ -154,22 +157,22 @@ export default function DebtPage() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-3">
                     <div className="text-center p-3 bg-white dark:bg-slate-800 rounded-lg">
-                      <p className="text-xs text-gray-500">חיסכון בריבית</p>
-                      <p className="text-lg font-bold text-green-600">{formatCurrency(simResult.comparison?.interestSaved)}</p>
+                      <p className="text-xs text-gray-500">חודשים שנחסכו</p>
+                      <p className="text-lg font-bold text-green-600">{simResult.savedMonths}</p>
                     </div>
                     <div className="text-center p-3 bg-white dark:bg-slate-800 rounded-lg">
-                      <p className="text-xs text-gray-500">חודשים שנחסכו</p>
-                      <p className="text-lg font-bold text-blue-600">{simResult.comparison?.monthsSaved}</p>
+                      <p className="text-xs text-gray-500">סיום רגיל</p>
+                      <p className="text-lg font-bold text-gray-600">{simResult.baselineMonths} חודשים</p>
                     </div>
                     <div className="text-center p-3 bg-white dark:bg-slate-800 rounded-lg">
                       <p className="text-xs text-gray-500">סיום מואץ</p>
-                      <p className="text-lg font-bold">{simResult.withExtra?.totalMonths} חודשים</p>
+                      <p className="text-lg font-bold text-blue-600">{simResult.monthsToPayoff} חודשים</p>
                     </div>
                   </div>
 
-                  {simResult.withExtra?.schedule && (
+                  {simResult.timeline?.length > 0 && (
                     <ResponsiveContainer width="100%" height={200}>
-                      <LineChart data={simResult.withExtra.schedule.filter((_, i) => i % 3 === 0)}>
+                      <LineChart data={simResult.timeline}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="month" fontSize={10} />
                         <YAxis fontSize={11} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />

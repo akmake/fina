@@ -15,7 +15,7 @@ const CURRENCIES = { USD: 'דולר $', EUR: 'אירו €', GBP: 'ליש"ט £'
 const HOLDING_TYPES = { bank_account: 'חשבון בנק', cash: 'מזומן', digital_wallet: 'ארנק דיגיטלי', crypto: 'קריפטו', other: 'אחר' };
 const COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1'];
 
-const emptyForm = { currency:'USD', amount:'', purchaseRate:'', currentRate:'', holdingType:'bank_account', bankOrProvider:'', notes:'' };
+const emptyForm = { name:'', currency:'USD', amountInCurrency:'', purchaseRate:'', exchangeRate:'', type:'bank_account', institution:'', notes:'' };
 
 export default function ForeignCurrencyPage() {
   const [holdings, setHoldings] = useState([]);
@@ -42,16 +42,17 @@ export default function ForeignCurrencyPage() {
   const openEdit = (h) => {
     setEditing(h._id);
     setForm({
-      currency: h.currency, amount: h.amount||'', purchaseRate: h.purchaseRate||'',
-      currentRate: h.currentRate||'', holdingType: h.holdingType, bankOrProvider: h.bankOrProvider||'', notes: h.notes||'',
+      name: h.name||'', currency: h.currency, amountInCurrency: h.amountInCurrency||'', purchaseRate: h.purchaseRate||'',
+      exchangeRate: h.exchangeRate||'', type: h.type, institution: h.institution||'', notes: h.notes||'',
     });
     setDialogOpen(true);
   };
 
   const save = async () => {
-    if (!form.amount) return toast.error('כמות חובה');
+    if (!form.name) return toast.error('שם חובה');
+    if (!form.amountInCurrency) return toast.error('כמות חובה');
     try {
-      const body = { ...form, amount: Number(form.amount)||0, purchaseRate: Number(form.purchaseRate)||0, currentRate: Number(form.currentRate)||0 };
+      const body = { ...form, amountInCurrency: Number(form.amountInCurrency)||0, purchaseRate: Number(form.purchaseRate)||0, exchangeRate: Number(form.exchangeRate)||0 };
       if (editing) await api.put(`/foreign-currency/${editing}`, body);
       else await api.post('/foreign-currency', body);
       toast.success(editing ? 'עודכן' : 'נוסף');
@@ -157,14 +158,15 @@ export default function ForeignCurrencyPage() {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <Coins className="h-4 w-4 text-indigo-500" />
-                    <span className="font-bold">{h.amount?.toLocaleString()} {h.currency}</span>
-                    <Badge variant="secondary" className="text-xs">{HOLDING_TYPES[h.holdingType]}</Badge>
-                    {h.bankOrProvider && <span className="text-xs text-gray-500">{h.bankOrProvider}</span>}
+                    <span className="font-bold">{h.name || `${h.amountInCurrency?.toLocaleString()} ${h.currency}`}</span>
+                    <Badge variant="secondary" className="text-xs">{HOLDING_TYPES[h.type]}</Badge>
+                    {h.institution && <span className="text-xs text-gray-500">{h.institution}</span>}
                   </div>
                   <div className="flex gap-4 text-xs text-gray-500">
+                    <span>{h.amountInCurrency?.toLocaleString()} {h.currency}</span>
                     {h.purchaseRate > 0 && <span>שער קניה: ₪{h.purchaseRate}</span>}
-                    {h.currentRate > 0 && <span>שער נוכחי: ₪{h.currentRate}</span>}
-                    {h.valueILS > 0 && <span>שווי: {formatCurrency(h.valueILS)}</span>}
+                    {h.exchangeRate > 0 && <span>שער נוכחי: ₪{h.exchangeRate}</span>}
+                    {h.amountInILS > 0 && <span>שווי: {formatCurrency(h.amountInILS)}</span>}
                     {h.profitLoss != null && h.profitLoss !== 0 && (
                       <span className={`flex items-center gap-1 ${h.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {h.profitLoss >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -193,17 +195,18 @@ export default function ForeignCurrencyPage() {
                 <SelectTrigger><SelectValue placeholder="מטבע" /></SelectTrigger>
                 <SelectContent>{Object.entries(CURRENCIES).map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
               </Select>
-              <Select value={form.holdingType} onValueChange={v => setForm({...form, holdingType: v})}>
+              <Select value={form.type} onValueChange={v => setForm({...form, type: v})}>
                 <SelectTrigger><SelectValue placeholder="סוג" /></SelectTrigger>
                 <SelectContent>{Object.entries(HOLDING_TYPES).map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <Input type="number" placeholder="כמות *" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} />
+            <Input placeholder="שם האחזקה *" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+            <Input type="number" placeholder="כמות *" value={form.amountInCurrency} onChange={e => setForm({...form, amountInCurrency: e.target.value})} />
             <div className="grid grid-cols-2 gap-2">
               <Input type="number" step="0.01" placeholder="שער קנייה (₪)" value={form.purchaseRate} onChange={e => setForm({...form, purchaseRate: e.target.value})} />
-              <Input type="number" step="0.01" placeholder="שער נוכחי (₪)" value={form.currentRate} onChange={e => setForm({...form, currentRate: e.target.value})} />
+              <Input type="number" step="0.01" placeholder="שער נוכחי (₪)" value={form.exchangeRate} onChange={e => setForm({...form, exchangeRate: e.target.value})} />
             </div>
-            <Input placeholder="בנק / ספק" value={form.bankOrProvider} onChange={e => setForm({...form, bankOrProvider: e.target.value})} />
+            <Input placeholder="בנק / מוסד" value={form.institution} onChange={e => setForm({...form, institution: e.target.value})} />
             <Input placeholder="הערות" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
           </div>
           <DialogFooter><Button onClick={save}>שמירה</Button></DialogFooter>

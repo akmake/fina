@@ -61,6 +61,7 @@ export default function InsurancePage() {
 
   const handleSubmit = async () => {
     if (!form.type || !form.name || !form.monthlyCost) return toast.error('מלא שדות חובה');
+    if (!form.startDate) return toast.error('תאריך תחילת ביטוח חובה');
     try {
       if (editing) {
         await api.put(`/insurance/${editing}`, { ...form, monthlyCost: Number(form.monthlyCost) });
@@ -227,8 +228,15 @@ export default function InsurancePage() {
             <div><label className="text-xs text-gray-500">סכום כיסוי</label><Input type="number" value={form.coverageAmount} onChange={e => setForm({ ...form, coverageAmount: e.target.value })} /></div>
             <div><label className="text-xs text-gray-500">השתתפות עצמית</label><Input type="number" value={form.deductible} onChange={e => setForm({ ...form, deductible: e.target.value })} /></div>
             <div><label className="text-xs text-gray-500">שם סוכן</label><Input value={form.agentName} onChange={e => setForm({ ...form, agentName: e.target.value })} /></div>
-            <div><label className="text-xs text-gray-500">תחילת ביטוח</label><Input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} /></div>
+            <div><label className="text-xs text-gray-500">טלפון סוכן</label><Input value={form.agentPhone} onChange={e => setForm({ ...form, agentPhone: e.target.value })} /></div>
+            <div><label className="text-xs text-gray-500">תחילת ביטוח *</label><Input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} /></div>
+            <div><label className="text-xs text-gray-500">סיום ביטוח</label><Input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} /></div>
             <div><label className="text-xs text-gray-500">תאריך חידוש</label><Input type="date" value={form.renewalDate} onChange={e => setForm({ ...form, renewalDate: e.target.value })} /></div>
+            <div className="flex items-center gap-2 mt-2">
+              <input type="checkbox" id="autoRenew" checked={form.autoRenew} onChange={e => setForm({ ...form, autoRenew: e.target.checked })} />
+              <label htmlFor="autoRenew" className="text-xs text-gray-500">חידוש אוטומטי</label>
+            </div>
+            <div className="col-span-2"><label className="text-xs text-gray-500">פרטי כיסוי</label><Input value={form.coverageDetails} onChange={e => setForm({ ...form, coverageDetails: e.target.value })} /></div>
             <div className="col-span-2"><label className="text-xs text-gray-500">הערות</label><Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
           </div>
           <DialogFooter><Button onClick={handleSubmit}>{editing ? 'עדכן' : 'הוסף'}</Button></DialogFooter>

@@ -285,10 +285,23 @@ export default function MortgagePage() {
                       <SelectContent>{TRACK_TYPES.map(tt => <SelectItem key={tt.value} value={tt.value}>{tt.label}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
+                  <div><label className="text-xs text-gray-500">סכום מקורי *</label><Input type="number" value={t.originalAmount} onChange={e => updateTrack(i, 'originalAmount', e.target.value)} /></div>
                   <div><label className="text-xs text-gray-500">יתרה נוכחית</label><Input type="number" value={t.currentBalance} onChange={e => updateTrack(i, 'currentBalance', e.target.value)} /></div>
                   <div><label className="text-xs text-gray-500">ריבית (%)</label><Input type="number" step="0.01" value={t.interestRate} onChange={e => updateTrack(i, 'interestRate', e.target.value)} /></div>
                   <div><label className="text-xs text-gray-500">החזר חודשי</label><Input type="number" value={t.monthlyPayment} onChange={e => updateTrack(i, 'monthlyPayment', e.target.value)} /></div>
+                  <div><label className="text-xs text-gray-500">תקופה (חודשים) *</label><Input type="number" value={t.termInMonths} onChange={e => updateTrack(i, 'termInMonths', e.target.value)} /></div>
                   <div><label className="text-xs text-gray-500">חודשים שנותרו</label><Input type="number" value={t.remainingMonths} onChange={e => updateTrack(i, 'remainingMonths', e.target.value)} /></div>
+                  <div>
+                    <label className="text-xs text-gray-500">שיטת החזר</label>
+                    <Select value={t.repaymentType} onValueChange={v => updateTrack(i, 'repaymentType', v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="שפיצר">שפיצר</SelectItem>
+                        <SelectItem value="קרן שווה">קרן שווה</SelectItem>
+                        <SelectItem value="בלון">בלון</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
             ))}

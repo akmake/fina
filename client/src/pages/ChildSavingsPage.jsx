@@ -101,7 +101,7 @@ export default function ChildSavingsPage() {
           </CardContent></Card>
           <Card><CardContent className="pt-4 text-center">
             <p className="text-xs text-gray-500">מספר ילדים</p>
-            <p className="text-xl font-bold">{summary.childCount || Object.keys(groupedByChild).length}</p>
+            <p className="text-xl font-bold">{summary.totalChildren || Object.keys(groupedByChild).length}</p>
           </CardContent></Card>
           <Card><CardContent className="pt-4 text-center">
             <p className="text-xs text-gray-500">מספר חסכונות</p>
