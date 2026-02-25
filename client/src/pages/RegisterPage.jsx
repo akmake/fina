@@ -21,7 +21,7 @@ export default function RegisterPage() {
 
   // משיכת טוקן CSRF
   useEffect(() => {
-    axios
+    api
       .get("/csrf-token", { withCredentials: true })
       .catch((err) => console.error("CSRF Error:", err));
   }, []);
