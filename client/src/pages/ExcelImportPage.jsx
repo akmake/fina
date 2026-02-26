@@ -30,7 +30,7 @@ function cleanFile(data, type) {
     if (trimmed.length < 1) throw new Error("לא נמצאו נתונים בקובץ לאחר הניקוי.");
     const headers = trimmed[0].map(h => String(h || '').trim().replace(/\s+/g, ' '));
     const rows = trimmed.slice(1);
-    
+
     if (!headers.includes('שם בית העסק') || !headers.includes('תאריך עסקה') || !headers.includes('סכום עסקה מקורי')) {
         throw new Error('העמודות הנדרשות לא נמצאו בקובץ "מקס".');
     }
@@ -40,6 +40,37 @@ function cleanFile(data, type) {
       headers.forEach((header, index) => { rowObject[header] = rowArray[index]; });
       return rowObject;
     });
+  }
+  if (type === 'isracard') {
+    const results = [];
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      if (!Array.isArray(row)) continue;
+      const hasDateCol = row.some(cell => typeof cell === 'string' && cell.includes('תאריך רכישה'));
+      const hasMerchantCol = row.some(cell => typeof cell === 'string' && cell.includes('שם בית עסק'));
+      if (!hasDateCol || !hasMerchantCol) continue;
+      const headers = row.map(h => String(h || '').trim());
+      const dateIdx = headers.findIndex(h => h.includes('תאריך רכישה'));
+      const merchantIdx = headers.findIndex(h => h.includes('שם בית עסק'));
+      const amountIdx = headers.findIndex(h => h.includes('סכום חיוב'));
+      for (let j = i + 1; j < data.length; j++) {
+        const dataRow = data[j];
+        if (!Array.isArray(dataRow)) continue;
+        const dateVal = dataRow[dateIdx];
+        const merchantVal = String(dataRow[merchantIdx] || '').trim();
+        const amountVal = dataRow[amountIdx];
+        const isDateLike = dateVal instanceof Date ||
+          (typeof dateVal === 'string' && /\d{1,2}[./]\d{1,2}/.test(dateVal));
+        if (!isDateLike || !merchantVal || merchantVal.includes('סה"כ')) continue;
+        results.push({
+          "תאריך עסקה": dateVal,
+          "שם בית העסק": merchantVal,
+          "סכום": amountVal,
+        });
+      }
+    }
+    if (results.length === 0) throw new Error("לא נמצאו עסקאות בקובץ 'ישראכרט'.");
+    return results;
   }
   throw new Error('סוג ייבוא לא ידוע.');
 }
@@ -226,6 +257,7 @@ export default function ExcelImportPage() {
               <div className="flex justify-center gap-4 pt-4">
                 <Button size="lg" onClick={() => handleImportButtonClick('max')}>ייבוא מדוח "מקס"</Button>
                 <Button size="lg" onClick={() => handleImportButtonClick('cal')}>ייבוא מדוח "כאל"</Button>
+                <Button size="lg" onClick={() => handleImportButtonClick('isracard')}>ייבוא מדוח "ישראכרט"</Button>
               </div>
               <input type="file" ref={fileInputRef} onChange={handleFileSelected} accept=".xlsx, .xls" className="hidden" />
             </div>

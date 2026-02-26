@@ -1,4 +1,4 @@
-import { cleanCalFile, cleanMaxFile } from '../utils/excelCleaners.js';
+import { cleanCalFile, cleanMaxFile, cleanIsracardFile } from '../utils/excelCleaners.js';
 import { parseTransactions } from '../utils/excelParser.js';
 import Transaction from '../models/Transaction.js';
 import FinanceProfile from '../models/FinanceProfile.js';
@@ -15,7 +15,7 @@ export const uploadAndParse = async (req, res, next) => {
   }
 
   try {
-    const cleaner = fileType === 'cal' ? cleanCalFile : cleanMaxFile;
+    const cleaner = fileType === 'cal' ? cleanCalFile : fileType === 'isracard' ? cleanIsracardFile : cleanMaxFile;
     const cleanedData = cleaner(data);
     const { transactions, unseenMerchants } = await parseTransactions(cleanedData, fileType, userId);
 
