@@ -69,4 +69,49 @@ const cleanCalFile = (data) => {
     });
 };
 
-export { cleanCalFile, cleanMaxFile };
+const cleanIsracardFile = (data) => {
+  const results = [];
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    if (!Array.isArray(row)) continue;
+
+    const hasDateCol = row.some(cell => typeof cell === 'string' && cell.includes('תאריך רכישה'));
+    const hasMerchantCol = row.some(cell => typeof cell === 'string' && cell.includes('שם בית עסק'));
+
+    if (!hasDateCol || !hasMerchantCol) continue;
+
+    const headers = row.map(h => String(h || '').trim());
+    const dateIdx = headers.findIndex(h => h.includes('תאריך רכישה'));
+    const merchantIdx = headers.findIndex(h => h.includes('שם בית עסק'));
+    const amountIdx = headers.findIndex(h => h.includes('סכום חיוב'));
+
+    for (let j = i + 1; j < data.length; j++) {
+      const dataRow = data[j];
+      if (!Array.isArray(dataRow)) continue;
+
+      const dateVal = dataRow[dateIdx];
+      const merchantVal = String(dataRow[merchantIdx] || '').trim();
+      const amountVal = dataRow[amountIdx];
+
+      const isDateLike = dateVal instanceof Date ||
+        (typeof dateVal === 'string' && /\d{1,2}[./]\d{1,2}/.test(dateVal));
+
+      if (!isDateLike || !merchantVal || merchantVal.includes('סה"כ')) continue;
+
+      results.push({
+        "תאריך רכישה": dateVal,
+        "שם בית עסק": merchantVal,
+        "סכום חיוב": amountVal,
+      });
+    }
+  }
+
+  if (results.length === 0) {
+    throw new Error("לא נמצאו עסקאות בקובץ 'ישראכרט'. ודא שהקובץ מכיל עמודות: תאריך רכישה, שם בית עסק, סכום חיוב.");
+  }
+
+  return results;
+};
+
+export { cleanCalFile, cleanMaxFile, cleanIsracardFile };

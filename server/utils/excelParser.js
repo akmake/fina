@@ -6,6 +6,20 @@ function parseDate(dateInput) {
   if (!dateInput) return null;
 
   const dateStr = String(dateInput).trim();
+
+  // DD.MM.YY or DD.MM.YYYY (ישראכרט format)
+  const dotParts = dateStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+  if (dotParts) {
+    const day = parseInt(dotParts[1], 10);
+    const month = parseInt(dotParts[2], 10);
+    let year = parseInt(dotParts[3], 10);
+    if (year < 100) year += 2000;
+    if (year > 1900 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const date = new Date(Date.UTC(year, month - 1, day));
+      if (!isNaN(date.getTime())) return date;
+    }
+  }
+
   const parts = dateStr.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
   if (parts) {
     const day = parseInt(parts[1], 10);
@@ -34,7 +48,7 @@ const createTransactionObject = (row, userId, type) => {
         return null;
     };
 
-    const date = parseDate(getValue(['תאריך עסקה', 'תאריך', 'Date', 'date']));
+    const date = parseDate(getValue(['תאריך עסקה', 'תאריך רכישה', 'תאריך', 'Date', 'date']));
     const description = getValue(['שם בית העסק', 'שם בית עסק', 'תיאור', 'Description', 'description']);
     
     if (!date || !description) return null;
@@ -56,6 +70,13 @@ const createTransactionObject = (row, userId, type) => {
         } else {
             return null;
         }
+    } else if (type === 'isracard') {
+        const amountValue = getValue(['סכום חיוב']);
+        if (amountValue == null) return null;
+        amount = parseFloat(String(amountValue).replace(/,/g, ''));
+        if (isNaN(amount)) return null;
+        transactionType = amount < 0 ? 'הכנסה' : 'הוצאה';
+        amount = Math.abs(amount);
     } else { // 'cal'
         const amountValue = getValue(["סכום בש\"ח", "סכום עסקה", "סכום חיוב"]);
         if (amountValue == null) return null;
