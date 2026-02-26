@@ -6,6 +6,23 @@ import MerchantMap from '../models/MerchantMap.js';
 import CategoryRule from '../models/CategoryRule.js'; // ייבוא מודל החוקים
 import AppError from '../utils/AppError.js';
 
+export const checkMerchants = async (req, res, next) => {
+  const { merchantNames } = req.body;
+
+  if (!Array.isArray(merchantNames)) {
+    return next(new AppError('merchantNames array is required.', 400));
+  }
+
+  try {
+    const existingMaps = await MerchantMap.find({ originalName: { $in: merchantNames } });
+    const knownNames = new Set(existingMaps.map(m => m.originalName));
+    const unseenMerchants = merchantNames.filter(name => !knownNames.has(name));
+    res.json({ unseenMerchants });
+  } catch (error) {
+    return next(new AppError(`שגיאה בבדיקת ספקים: ${error.message}`, 500));
+  }
+};
+
 export const uploadAndParse = async (req, res, next) => {
   const { data, fileType } = req.body;
   const userId = req.user._id;
