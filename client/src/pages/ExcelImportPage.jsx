@@ -43,6 +43,9 @@ function cleanFile(data, type) {
   }
   if (type === 'isracard') {
     const results = [];
+
+    // שלב 1: מציאת כל מיקומי שורות ה-header
+    const headerPositions = [];
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       if (!Array.isArray(row)) continue;
@@ -50,10 +53,20 @@ function cleanFile(data, type) {
       const hasMerchantCol = row.some(cell => typeof cell === 'string' && cell.includes('שם בית עסק'));
       if (!hasDateCol || !hasMerchantCol) continue;
       const headers = row.map(h => String(h || '').trim());
-      const dateIdx = headers.findIndex(h => h.includes('תאריך רכישה'));
-      const merchantIdx = headers.findIndex(h => h.includes('שם בית עסק'));
-      const amountIdx = headers.findIndex(h => h.includes('סכום חיוב'));
-      for (let j = i + 1; j < data.length; j++) {
+      headerPositions.push({
+        rowIdx: i,
+        dateIdx: headers.findIndex(h => h.includes('תאריך רכישה')),
+        merchantIdx: headers.findIndex(h => h.includes('שם בית עסק')),
+        amountIdx: headers.findIndex(h => h.includes('סכום חיוב')),
+      });
+    }
+
+    // שלב 2: לכל header, אוספים שורות עד ה-header הבא בלבד (מניעת כפילויות)
+    for (let h = 0; h < headerPositions.length; h++) {
+      const { rowIdx, dateIdx, merchantIdx, amountIdx } = headerPositions[h];
+      const endIdx = h + 1 < headerPositions.length ? headerPositions[h + 1].rowIdx : data.length;
+
+      for (let j = rowIdx + 1; j < endIdx; j++) {
         const dataRow = data[j];
         if (!Array.isArray(dataRow)) continue;
         const dateVal = dataRow[dateIdx];
@@ -69,6 +82,7 @@ function cleanFile(data, type) {
         });
       }
     }
+
     if (results.length === 0) throw new Error("לא נמצאו עסקאות בקובץ 'ישראכרט'.");
     return results;
   }
