@@ -71,33 +71,43 @@ const cleanCalFile = (data) => {
 
 const cleanIsracardFile = (data) => {
   const results = [];
+  let dateIdx = -1;
+  let merchantIdx = -1;
+  let amountIdx = -1;
+  let parsingTable = false;
 
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
     if (!Array.isArray(row)) continue;
 
-    const hasDateCol = row.some(cell => typeof cell === 'string' && cell.includes('תאריך רכישה'));
-    const hasMerchantCol = row.some(cell => typeof cell === 'string' && cell.includes('שם בית עסק'));
+    // זיהוי שורת כותרת (ישראכרט לעיתים מחלקת למספר טבלאות שונות באותו קובץ)
+    const isHeaderRow = row.some(cell => typeof cell === 'string' && cell.includes('תאריך רכישה')) &&
+                        row.some(cell => typeof cell === 'string' && cell.includes('שם בית עסק'));
 
-    if (!hasDateCol || !hasMerchantCol) continue;
+    if (isHeaderRow) {
+      const headers = row.map(h => String(h || '').trim());
+      dateIdx = headers.findIndex(h => h.includes('תאריך רכישה'));
+      merchantIdx = headers.findIndex(h => h.includes('שם בית עסק'));
+      amountIdx = headers.findIndex(h => h.includes('סכום חיוב'));
+      parsingTable = true;
+      continue; // מדלגים על שורת הכותרת עצמה ועוברים לשורות המידע
+    }
 
-    const headers = row.map(h => String(h || '').trim());
-    const dateIdx = headers.findIndex(h => h.includes('תאריך רכישה'));
-    const merchantIdx = headers.findIndex(h => h.includes('שם בית עסק'));
-    const amountIdx = headers.findIndex(h => h.includes('סכום חיוב'));
+    if (parsingTable) {
+      // מוודאים שמצאנו את כל העמודות הנדרשות
+      if (dateIdx === -1 || merchantIdx === -1 || amountIdx === -1) continue;
 
-    for (let j = i + 1; j < data.length; j++) {
-      const dataRow = data[j];
-      if (!Array.isArray(dataRow)) continue;
-
-      const dateVal = dataRow[dateIdx];
-      const merchantVal = String(dataRow[merchantIdx] || '').trim();
-      const amountVal = dataRow[amountIdx];
+      const dateVal = row[dateIdx];
+      const merchantVal = String(row[merchantIdx] || '').trim();
+      const amountVal = row[amountIdx];
 
       const isDateLike = dateVal instanceof Date ||
-        (typeof dateVal === 'string' && /\d{1,2}[./]\d{1,2}/.test(dateVal));
+        (typeof dateVal === 'string' && /\d{1,2}[./-]\d{1,2}/.test(dateVal));
 
-      if (!isDateLike || !merchantVal || merchantVal.includes('סה"כ')) continue;
+      // דילוג על שורות שאינן עסקאות (כמו שורות ריקות, כותרות ביניים או "סה"כ")
+      if (!isDateLike || !merchantVal || merchantVal.includes('סה"כ')) {
+        continue;
+      }
 
       results.push({
         "תאריך רכישה": dateVal,

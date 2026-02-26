@@ -285,6 +285,9 @@ export default function FinanceDashboardPage() {
                     <Button variant="outline" className="rounded-full h-9 sm:h-10 px-4 sm:px-6 bg-white/50 border-slate-200 text-slate-700 hover:bg-white hover:shadow-md transition-all flex-1 sm:flex-none text-sm" onClick={() => handleImportButtonClick('cal')}>
                         <Upload className="ml-2 h-4 w-4" /> Cal
                     </Button>
+                    <Button variant="outline" className="rounded-full h-9 sm:h-10 px-4 sm:px-6 bg-white/50 border-slate-200 text-slate-700 hover:bg-white hover:shadow-md transition-all flex-1 sm:flex-none text-sm" onClick={() => handleImportButtonClick('isracard')}>
+                        <Upload className="ml-2 h-4 w-4" /> ישראכרט
+                    </Button>
                     <input type="file" ref={fileInputRef} onChange={handleFileSelected} accept=".xlsx, .xls, .csv" className="hidden" />
                 </div>
             </header>

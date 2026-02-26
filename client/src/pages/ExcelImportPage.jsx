@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '@/utils/api';
 import * as XLSX from 'xlsx';
 
-// --- ייבוא רכיבי UI מהספרייה שלך ---
+// --- ייבוא רכיבי UI ---
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,68 +12,6 @@ import { UploadCloud, FileText, Settings, CheckCircle, AlertTriangle } from 'luc
 
 // --- הגדרות קבועות ---
 const CREATE_NEW_CATEGORY_VALUE = "CREATE_NEW";
-
-// --- פונקציות עזר לעיבוד אקסל ---
-function cleanFile(data, type) {
-  if (type === 'cal') {
-    if (data.length < 5) throw new Error("הקובץ נראה קצר מדי עבור פורמט 'כאל'.");
-    const trimmed = data.slice(1, -3);
-    return trimmed.map(row => ({
-      "תאריך עסקה": row[0],
-      "שם בית העסק": String(row[1] || '').trim(),
-      "סכום": row[2],
-    }));
-  }
-  if (type === 'max') {
-    if (data.length < 7) throw new Error("הקובץ נראה קצר מדי עבור פורמט 'מקס'.");
-    const trimmed = data.slice(3, -3);
-    if (trimmed.length < 1) throw new Error("לא נמצאו נתונים בקובץ לאחר הניקוי.");
-    const headers = trimmed[0].map(h => String(h || '').trim().replace(/\s+/g, ' '));
-    const rows = trimmed.slice(1);
-
-    if (!headers.includes('שם בית העסק') || !headers.includes('תאריך עסקה') || !headers.includes('סכום עסקה מקורי')) {
-        throw new Error('העמודות הנדרשות לא נמצאו בקובץ "מקס".');
-    }
-
-    return rows.map(rowArray => {
-      let rowObject = {};
-      headers.forEach((header, index) => { rowObject[header] = rowArray[index]; });
-      return rowObject;
-    });
-  }
-  if (type === 'isracard') {
-    const results = [];
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i];
-      if (!Array.isArray(row)) continue;
-      const hasDateCol = row.some(cell => typeof cell === 'string' && cell.includes('תאריך רכישה'));
-      const hasMerchantCol = row.some(cell => typeof cell === 'string' && cell.includes('שם בית עסק'));
-      if (!hasDateCol || !hasMerchantCol) continue;
-      const headers = row.map(h => String(h || '').trim());
-      const dateIdx = headers.findIndex(h => h.includes('תאריך רכישה'));
-      const merchantIdx = headers.findIndex(h => h.includes('שם בית עסק'));
-      const amountIdx = headers.findIndex(h => h.includes('סכום חיוב'));
-      for (let j = i + 1; j < data.length; j++) {
-        const dataRow = data[j];
-        if (!Array.isArray(dataRow)) continue;
-        const dateVal = dataRow[dateIdx];
-        const merchantVal = String(dataRow[merchantIdx] || '').trim();
-        const amountVal = dataRow[amountIdx];
-        const isDateLike = dateVal instanceof Date ||
-          (typeof dateVal === 'string' && /\d{1,2}[./]\d{1,2}/.test(dateVal));
-        if (!isDateLike || !merchantVal || merchantVal.includes('סה"כ')) continue;
-        results.push({
-          "תאריך עסקה": dateVal,
-          "שם בית העסק": merchantVal,
-          "סכום": amountVal,
-        });
-      }
-    }
-    if (results.length === 0) throw new Error("לא נמצאו עסקאות בקובץ 'ישראכרט'.");
-    return results;
-  }
-  throw new Error('סוג ייבוא לא ידוע.');
-}
 
 // --- רכיב הדף הראשי ---
 export default function ExcelImportPage() {
@@ -121,11 +59,13 @@ export default function ExcelImportPage() {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-        const cleanedData = cleanFile(rawData, type);
-        setParsedData(cleanedData);
-        const merchantNames = [...new Set(cleanedData.map(row => row['שם בית העסק']).filter(Boolean))];
-        const { data: response } = await api.post('/import/check-merchants', { merchantNames });
+        const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+        
+        // --- שימוש בנתיב השרת המעודכן שעושה את כל העבודה (כמו בטאב העסקאות) ---
+        const { data: response } = await api.post('/import/upload', { data: rawData, fileType: type });
+        
+        setParsedData(response.transactions);
+        
         if (response.unseenMerchants && response.unseenMerchants.length > 0) {
           setUnseenMerchants(response.unseenMerchants);
           const initialMappings = {};
@@ -135,10 +75,10 @@ export default function ExcelImportPage() {
           setMappings(initialMappings);
           setStage('map');
         } else {
-          processData([], cleanedData);
+          processData([], response.transactions);
         }
       } catch (error) {
-        setMessage(error.message || 'שגיאה בקריאת הקובץ.');
+        setMessage(error.response?.data?.message || error.message || 'שגיאה בקריאת הקובץ.');
         setStage('result');
       }
     };
@@ -158,7 +98,6 @@ export default function ExcelImportPage() {
     if (!newCategoryName.trim()) return;
     try {
       const { data: newCategory } = await api.post('/categories', { name: newCategoryName.trim(), type: 'הוצאה' });
-      // Real-time update
       setCategories(prev => [...prev, newCategory].sort((a, b) => a.name.localeCompare(b.name)));
       if (currentMerchantForNewCategory) {
           handleMappingChange(currentMerchantForNewCategory, 'category', newCategory._id);
@@ -175,29 +114,26 @@ export default function ExcelImportPage() {
     setStage('processing');
     setMessage('מעבד עסקאות ושולח לשרת...');
     try {
-      const allMapsRes = await api.get('/management');
-      const allMaps = allMapsRes.data.merchantMaps || [];
-      
-      const finalMap = [...allMaps, ...mappingsToSave];
-      const mappingDict = Object.fromEntries(finalMap.map(m => [m.originalName, { newName: m.newName, category: m.category?.name }]));
-
-      const transactions = dataToProcess.map(row => {
-        const originalName = row['שם בית העסק'];
-        const amount = row['סכום'] || row['סכום עסקה מקורי'];
-        const date = row['תאריך עסקה'];
-        const mapping = mappingDict[originalName] || {};
-        
-        return {
-            date: date,
-            description: mapping.newName || originalName,
-            amount: Math.abs(Number(amount)) || 0,
-            type: 'הוצאה',
-            category: mapping.category || 'ללא קטגוריה',
-            account: 'checking',
-        };
+      // החלת המיפויים שהמשתמש בחר
+      const finalTransactions = dataToProcess.map(trx => {
+          const originalDesc = trx.rawDescription || trx.description;
+          const m = mappingsToSave.find(map => map.originalName === originalDesc);
+          if (m) {
+              const newCat = categories.find(c => c._id === m.category)?.name;
+              return { 
+                  ...trx, 
+                  description: m.newName || trx.description, 
+                  ...(newCat && { category: newCat }) 
+              };
+          }
+          return trx;
       });
       
-      const { data: response } = await api.post('/import/process-transactions', { transactions, newMappings: mappingsToSave });
+      const { data: response } = await api.post('/import/process-transactions', { 
+          transactions: finalTransactions, 
+          newMappings: mappingsToSave 
+      });
+      
       setMessage(response.message);
       setStage('result');
     } catch (error) {
@@ -214,8 +150,6 @@ export default function ExcelImportPage() {
       let categoryId = mapping.category;
 
       if (categoryId === CREATE_NEW_CATEGORY_VALUE) {
-        // This case is handled by the Dialog now, so this part of logic might not be directly triggered
-        // but is kept for safety.
         alert('יש ליצור קטגוריה חדשה דרך החלון שנפתח.');
         return;
       }
@@ -226,7 +160,6 @@ export default function ExcelImportPage() {
         alert(`נא לבחור קטגוריה עבור "${originalName}"`);
         return;
       } else {
-        // Add a mapping without a category if forcing all
         finalMappings.push({ originalName, newName: mapping.newName.trim() || originalName, category: null });
       }
     }
@@ -259,7 +192,7 @@ export default function ExcelImportPage() {
                 <Button size="lg" onClick={() => handleImportButtonClick('cal')}>ייבוא מדוח "כאל"</Button>
                 <Button size="lg" onClick={() => handleImportButtonClick('isracard')}>ייבוא מדוח "ישראכרט"</Button>
               </div>
-              <input type="file" ref={fileInputRef} onChange={handleFileSelected} accept=".xlsx, .xls" className="hidden" />
+              <input type="file" ref={fileInputRef} onChange={handleFileSelected} accept=".xlsx, .xls, .csv" className="hidden" />
             </div>
           )}
 
