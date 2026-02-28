@@ -14,12 +14,17 @@ const normalizeAccount = (account) => {
     return map[account] || account || 'checking';
 };
 
-// @desc   קבלת כל העסקאות של המשתמש
+// @desc   קבלת עסקאות של המשתמש (תמיכה ב-?before=DATE&limit=N לפגינציה)
 // @route  GET /api/transactions
 export const getTransactions = async (req, res) => {
   try {
-    // שליפה לפי המשתמש המחובר, ממוין לפי תאריך יורד
-    const transactions = await Transaction.find({ user: req.user._id }).sort({ date: -1 });
+    const filter = { user: req.user._id };
+    if (req.query.before) filter.date = { $lt: new Date(req.query.before) };
+
+    let query = Transaction.find(filter).sort({ date: -1 });
+    if (req.query.limit) query = query.limit(Math.min(parseInt(req.query.limit), 2000));
+
+    const transactions = await query;
     res.json(transactions);
   } catch (error) {
     console.error("Get transactions error:", error);
@@ -263,6 +268,22 @@ export const updateTransaction = async (req, res) => {
   } catch (error) {
     console.error('Update transaction error:', error);
     res.status(500).json({ message: 'שגיאה בעדכון העסקה' });
+  }
+};
+
+// @desc   מחיקת כל עסקאות המשתמש + איפוס יתרות
+// @route  DELETE /api/transactions/all
+export const deleteAllTransactions = async (req, res) => {
+  try {
+    await Transaction.deleteMany({ user: req.user._id });
+    await FinanceProfile.updateOne(
+      { user: req.user._id },
+      { $set: { checking: 0, cash: 0 } }
+    );
+    res.json({ message: 'כל העסקאות נמחקו בהצלחה' });
+  } catch (error) {
+    console.error('Delete all transactions error:', error);
+    res.status(500).json({ message: 'שגיאה במחיקת העסקאות' });
   }
 };
 

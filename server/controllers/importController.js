@@ -48,8 +48,8 @@ const applyRulesToTransactionInMemory = (transaction, rules) => {
     }
 
     if (isMatch) {
-      // אם נמצאה התאמה, מעדכנים קטגוריה ושם
-      transaction.category = rule.category;
+      // אם נמצאה התאמה, מעדכנים קטגוריה ושם (משתמשים בשם, לא ObjectId)
+      transaction.category = rule.category?.name || rule.category || 'כללי';
       if (rule.newName) {
         transaction.description = rule.newName;
       }
@@ -69,8 +69,8 @@ export const processTransactions = async (req, res, next) => {
   }
 
   try {
-    // 1. טעינת כל החוקים של המשתמש לזיכרון
-    const rules = await CategoryRule.find({ user: userId });
+    // 1. טעינת כל החוקים של המשתמש לזיכרון (עם populate לשם הקטגוריה)
+    const rules = await CategoryRule.find({ user: userId }).populate('category').lean();
 
     // 2. עיבוד העסקאות (החלת חוקים + שמירת מקור)
     const processedTransactions = transactions.map(t => {

@@ -31,6 +31,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/finance-dashboard", label: "לוח בקרה", icon: LayoutDashboard, auth: true },
       { to: "/portfolio",         label: "עסקאות",   icon: Receipt,          auth: true },
+      { to: "/categories",        label: "קטגוריות", icon: PieChart,         auth: true },
       { to: "/budget",            label: "תקציב",    icon: Wallet,           auth: true },
       { to: "/recurring",         label: "קבועים",   icon: RefreshCw,        auth: true },
       { to: "/smart-analytics",   label: "ניתוח חכם", icon: BarChart3,        auth: true },

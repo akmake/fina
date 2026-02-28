@@ -45,6 +45,7 @@ import UserActivityPage from "@/pages/UserActivityPage";
 /* New Features */
 import BudgetPage      from "@/pages/BudgetPage";
 import RecurringPage   from "@/pages/RecurringPage";
+import CategoryInsightsPage from "@/pages/CategoryInsightsPage";
 import PensionPage     from "@/pages/PensionPage";
 import NetWorthPage    from "@/pages/NetWorthPage";
 import ExcelImportPage from "@/pages/ExcelImportPage";
@@ -83,6 +84,7 @@ export default function App() {
           <Route path="smart-analytics"   element={<SmartAnalyticsDashboard />} />
           <Route path="finance"           element={<FinancePage />}             />
           <Route path="budget"            element={<BudgetPage />}              />
+          <Route path="categories"        element={<CategoryInsightsPage />}    />
           <Route path="recurring"         element={<RecurringPage />}           />
           <Route path="net-worth"         element={<NetWorthPage />}            />
           <Route path="import"            element={<ImportPage />}              />

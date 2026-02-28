@@ -14,6 +14,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import api from '@/utils/api';
 
 // ---------------------------------------------------------------------------
 // Section wrapper
@@ -41,12 +42,26 @@ export default function SettingsPage() {
   const { logout }             = useAuthStore();
 
   const [confirmLogout,    setConfirmLogout]    = useState(false);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [deletingAll,      setDeletingAll]      = useState(false);
   const [notifyTransact,   setNotifyTransact]   = useState(true);
   const [notifyMonthly,    setNotifyMonthly]    = useState(true);
   const [notifyAnomalies,  setNotifyAnomalies]  = useState(false);
 
   const handleExportData = () => {
     toast('ייצוא נתונים יהיה זמין בגרסה הבאה', { icon: '📦' });
+  };
+
+  const handleDeleteAllTransactions = async () => {
+    setDeletingAll(true);
+    try {
+      await api.delete('/transactions/all');
+      toast.success('כל העסקאות נמחקו בהצלחה');
+    } catch {
+      toast.error('שגיאה במחיקת העסקאות');
+    } finally {
+      setDeletingAll(false);
+    }
   };
 
   return (
@@ -112,7 +127,7 @@ export default function SettingsPage() {
       </Section>
 
       {/* Data management */}
-      <Section icon={Database} title="ניהול נתונים" description="ייצוא וגיבוי הנתונים שלך">
+      <Section icon={Database} title="ניהול נתונים" description="ייצוא, גיבוי ומחיקת הנתונים שלך">
         <div className="space-y-3">
           <Button variant="outline" className="w-full justify-start gap-2" onClick={handleExportData}>
             <Download className="h-4 w-4" />
@@ -120,6 +135,19 @@ export default function SettingsPage() {
           </Button>
           <p className="text-xs text-gray-400">
             ייצוא כולל: עסקאות, קטגוריות, מניות, פקדונות והלוואות.
+          </p>
+          <Separator />
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-2 text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30"
+            onClick={() => setConfirmDeleteAll(true)}
+            disabled={deletingAll}
+          >
+            <Trash2 className="h-4 w-4" />
+            מחק את כל העסקאות
+          </Button>
+          <p className="text-xs text-red-400">
+            פעולה בלתי הפיכה. כל העסקאות ייחסכו לצמיתות ויתרות החשבון יאופסו.
           </p>
         </div>
       </Section>
@@ -152,6 +180,16 @@ export default function SettingsPage() {
         description="פעולה זו תנתק אותך מכל המכשירים שמחוברים לחשבון. תצטרך להתחבר מחדש."
         confirmLabel="התנתק"
         onConfirm={logout}
+      />
+
+      {/* Confirm delete all transactions */}
+      <ConfirmDialog
+        open={confirmDeleteAll}
+        onOpenChange={setConfirmDeleteAll}
+        title="מחיקת כל העסקאות"
+        description="פעולה זו תמחק לצמיתות את כל העסקאות שלך ותאפס את יתרות החשבון. אי אפשר לבטל פעולה זו!"
+        confirmLabel="מחק הכל"
+        onConfirm={handleDeleteAllTransactions}
       />
     </div>
   );
