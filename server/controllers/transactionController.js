@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import Transaction from '../models/Transaction.js';
 import FinanceProfile from '../models/FinanceProfile.js';
+import MerchantMap from '../models/MerchantMap.js';
 
 // --- פונקציית עזר לתרגום סוגים ---
 const normalizeType = (type) => {
@@ -262,5 +263,53 @@ export const updateTransaction = async (req, res) => {
   } catch (error) {
     console.error('Update transaction error:', error);
     res.status(500).json({ message: 'שגיאה בעדכון העסקה' });
+  }
+};
+
+// @desc   עדכון bulk לכל עסקאות בית עסק + שמירה ב-MerchantMap הגלובלי
+// @route  POST /api/transactions/merchant-bulk
+export const bulkUpdateMerchant = async (req, res) => {
+  const { originalName, newDisplayName, newCategory } = req.body;
+  const userId = req.user._id;
+
+  if (!originalName) {
+    return res.status(400).json({ message: 'originalName נדרש' });
+  }
+
+  try {
+    // מצא דוגמה לעסקה כדי לקבל rawDescription
+    const sample = await Transaction.findOne({ user: userId, description: originalName });
+    const rawDescription = sample?.rawDescription || originalName;
+
+    // עדכן כל עסקאות המשתמש עם שם זה
+    const updateFields = {};
+    if (newDisplayName && newDisplayName !== originalName) updateFields.description = newDisplayName;
+    if (newCategory) updateFields.category = newCategory;
+
+    if (Object.keys(updateFields).length > 0) {
+      await Transaction.updateMany({ user: userId, description: originalName }, { $set: updateFields });
+    }
+
+    // עדכן MerchantMap גלובלי (רק אם יש שינוי משמעותי)
+    const shouldUpdateCategory = newCategory && newCategory !== 'כללי';
+    const shouldUpdateName = newDisplayName && newDisplayName !== rawDescription;
+
+    if (shouldUpdateCategory || shouldUpdateName) {
+      await MerchantMap.findOneAndUpdate(
+        { originalName: rawDescription },
+        {
+          $set: {
+            newName: newDisplayName || rawDescription,
+            ...(shouldUpdateCategory ? { categoryName: newCategory } : {}),
+          },
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    res.json({ message: 'עודכן בהצלחה' });
+  } catch (error) {
+    console.error('bulkUpdateMerchant error:', error);
+    res.status(500).json({ message: 'שגיאה בעדכון' });
   }
 };

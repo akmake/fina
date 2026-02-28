@@ -67,7 +67,7 @@ export default function App() {
       <Route path="/" element={<Layout />}>
 
         {/* ── Public ─────────────────────────────────────────── */}
-        <Route index           element={<HomePage />}    />
+        <Route index           element={<Navigate to="/finance-dashboard" replace />} />
         <Route path="login"    element={<LoginPage />}   />
         <Route path="register" element={<RegisterPage />} />
 

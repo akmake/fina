@@ -38,20 +38,30 @@ function parseDate(dateInput) {
 }
 
 const createTransactionObject = (row, userId, type) => {
-    // פונקציית עזר למציאת ערך לפי רשימת מפתחות אפשריים
-    const getValue = (keys) => {
-        for (const key of keys) {
-            if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
-                return row[key];
+    // --- התיקון הקריטי כאן: פונקציית עזר חכמה שעוקפת רווחים נסתרים באקסל ---
+    const getValue = (keyPhrases) => {
+        for (const actualKey of Object.keys(row)) {
+            for (const phrase of keyPhrases) {
+                if (actualKey.includes(phrase)) {
+                    const val = row[actualKey];
+                    if (val !== undefined && val !== null && String(val).trim() !== '') {
+                        return val;
+                    }
+                }
             }
         }
         return null;
     };
 
-    const date = parseDate(getValue(['תאריך עסקה', 'תאריך רכישה', 'תאריך', 'Date', 'date']));
-    const description = getValue(['שם בית העסק', 'שם בית עסק', 'תיאור', 'Description', 'description']);
+    const dateVal = getValue(['תאריך עסקה', 'תאריך רכישה', 'תאריך', 'Date', 'date']);
+    const date = parseDate(dateVal);
     
-    if (!date || !description) return null;
+    const descriptionVal = getValue(['שם בית העסק', 'שם בית עסק', 'תיאור', 'Description', 'description']);
+    
+    // סינון שורות "זבל" - אם אין תאריך או תיאור, מתעלמים מהשורה
+    if (!date || !descriptionVal) return null;
+    
+    const description = String(descriptionVal).trim();
 
     let amount, transactionType;
     if (type === 'max') {
@@ -68,7 +78,7 @@ const createTransactionObject = (row, userId, type) => {
             amount = Math.abs(creditAmount);
             transactionType = 'הכנסה';
         } else {
-            return null;
+            return null; // אם אין סכום, מדלגים
         }
     } else if (type === 'isracard') {
         const amountValue = getValue(['סכום חיוב']);
@@ -86,7 +96,7 @@ const createTransactionObject = (row, userId, type) => {
         amount = Math.abs(amount);
     }
 
-    // קריאת הקטגוריה מהקובץ (תומך גם ב"שם ענף" וגם ב"קטגוריה" כמו בקובץ ששלחת)
+    // קריאת הקטגוריה מהקובץ
     const rawCategory = getValue([
         'קטגוריה', 
         'שם קטגוריה', 
@@ -124,7 +134,6 @@ export async function parseTransactions(cleanedData, fileType, userId) {
         let finalDescription = trx.description;
         let finalCategoryName = trx.category;
         
-        // --- התיקון הקריטי כאן ---
         // בודקים האם הקטגוריה שהגיעה מהקובץ היא "קטגוריה אמיתית" ולא סתם "כללי"
         const genericNames = ['כללי', 'שונות', '', 'null', 'undefined'];
         let categoryIsGeneric = genericNames.includes(finalCategoryName);
@@ -138,6 +147,9 @@ export async function parseTransactions(cleanedData, fileType, userId) {
             finalDescription = mapping.newName;
             if (mapping.category) {
                 finalCategoryName = mapping.category.name;
+                categoryFound = true;
+            } else if (mapping.categoryName) {
+                finalCategoryName = mapping.categoryName;
                 categoryFound = true;
             }
         }

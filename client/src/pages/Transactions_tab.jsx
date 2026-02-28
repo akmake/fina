@@ -10,7 +10,7 @@ import {
     ArrowUpRight, ArrowDownLeft, Wallet, CreditCard,
     Calendar, Search, Filter, Briefcase, ShoppingBag, 
     Coffee, Home, Car, Zap, MoreHorizontal, Trash2,
-    Tag, Edit3, Calculator, X, Save
+    Tag, Edit3, X, Save, ChevronDown, TrendingDown
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 const CREATE_NEW_CATEGORY_VALUE = "CREATE_NEW";
 
@@ -102,7 +103,7 @@ const KpiCard = ({ title, value, icon: Icon, trend }) => (
         </div>
         <div className="z-10">
             <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{formatCurrency(value)}</h3>
-            {trend && <p className="text-xs text-slate-400 mt-1 font-medium">{trend}</p>}
+            {trend && <p className="text-xs text-slate-400 mt-1 font-medium truncate">{trend}</p>}
         </div>
     </div>
 );
@@ -122,6 +123,12 @@ export default function FinanceDashboardPage() {
     const [selectedNewCategory, setSelectedNewCategory] = useState('');
     const [customCategory, setCustomCategory] = useState('');
     const [updatingCategory, setUpdatingCategory] = useState(false);
+    const [editNameMode, setEditNameMode] = useState(false);
+    const [newMerchantName, setNewMerchantName] = useState('');
+
+    // --- State של סינון וחיפוש ---
+    const [filterType, setFilterType] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
 
     // ייבוא
     const [importState, setImportState] = useState('idle');
@@ -169,6 +176,7 @@ export default function FinanceDashboardPage() {
         setSelectedMerchant(merchantName);
         setIsMerchantDetailOpen(true);
         setEditCategoryMode(false);
+        setEditNameMode(false);
         setSelectedNewCategory('');
         setCustomCategory('');
     };
@@ -186,34 +194,64 @@ export default function FinanceDashboardPage() {
 
     const currentMerchantCategory = merchantHistory.length > 0 ? merchantHistory[0].category : 'כללי';
 
-    const handleBulkCategoryUpdate = async () => {
+    const handleBulkMerchantUpdate = async () => {
         const isCustom = selectedNewCategory === 'custom';
         const finalCategoryString = isCustom ? customCategory : selectedNewCategory;
-        
+
         if (!finalCategoryString || finalCategoryString.trim() === '') {
             return alert('נא לבחור או להקליד קטגוריה חוקית');
         }
 
+        let catNameToSave = finalCategoryString.trim();
+        if (!isCustom) {
+            const found = categories.find(c => c._id === finalCategoryString);
+            if (found) catNameToSave = found.name;
+        }
+
         setUpdatingCategory(true);
         try {
-            // הפיכת ה-ID לשם קטגוריה אם בחרנו מהרשימה
-            let catNameToSave = finalCategoryString;
-            if (!isCustom) {
-                const found = categories.find(c => c._id === finalCategoryString);
-                if (found) catNameToSave = found.name;
+            if (isCustom) {
+                try {
+                    const { data: newCat } = await api.post('/categories', { name: catNameToSave, type: 'הוצאה' });
+                    setCategories(prev => [...prev, newCat].sort((a, b) => a.name.localeCompare(b.name)));
+                } catch (e) { /* ignore duplicate */ }
             }
 
-            for (const t of merchantHistory) {
-                if (t.category !== catNameToSave) {
-                    await api.put(`/transactions/${t._id}`, { ...t, category: catNameToSave });
-                }
-            }
-            
+            await api.post('/transactions/merchant-bulk', {
+                originalName: selectedMerchant,
+                newCategory: catNameToSave,
+            });
+
             setEditCategoryMode(false);
-            fetchTransactions(); // מרענן כדי לראות את השינוי בכל המקומות
+            setCustomCategory('');
+            setSelectedNewCategory('');
+            await fetchTransactions();
         } catch (error) {
             console.error(error);
-            alert('שגיאה בעדכון הקטגוריות');
+            alert('שגיאה בעדכון הקטגוריה');
+        } finally {
+            setUpdatingCategory(false);
+        }
+    };
+
+    const handleSaveName = async () => {
+        const trimmedName = newMerchantName.trim();
+        if (!trimmedName || trimmedName === selectedMerchant) {
+            setEditNameMode(false);
+            return;
+        }
+        setUpdatingCategory(true);
+        try {
+            await api.post('/transactions/merchant-bulk', {
+                originalName: selectedMerchant,
+                newDisplayName: trimmedName,
+            });
+            setSelectedMerchant(trimmedName);
+            setEditNameMode(false);
+            await fetchTransactions();
+        } catch (e) {
+            console.error(e);
+            alert('שגיאה בשינוי השם');
         } finally {
             setUpdatingCategory(false);
         }
@@ -265,9 +303,21 @@ export default function FinanceDashboardPage() {
             try {
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
-                const { data: response } = await api.post('/import/upload', { data: rawData, fileType: type });
+                
+                // --- התיקון: קריאת כל הגיליונות ולא רק הראשון ---
+                let allRawData = [];
+                workbook.SheetNames.forEach(sheetName => {
+                    const sheet = workbook.Sheets[sheetName];
+                    const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+                    // מוסיפים למערך הגדול רק אם יש נתונים בטאב
+                    if (rawData.length > 0) {
+                        allRawData = allRawData.concat(rawData);
+                    }
+                });
+
+                // שולחים לשרת את כל הנתונים המאוחדים
+                const { data: response } = await api.post('/import/upload', { data: allRawData, fileType: type });
+                
                 setParsedTransactions(response.transactions);
                 if (response.unseenMerchants?.length > 0) {
                     setUnseenMerchants(response.unseenMerchants);
@@ -275,8 +325,14 @@ export default function FinanceDashboardPage() {
                     response.unseenMerchants.forEach(name => initialMappings[name] = { newName: name, category: '' });
                     setMappings(initialMappings);
                     setImportState('mapping');
-                } else setImportState('confirming');
-            } catch (error) { setImportMessage(error.response?.data?.message || 'שגיאה בקובץ'); setImportState('error'); }
+                } else {
+                    setImportState('confirming');
+                }
+            } catch (error) { 
+                console.error("Import Error:", error);
+                setImportMessage(error.response?.data?.message || 'שגיאה בקובץ'); 
+                setImportState('error'); 
+            }
         };
         reader.readAsArrayBuffer(file);
     };
@@ -308,23 +364,70 @@ export default function FinanceDashboardPage() {
         } catch (error) { setImportMessage('שגיאה בשמירה'); setImportState('error'); }
     };
 
-    const summary = useMemo(() => {
+    // --- חישוב KPIs משודרג לחודש הנוכחי ---
+    const monthlyStats = useMemo(() => {
         const now = new Date();
         const relevant = transactions.filter(t => isWithinInterval(new Date(t.date), { start: startOfMonth(now), end: endOfMonth(now) }));
-        return relevant.reduce((acc, curr) => {
-            if (curr.type === 'הכנסה') acc.income += curr.amount; else acc.expense += curr.amount; return acc;
-        }, { income: 0, expense: 0 });
+        
+        let income = 0;
+        let expense = 0;
+        let largestExpense = null;
+        const categorySums = {};
+
+        relevant.forEach(curr => {
+            if (curr.type === 'הכנסה') {
+                income += curr.amount;
+            } else {
+                expense += curr.amount;
+                // חישוב העסקה הגדולה ביותר
+                if (!largestExpense || curr.amount > largestExpense.amount) {
+                    largestExpense = curr;
+                }
+                // סכימת קטגוריות
+                if (curr.category) {
+                    categorySums[curr.category] = (categorySums[curr.category] || 0) + curr.amount;
+                }
+            }
+        });
+
+        // מציאת הקטגוריה הבזבזנית ביותר
+        let topCategory = null;
+        let maxCatAmount = 0;
+        Object.entries(categorySums).forEach(([cat, amount]) => {
+            if (amount > maxCatAmount) {
+                maxCatAmount = amount;
+                topCategory = { name: cat, amount: amount };
+            }
+        });
+
+        return { income, expense, largestExpense, topCategory };
     }, [transactions]);
 
+    // --- סינון וקיבוץ עסקאות לפי חודשים ---
     const groupedTransactions = useMemo(() => {
+        let filtered = transactions;
+
+        // סינון לפי סוג (הוצאה/הכנסה)
+        if (filterType === 'expense') filtered = filtered.filter(t => t.type === 'הוצאה');
+        if (filterType === 'income') filtered = filtered.filter(t => t.type === 'הכנסה');
+
+        // סינון לפי טקסט חיפוש
+        if (searchQuery.trim() !== '') {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(t => 
+                t.description.toLowerCase().includes(query) || 
+                (t.category && t.category.toLowerCase().includes(query))
+            );
+        }
+
         const groups = {};
-        transactions.forEach(t => {
+        filtered.forEach(t => {
             const month = format(new Date(t.date), 'LLLL yyyy', { locale: he });
             if (!groups[month]) groups[month] = [];
             groups[month].push(t);
         });
         return groups;
-    }, [transactions]);
+    }, [transactions, filterType, searchQuery]);
   
     return (
         <div className="min-h-screen bg-[#F2F4F8] font-sans text-slate-900 pb-20">
@@ -335,43 +438,89 @@ export default function FinanceDashboardPage() {
                     <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">הארנק שלי</h1>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
-                    <Button variant="outline" className="rounded-full h-9 sm:h-10 px-4 sm:px-6 bg-white/50 border-slate-200 text-slate-700 hover:bg-white hover:shadow-md transition-all flex-1 sm:flex-none text-sm" onClick={() => handleImportButtonClick('max')}>
-                        <Upload className="ml-2 h-4 w-4" /> Max
-                    </Button>
-                    <Button variant="outline" className="rounded-full h-9 sm:h-10 px-4 sm:px-6 bg-white/50 border-slate-200 text-slate-700 hover:bg-white hover:shadow-md transition-all flex-1 sm:flex-none text-sm" onClick={() => handleImportButtonClick('cal')}>
-                        <Upload className="ml-2 h-4 w-4" /> Cal
-                    </Button>
-                    <Button variant="outline" className="rounded-full h-9 sm:h-10 px-4 sm:px-6 bg-white/50 border-slate-200 text-slate-700 hover:bg-white hover:shadow-md transition-all flex-1 sm:flex-none text-sm" onClick={() => handleImportButtonClick('isracard')}>
-                        <Upload className="ml-2 h-4 w-4" /> ישראכרט
-                    </Button>
+                    {/* התפריט המשודרג של הייבוא */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="rounded-full h-9 sm:h-10 px-4 sm:px-6 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:shadow-md transition-all flex-1 sm:flex-none text-sm font-semibold">
+                                <Upload className="ml-2 h-4 w-4" /> ייבוא אשראי <ChevronDown className="mr-2 h-4 w-4 text-slate-400" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="rounded-2xl min-w-[150px]" align="end">
+                            <DropdownMenuItem onClick={() => handleImportButtonClick('max')} className="cursor-pointer font-medium py-3">Max</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleImportButtonClick('cal')} className="cursor-pointer font-medium py-3">Cal</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleImportButtonClick('isracard')} className="cursor-pointer font-medium py-3">ישראכרט</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                     <input type="file" ref={fileInputRef} onChange={handleFileSelected} accept=".xlsx, .xls, .csv" className="hidden" />
                 </div>
             </header>
 
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+            {/* שים לב - הרחבנו את העטיפה המרכזית */}
+            <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 sm:py-10">
                 
-                {/* KPI Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-8 mb-8 sm:mb-12">
-                    <KpiCard title="יתרה חודשית" value={summary.income - summary.expense} icon={Wallet} trend="מאזן נוכחי" />
-                    <KpiCard title="הכנסות" value={summary.income} icon={ArrowUpRight} trend="נכנס לחשבון" />
-                    <KpiCard title="הוצאות" value={summary.expense} icon={ArrowDownLeft} trend="יצא מהחשבון" />
+                {/* KPI Cards המשודרג עם 5 עמודות בדסקטופ */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6 mb-8 sm:mb-12">
+                    <KpiCard title="יתרה חודשית" value={monthlyStats.income - monthlyStats.expense} icon={Wallet} trend="מאזן נוכחי" />
+                    <KpiCard title="הכנסות" value={monthlyStats.income} icon={ArrowUpRight} trend="נכנס לחשבון" />
+                    <KpiCard title="הוצאות" value={monthlyStats.expense} icon={ArrowDownLeft} trend="יצא מהחשבון" />
+                    <KpiCard title="הקטגוריה הבזבזנית" value={monthlyStats.topCategory ? monthlyStats.topCategory.amount : 0} icon={TrendingDown} trend={monthlyStats.topCategory ? monthlyStats.topCategory.name : "אין נתונים"} />
+                    <KpiCard title="העסקה הגדולה ביותר" value={monthlyStats.largestExpense ? monthlyStats.largestExpense.amount : 0} icon={AlertCircle} trend={monthlyStats.largestExpense ? monthlyStats.largestExpense.description : "אין נתונים"} />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12">
                     
                     {/* Main Feed */}
                     <main className="lg:col-span-8">
-                        <div className="flex items-center justify-between mb-6 sm:mb-8">
-                            <h2 className="text-lg sm:text-xl font-bold text-slate-900">פעילות אחרונה</h2>
-                            <div className="flex gap-1 sm:gap-2 bg-white/60 p-1 rounded-full border border-white/50 shadow-sm">
-                                <Badge variant="secondary" className="bg-white hover:bg-slate-50 text-slate-900 shadow-sm cursor-pointer px-2 sm:px-4 py-1 sm:py-1.5 rounded-full font-medium text-xs sm:text-sm">הכל</Badge>
-                                <Badge variant="ghost" className="text-slate-500 hover:bg-white/50 cursor-pointer px-2 sm:px-4 py-1 sm:py-1.5 rounded-full font-medium text-xs sm:text-sm">הוצאות</Badge>
-                                <Badge variant="ghost" className="text-slate-500 hover:bg-white/50 cursor-pointer px-2 sm:px-4 py-1 sm:py-1.5 rounded-full font-medium text-xs sm:text-sm">הכנסות</Badge>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8 gap-4">
+                            <h2 className="text-lg sm:text-xl font-bold text-slate-900 shrink-0">פעילות אחרונה</h2>
+                            
+                            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                                {/* שורת חיפוש חדשה */}
+                                <div className="relative w-full sm:w-64">
+                                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                    <Input 
+                                        placeholder="חיפוש עסקה..." 
+                                        className="h-10 pl-4 pr-9 rounded-full bg-white/60 backdrop-blur-sm border-white/50 shadow-sm text-sm w-full"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                    />
+                                </div>
+                                
+                                {/* פילטרים פעילים */}
+                                <div className="flex gap-1 sm:gap-2 bg-white/60 p-1 rounded-full border border-white/50 shadow-sm w-fit">
+                                    <Badge 
+                                        variant={filterType === 'all' ? "secondary" : "ghost"} 
+                                        onClick={() => setFilterType('all')} 
+                                        className={`cursor-pointer px-3 sm:px-4 py-1 sm:py-1.5 rounded-full font-medium text-xs sm:text-sm transition-colors ${filterType === 'all' ? 'bg-white hover:bg-slate-50 text-slate-900 shadow-sm' : 'text-slate-500 hover:bg-white/50'}`}
+                                    >
+                                        הכל
+                                    </Badge>
+                                    <Badge 
+                                        variant={filterType === 'expense' ? "secondary" : "ghost"} 
+                                        onClick={() => setFilterType('expense')} 
+                                        className={`cursor-pointer px-3 sm:px-4 py-1 sm:py-1.5 rounded-full font-medium text-xs sm:text-sm transition-colors ${filterType === 'expense' ? 'bg-white hover:bg-slate-50 text-slate-900 shadow-sm' : 'text-slate-500 hover:bg-white/50'}`}
+                                    >
+                                        הוצאות
+                                    </Badge>
+                                    <Badge 
+                                        variant={filterType === 'income' ? "secondary" : "ghost"} 
+                                        onClick={() => setFilterType('income')} 
+                                        className={`cursor-pointer px-3 sm:px-4 py-1 sm:py-1.5 rounded-full font-medium text-xs sm:text-sm transition-colors ${filterType === 'income' ? 'bg-white hover:bg-slate-50 text-slate-900 shadow-sm' : 'text-slate-500 hover:bg-white/50'}`}
+                                    >
+                                        הכנסות
+                                    </Badge>
+                                </div>
                             </div>
                         </div>
 
                         {loading ? (
                             <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>
+                        ) : Object.keys(groupedTransactions).length === 0 ? (
+                            <div className="text-center py-16 bg-white/40 rounded-3xl border border-white/50">
+                                <Search className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                                <h3 className="text-lg font-bold text-slate-700">לא נמצאו עסקאות</h3>
+                                <p className="text-sm text-slate-500">נסה לשנות את סינון החיפוש שלך</p>
+                            </div>
                         ) : (
                             Object.entries(groupedTransactions).map(([month, trans]) => (
                                 <div key={month} className="mb-10">
@@ -443,95 +592,148 @@ export default function FinanceDashboardPage() {
                 </div>
             </div>
 
-            {/* --- המודל החדש והמשודרג של חקר בית עסק --- */}
+            {/* ─── דיאלוג בית עסק — Apple Wallet Style ─── */}
             <Dialog open={isMerchantDetailOpen} onOpenChange={setIsMerchantDetailOpen}>
-                <DialogContent className="rounded-[40px] p-0 overflow-hidden bg-white max-w-sm sm:max-w-md border-none shadow-2xl flex flex-col max-h-[90vh]">
-                    <div className="bg-slate-50 p-6 sm:p-10 text-center relative shrink-0">
-                        <div className="mx-auto h-16 w-16 sm:h-20 sm:w-20 bg-white rounded-3xl flex items-center justify-center shadow-md mb-4 sm:mb-6 rotate-3">
-                            <ShoppingBag className="h-8 w-8 sm:h-10 sm:w-10 text-slate-800" />
-                        </div>
-                        <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900">{selectedMerchant}</DialogTitle>
-                        <p className="text-slate-500 font-medium mt-1 mb-4">היסטוריית עסקאות</p>
+                <DialogContent className="rounded-[32px] p-0 overflow-hidden bg-white border-none shadow-2xl flex flex-col max-w-sm sm:max-w-md" style={{ maxHeight: '88vh' }}>
 
-                        {/* אזור עריכת קטגוריה במודל */}
-                        <div className="bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-3 text-right">
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Tag className="h-4 w-4 text-slate-400" />
-                                    <span className="text-sm text-slate-600 font-medium">קטגוריה נוכחית:</span>
-                                </div>
-                                
-                                {!editCategoryMode ? (
-                                    <Badge 
-                                        className="cursor-pointer hover:bg-blue-600 transition-colors text-sm px-3 py-1 bg-blue-100 text-blue-700 font-normal mt-2 sm:mt-0 self-start sm:self-auto"
-                                        onClick={() => {
-                                            setEditCategoryMode(true);
-                                            const catId = categories.find(c => c.name === currentMerchantCategory)?._id || '';
-                                            setSelectedNewCategory(catId);
-                                        }}
-                                        title="לחץ לעריכה גורפת לבית עסק זה"
+                    {/* ── Header קומפקטי ── */}
+                    <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 px-5 pt-4 pb-4 shrink-0">
+                        {/* כפתור סגירה */}
+                        <button
+                            onClick={() => setIsMerchantDetailOpen(false)}
+                            className="absolute top-3 left-3 h-7 w-7 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center transition-colors"
+                        >
+                            <X className="h-3.5 w-3.5 text-white" />
+                        </button>
+
+                        {/* שם + עריכה */}
+                        <div className="pr-4 flex items-center gap-2 mb-0.5">
+                            {!editNameMode ? (
+                                <>
+                                    <DialogTitle className="text-[17px] font-bold text-white leading-tight flex-1 truncate">{selectedMerchant}</DialogTitle>
+                                    <button
+                                        onClick={() => { setEditNameMode(true); setNewMerchantName(selectedMerchant); }}
+                                        className="shrink-0 p-1 rounded-full hover:bg-white/10 transition-colors"
+                                        title="שנה שם"
                                     >
-                                        {currentMerchantCategory} <Edit3 className="h-3 w-3 ms-2 inline" />
-                                    </Badge>
-                                ) : (
-                                    <div className="flex flex-col gap-2 w-full mt-2">
-                                        <div className="flex items-center gap-2">
-                                            <Select value={selectedNewCategory} onValueChange={setSelectedNewCategory}>
-                                                <SelectTrigger className="h-10 text-sm rounded-xl flex-1 bg-slate-50 border-slate-200">
-                                                    <SelectValue placeholder="בחר קטגוריה" />
-                                                </SelectTrigger>
-                                                <SelectContent className="rounded-2xl">
-                                                    {categories.map(c => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}
-                                                    <SelectItem value="custom" className="text-blue-600 font-bold"><Plus className="h-3 w-3 me-1 inline"/> קטגוריה חדשה...</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                            <Button size="icon" onClick={handleBulkCategoryUpdate} disabled={updatingCategory} className="h-10 w-10 shrink-0 bg-blue-600 rounded-xl hover:bg-blue-700">
-                                                {updatingCategory ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4" />}
-                                            </Button>
-                                            <Button size="icon" variant="ghost" className="h-10 w-10 shrink-0 text-red-500 rounded-xl hover:bg-red-50" onClick={() => setEditCategoryMode(false)}>
-                                                <X className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                        {selectedNewCategory === 'custom' && (
-                                            <Input 
-                                                placeholder="הקלד שם קטגוריה חדשה..." 
-                                                className="h-10 text-sm rounded-xl bg-slate-50 border-slate-200"
-                                                value={customCategory}
-                                                onChange={(e) => setCustomCategory(e.target.value)}
-                                            />
-                                        )}
-                                    </div>
-                                )}
-                            </div>
+                                        <Edit3 className="h-3.5 w-3.5 text-white/40" />
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <input
+                                        value={newMerchantName}
+                                        onChange={e => setNewMerchantName(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleSaveName()}
+                                        className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-1 text-white text-sm outline-none focus:border-white/40"
+                                        autoFocus
+                                    />
+                                    <button onClick={handleSaveName} className="shrink-0 h-7 w-7 bg-emerald-500/30 hover:bg-emerald-500/50 rounded-full flex items-center justify-center transition-colors">
+                                        <Check className="h-3.5 w-3.5 text-emerald-300" />
+                                    </button>
+                                    <button onClick={() => setEditNameMode(false)} className="shrink-0 h-7 w-7 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
+                                        <X className="h-3 w-3 text-white/60" />
+                                    </button>
+                                </>
+                            )}
                         </div>
-                    </div>
+                        <p className="text-white/40 text-[11px] font-medium pr-4 mb-3">{merchantHistory.length} עסקאות</p>
 
-                    <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-white">
-                        {merchantHistory.map((trx, i) => (
-                            <div key={i} className="flex justify-between items-center p-3 sm:p-4 hover:bg-slate-50 rounded-2xl transition-colors mb-1 border border-transparent hover:border-slate-100">
-                                <span className="text-sm font-medium text-slate-500">{format(new Date(trx.date), 'dd/MM/yy')}</span>
-                                <span className={`font-bold font-mono text-base sm:text-lg ${trx.type === 'הכנסה' ? 'text-emerald-600' : 'text-slate-900'}`}>
-                                    {trx.type === 'הכנסה' ? '+' : '-'}{formatCurrency(trx.amount)}
-                                </span>
-                            </div>
-                        ))}
-                        {merchantHistory.length === 0 && <p className="text-center text-slate-400 py-4">לא נמצאו עסקאות</p>}
-                    </div>
-
-                    <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 shrink-0">
-                        {/* סיכום כספי מתקדם */}
-                        <div className={`p-4 rounded-2xl flex items-center justify-between mb-4 ${merchantTotal < 0 ? 'bg-red-50/50 border border-red-100' : 'bg-emerald-50/50 border border-emerald-100'}`}>
-                            <div className="flex items-center gap-2">
-                                <Calculator className={`h-5 w-5 ${merchantTotal < 0 ? 'text-red-500' : 'text-emerald-500'}`} />
-                                <span className={`text-sm sm:text-base font-medium ${merchantTotal < 0 ? 'text-red-700' : 'text-emerald-700'}`}>
-                                    {merchantTotal < 0 ? 'סך הכל הוצאות:' : 'סך הכל הכנסות:'}
-                                </span>
-                            </div>
-                            <span className={`text-xl sm:text-2xl font-bold ${merchantTotal < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                                {formatCurrency(Math.abs(merchantTotal))}
+                        {/* סך הכל + תגית */}
+                        <div className="flex items-end justify-between">
+                            <p className={`text-[1.85rem] font-extrabold tracking-tight leading-none ${merchantTotal < 0 ? 'text-red-300' : 'text-emerald-300'}`}>
+                                {merchantTotal < 0 ? '−' : '+'}{formatCurrency(Math.abs(merchantTotal))}
+                            </p>
+                            <span className={`text-[11px] font-semibold px-3 py-1.5 rounded-full ${merchantTotal < 0 ? 'bg-red-500/20 text-red-200' : 'bg-emerald-500/20 text-emerald-200'}`}>
+                                {merchantTotal < 0 ? 'הוצאות' : 'הכנסות'}
                             </span>
                         </div>
-                        <Button variant="outline" className="w-full h-12 rounded-2xl border-slate-200 text-slate-700 font-bold hover:bg-slate-100" onClick={() => setIsMerchantDetailOpen(false)}>סגור</Button>
+                    </div>
+
+                    {/* ── שורת קטגוריה ── */}
+                    <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-100/80 shrink-0 flex items-center gap-2">
+                        <Tag className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span className="text-xs text-slate-400">קטגוריה:</span>
+                        {!editCategoryMode ? (
+                            <button
+                                onClick={() => {
+                                    setEditCategoryMode(true);
+                                    const catId = categories.find(c => c.name === currentMerchantCategory)?._id || '';
+                                    setSelectedNewCategory(catId);
+                                }}
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-full px-3 py-1 hover:border-blue-300 hover:text-blue-600 transition-colors shadow-sm"
+                            >
+                                {currentMerchantCategory}
+                                <Edit3 className="h-3 w-3 text-slate-400" />
+                            </button>
+                        ) : (
+                            <div className="flex items-center gap-1.5 flex-1">
+                                <Select value={selectedNewCategory} onValueChange={setSelectedNewCategory}>
+                                    <SelectTrigger className="h-7 text-xs rounded-full flex-1 bg-white border-slate-200">
+                                        <SelectValue placeholder="בחר קטגוריה" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {categories.map(c => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}
+                                        <SelectItem value="custom" className="text-blue-600 font-bold">+ חדשה...</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {selectedNewCategory === 'custom' && (
+                                    <Input placeholder="שם..." className="h-7 text-xs rounded-full w-24 bg-white border-slate-200" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} />
+                                )}
+                                <Button size="icon" onClick={handleBulkMerchantUpdate} disabled={updatingCategory} className="h-7 w-7 shrink-0 bg-slate-900 rounded-full hover:bg-slate-700">
+                                    {updatingCategory ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-red-400 rounded-full hover:bg-red-50" onClick={() => setEditCategoryMode(false)}>
+                                    <X className="h-3 w-3" />
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ── רשימת עסקאות ── */}
+                    <div className="overflow-y-auto flex-1 bg-white">
+                        {merchantHistory.length === 0 ? (
+                            <p className="text-center text-slate-400 py-12 text-sm">לא נמצאו עסקאות</p>
+                        ) : (
+                            <div className="divide-y divide-slate-50">
+                                {merchantHistory.map((trx, i) => {
+                                    const d = new Date(trx.date);
+                                    const isIncome = trx.type === 'הכנסה';
+                                    return (
+                                        <div key={i} className="flex items-center gap-3.5 px-5 py-3 hover:bg-slate-50/70 transition-colors">
+                                            {/* עיגול תאריך */}
+                                            <div className={`h-10 w-10 rounded-2xl flex flex-col items-center justify-center shrink-0 ${isIncome ? 'bg-emerald-50' : 'bg-slate-100'}`}>
+                                                <span className={`text-sm font-bold leading-none ${isIncome ? 'text-emerald-600' : 'text-slate-700'}`}>
+                                                    {format(d, 'dd')}
+                                                </span>
+                                                <span className={`text-[9px] font-medium uppercase leading-none mt-0.5 ${isIncome ? 'text-emerald-400' : 'text-slate-400'}`}>
+                                                    {format(d, 'MMM', { locale: he })}
+                                                </span>
+                                            </div>
+                                            {/* פרטי תאריך */}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-slate-800 leading-tight">{format(d, 'EEEE', { locale: he })}</p>
+                                                <p className="text-xs text-slate-400">{format(d, 'yyyy')}</p>
+                                            </div>
+                                            {/* סכום */}
+                                            <span className={`text-base font-bold tabular-nums shrink-0 ${isIncome ? 'text-emerald-600' : 'text-slate-900'}`}>
+                                                {isIncome ? '+' : '−'}{formatCurrency(trx.amount)}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ── Footer ── */}
+                    <div className="px-5 pt-3 pb-5 bg-white border-t border-slate-50 shrink-0">
+                        <button
+                            onClick={() => setIsMerchantDetailOpen(false)}
+                            className="w-full h-12 rounded-2xl bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200 active:scale-[0.98] transition-all"
+                        >
+                            סגור
+                        </button>
                     </div>
                 </DialogContent>
             </Dialog>

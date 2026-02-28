@@ -1,12 +1,12 @@
-import { useState, Fragment } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { useState, Fragment, useEffect } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import {
   Menu, X, LogOut, LayoutDashboard, Landmark,
   TrendingUp, Home, Settings, UserCircle, PieChart,
   ChevronDown, Cpu, BarChart3, Receipt,
   CreditCard, Target, Moon, Sun, Lightbulb, Activity,
   Wallet, RefreshCw, Scale, GraduationCap, FileSpreadsheet, Upload,
-  Shield, Building2, Bell, Calculator,DownloadCloud , Baby, Globe, FileText,
+  Shield, Building2, Bell, Calculator, DownloadCloud, Baby, Globe, FileText,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -26,12 +26,6 @@ import {
 // Navigation structure — grouped for clarity
 // ---------------------------------------------------------------------------
 const NAV_GROUPS = [
-  {
-    label: null,
-    items: [
-      { to: "/", label: "בית", icon: Home, auth: false },
-    ],
-  },
   {
     label: "פיננסים",
     items: [
@@ -75,14 +69,14 @@ const NAV_GROUPS = [
   {
     label: "ניהול",
     items: [
-          { to: "/alerts",         label: "התראות",                icon: Bell,            auth: true },
-          { to: "/reports",        label: "דוחות",                 icon: FileText,        auth: true },
-          { to: "/management",     label: "אוטומציה",              icon: Cpu,             auth: true },
-          { to: "/import/excel",   label: "ייבוא אקסל",            icon: FileSpreadsheet, auth: true },
-          { to: "/import",         label: "ייבוא נתונים",          icon: Upload,          auth: true },
-          { to: "/discount-import",label: "ייבוא הכנסות (דיסקונט)", icon: DownloadCloud,   auth: true }, // <--- השורה החדשה שלנו!
-          { to: "/suggestions",    label: "הצעות שיפור",           icon: Lightbulb,       auth: true },
-        ],
+      { to: "/alerts",         label: "התראות",                icon: Bell,            auth: true },
+      { to: "/reports",        label: "דוחות",                 icon: FileText,        auth: true },
+      { to: "/management",     label: "אוטומציה",              icon: Cpu,             auth: true },
+      { to: "/import/excel",   label: "ייבוא אקסל",            icon: FileSpreadsheet, auth: true },
+      { to: "/import",         label: "ייבוא נתונים",          icon: Upload,          auth: true },
+      { to: "/discount-import",label: "ייבוא הכנסות (דיסקונט)", icon: DownloadCloud,   auth: true },
+      { to: "/suggestions",    label: "הצעות שיפור",           icon: Lightbulb,       auth: true },
+    ],
   },
   {
     label: "אדמין",
@@ -185,6 +179,27 @@ export default function Navbar() {
 // ---------------------------------------------------------------------------
 function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
   const { isDark, toggleDark } = useUIStore();
+  const location = useLocation();
+
+  // State to track which accordions are open
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    const initial = {};
+    groups.forEach((group, index) => {
+      // Auto-expand the group if the current URL matches one of its items
+      const isActiveGroup = group.items.some(
+        (item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)
+      );
+      // Open the active group, or the first group by default
+      if (isActiveGroup || index === 0) {
+        initial[group.label] = true;
+      }
+    });
+    return initial;
+  });
+
+  const toggleGroup = (label) => {
+    setExpandedGroups((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
 
   const handleLogout = () => {
     logout();
@@ -193,7 +208,6 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
 
   return (
     <div className="flex flex-col h-full border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-
       {/* Brand header */}
       <div className="flex items-center justify-between h-16 px-5 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
         <Link
@@ -222,24 +236,47 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-        {groups.map((group, gi) => (
-          <div key={gi}>
-            {group.label && (
-              <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                {group.label}
-              </p>
-            )}
-            <ul className="space-y-0.5">
-              {group.items.map((item) => (
-                <li key={item.to}>
-                  <NavItem item={item} onClick={onClose} />
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+      {/* Navigation - With Accordions */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-2">
+        {groups.map((group, gi) => {
+          const isExpanded = expandedGroups[group.label];
+
+          return (
+            <div key={gi} className="mb-1">
+              {group.label && (
+                <button
+                  onClick={() => toggleGroup(group.label)}
+                  className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 rounded-lg transition-colors cursor-pointer"
+                >
+                  <span>{group.label}</span>
+                  <motion.div
+                    animate={{ rotate: isExpanded ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </motion.div>
+                </button>
+              )}
+              <AnimatePresence initial={false}>
+                {(!group.label || isExpanded) && (
+                  <motion.ul
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                    className="space-y-0.5 overflow-hidden mt-1"
+                  >
+                    {group.items.map((item) => (
+                      <li key={item.to}>
+                        <NavItem item={item} onClick={onClose} />
+                      </li>
+                    ))}
+                  </motion.ul>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
       </nav>
 
       {/* Footer — user section */}

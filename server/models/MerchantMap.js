@@ -18,6 +18,11 @@ const merchantMapSchema = new mongoose.Schema({
     ref: 'Category',
     required: false,
   },
+  categoryName: {
+    type: String,
+    trim: true,
+    required: false,
+  },
 }, {
   timestamps: true,
 });
