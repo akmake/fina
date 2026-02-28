@@ -6,7 +6,7 @@ import {
   ChevronDown, Cpu, BarChart3, Receipt,
   CreditCard, Target, Moon, Sun, Lightbulb, Activity,
   Wallet, RefreshCw, Scale, GraduationCap, FileSpreadsheet, Upload,
-  Shield, Building2, Bell, Calculator, Baby, Globe, FileText,
+  Shield, Building2, Bell, Calculator,DownloadCloud , Baby, Globe, FileText,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -75,13 +75,14 @@ const NAV_GROUPS = [
   {
     label: "ניהול",
     items: [
-      { to: "/alerts",        label: "התראות",       icon: Bell,            auth: true },
-      { to: "/reports",        label: "דוחות",        icon: FileText,        auth: true },
-      { to: "/management",     label: "אוטומציה",    icon: Cpu,             auth: true },
-      { to: "/import/excel",   label: "ייבוא אקסל",  icon: FileSpreadsheet, auth: true },
-      { to: "/import",         label: "ייבוא נתונים", icon: Upload,          auth: true },
-      { to: "/suggestions",    label: "הצעות שיפור",  icon: Lightbulb,       auth: true },
-    ],
+          { to: "/alerts",         label: "התראות",                icon: Bell,            auth: true },
+          { to: "/reports",        label: "דוחות",                 icon: FileText,        auth: true },
+          { to: "/management",     label: "אוטומציה",              icon: Cpu,             auth: true },
+          { to: "/import/excel",   label: "ייבוא אקסל",            icon: FileSpreadsheet, auth: true },
+          { to: "/import",         label: "ייבוא נתונים",          icon: Upload,          auth: true },
+          { to: "/discount-import",label: "ייבוא הכנסות (דיסקונט)", icon: DownloadCloud,   auth: true }, // <--- השורה החדשה שלנו!
+          { to: "/suggestions",    label: "הצעות שיפור",           icon: Lightbulb,       auth: true },
+        ],
   },
   {
     label: "אדמין",

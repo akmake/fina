@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   RefreshCw, Plus, Trash2, Pause, Play, Calendar, ArrowUpDown,
-  CreditCard, Building, Wifi, Shield, Home, Car, Zap, TrendingDown, TrendingUp
+  CreditCard, Building, Wifi, Shield, Home, Car, Zap, TrendingDown, TrendingUp,
+  Search, Check, X, Loader2, Lightbulb, ExternalLink
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -40,7 +41,12 @@ export default function RecurringPage() {
   const [summary, setSummary] = useState({});
   const [forecast, setForecast] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [insights, setInsights] = useState([]);
   const [showDialog, setShowDialog] = useState(false);
+  const [showDetectDialog, setShowDetectDialog] = useState(false);
+  const [detectLoading, setDetectLoading] = useState(false);
+  const [candidates, setCandidates] = useState([]);
+  const [dismissed, setDismissed] = useState(new Set());
   const [filter, setFilter] = useState('all'); // all, expenses, income, subscriptions
 
   const [form, setForm] = useState({
@@ -54,13 +60,20 @@ export default function RecurringPage() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [transRes, cashflowRes] = await Promise.all([
+      const [transRes, cashflowRes, insightsRes] = await Promise.all([
         api.get('/recurring'),
         api.get('/recurring/cashflow?months=6'),
+        api.get('/analytics/recommendations').catch(() => null),
       ]);
       setTransactions(transRes.data.transactions);
       setSummary(transRes.data.summary);
       setForecast(cashflowRes.data.forecast);
+      if (insightsRes) {
+        const relevant = (insightsRes.data?.data?.recommendations || [])
+          .filter(r => ['recurring_missing', 'budget_missing', 'goal_behind'].includes(r.type))
+          .slice(0, 3);
+        setInsights(relevant);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -111,6 +124,44 @@ export default function RecurringPage() {
     }
   };
 
+  const openDetect = async () => {
+    setShowDetectDialog(true);
+    setDetectLoading(true);
+    setCandidates([]);
+    setDismissed(new Set());
+    try {
+      const { data } = await api.get('/recurring/detect');
+      setCandidates(data.candidates || []);
+    } catch {
+      toast.error('שגיאה בזיהוי דפוסים');
+    }
+    setDetectLoading(false);
+  };
+
+  const approveCandidate = async (c) => {
+    try {
+      await api.post('/recurring', {
+        description: c.description,
+        amount: c.amount,
+        type: c.type,
+        category: c.category,
+        frequency: 'monthly',
+        dayOfMonth: c.suggestedDay,
+        startDate: new Date().toISOString().split('T')[0],
+        subcategory: 'other',
+      });
+      toast.success(`"${c.description}" נוסף לקבועות`);
+      setDismissed(prev => new Set([...prev, c.description]));
+      fetchAll();
+    } catch {
+      toast.error('שגיאה בהוספה');
+    }
+  };
+
+  const dismissCandidate = (description) => {
+    setDismissed(prev => new Set([...prev, description]));
+  };
+
   const MONTHS_HE = ['', 'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
 
   const filtered = useMemo(() => {
@@ -143,10 +194,35 @@ export default function RecurringPage() {
             ניהול מנויים, חשבונות והעברות קבועות
           </p>
         </div>
-        <Button onClick={() => setShowDialog(true)}>
-          <Plus className="h-4 w-4 me-2" /> הוסף חדש
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={openDetect}>
+            <Search className="h-4 w-4 me-2" /> זיהוי אוטומטי
+          </Button>
+          <Button onClick={() => setShowDialog(true)}>
+            <Plus className="h-4 w-4 me-2" /> הוסף חדש
+          </Button>
+        </div>
       </div>
+
+      {/* InsightsBar — המלצות פעולה */}
+      {insights.length > 0 && (
+        <div className="space-y-2 mb-4">
+          {insights.map((ins, i) => (
+            <div key={i} className={`flex items-start gap-3 px-4 py-3 rounded-lg border text-sm
+              ${ins.priority === 'high'
+                ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950/40 dark:border-red-800 dark:text-red-300'
+                : 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300'}`}>
+              <Lightbulb className="h-4 w-4 mt-0.5 shrink-0" />
+              <span className="flex-1">{ins.suggestion}</span>
+              {ins.actionUrl && (
+                <a href={ins.actionUrl} className="flex items-center gap-1 font-medium underline underline-offset-2 shrink-0">
+                  {ins.actionLabel} <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* כרטיסי סיכום */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -274,6 +350,64 @@ export default function RecurringPage() {
           </div>
         )}
       </div>
+
+      {/* דיאלוג זיהוי אוטומטי */}
+      <Dialog open={showDetectDialog} onOpenChange={setShowDetectDialog}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5 text-blue-600" />
+              זיהוי תשלומים קבועים אוטומטי
+            </DialogTitle>
+          </DialogHeader>
+
+          {detectLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+              <p className="text-slate-500 text-sm">מנתח היסטוריית עסקאות...</p>
+            </div>
+          ) : candidates.filter(c => !dismissed.has(c.description)).length === 0 ? (
+            <div className="text-center py-12 text-slate-500">
+              <Check className="h-12 w-12 mx-auto text-green-400 mb-3" />
+              <p className="font-medium">לא נמצאו דפוסים חדשים</p>
+              <p className="text-sm mt-1">כל הדפוסים שזוהו כבר מוגדרים, או שאין מספיק היסטוריה</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-500">
+                זוהו <strong>{candidates.filter(c => !dismissed.has(c.description)).length}</strong> דפוסים חוזרים בהיסטוריית העסקאות. אשר או דחה כל אחד:
+              </p>
+              {candidates.filter(c => !dismissed.has(c.description)).map((c) => (
+                <div key={c.description} className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-slate-50 dark:bg-slate-800">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{c.description}</p>
+                    <div className="flex items-center gap-3 mt-1 flex-wrap text-xs text-slate-500">
+                      <span className={c.type === 'הכנסה' ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                        {c.type === 'הכנסה' ? '+' : '-'}{formatCurrency(c.amount)}
+                      </span>
+                      <span>{c.occurrenceCount} פעמים • {c.monthsCount} חודשים</span>
+                      {c.suggestedDay && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />יום {c.suggestedDay}</span>}
+                      <span className="text-blue-600">ביטחון: {Math.round(c.confidence * 100)}%</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button size="sm" onClick={() => approveCandidate(c)} className="bg-green-600 hover:bg-green-700 text-white h-8 px-3">
+                      <Check className="h-3.5 w-3.5 me-1" /> אשר
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => dismissCandidate(c.description)} className="h-8 px-3 text-slate-400 hover:text-red-500">
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDetectDialog(false)}>סגור</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* דיאלוג הוספה */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>

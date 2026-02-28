@@ -6,6 +6,9 @@
 import Transaction from '../models/Transaction.js';
 import User from '../models/User.js';
 import CategoryRule from '../models/CategoryRule.js';
+import RecurringTransaction from '../models/RecurringTransaction.js';
+import Budget from '../models/Budget.js';
+import Goal from '../models/Goal.js';
 import smartCategoryEngine from '../utils/smartCategoryEngine.js';
 import { getPaginationOptions, formatPaginatedResponse } from '../utils/pagination.js';
 import logger from '../utils/logger.js';
@@ -82,33 +85,38 @@ export const autoCategorizeBatch = async (req, res) => {
       .limit(parseInt(limit))
       .lean();
 
+    // Batch classify — pre-fetches DB data once instead of 6 queries per transaction
+    const predictions = await smartCategoryEngine.classifyBatch(transactions);
+
     const categorized = [];
     const skipped = [];
+    const bulkOps = [];
 
-    for (const transaction of transactions) {
-      const prediction = await smartCategoryEngine.classifyTransaction(transaction);
+    for (let i = 0; i < transactions.length; i++) {
+      const tx         = transactions[i];
+      const prediction = predictions[i];
 
       if (prediction.confidence >= smartCategoryEngine.confidenceThreshold) {
-        // Auto-update category
-        await Transaction.findByIdAndUpdate(transaction._id, {
-          category: prediction.category,
+        bulkOps.push({
+          updateOne: { filter: { _id: tx._id }, update: { $set: { category: prediction.category } } },
         });
-
         categorized.push({
-          _id: transaction._id,
-          oldCategory: transaction.category,
+          _id: tx._id,
+          oldCategory: tx.category,
           newCategory: prediction.category,
           confidence: prediction.confidence,
         });
       } else {
         skipped.push({
-          _id: transaction._id,
-          description: transaction.description,
-          amount: transaction.amount,
+          _id: tx._id,
+          description: tx.description,
+          amount: tx.amount,
           confidence: prediction.confidence,
         });
       }
     }
+
+    if (bulkOps.length > 0) await Transaction.bulkWrite(bulkOps);
 
     res.json({
       status: 'success',
@@ -116,7 +124,7 @@ export const autoCategorizeBatch = async (req, res) => {
         categorized,
         skipped,
         totalProcessed: transactions.length,
-        successRate: (categorized.length / transactions.length) * 100,
+        successRate: transactions.length > 0 ? (categorized.length / transactions.length) * 100 : 0,
       },
     });
   } catch (error) {
@@ -243,6 +251,64 @@ export const getSpendingRecommendations = async (req, res) => {
       });
     });
 
+    // ── המלצות חוצות-מודולים ──────────────────────────────────────────
+    const now = new Date();
+    const [recurringCount, currentBudget, offTrackGoals] = await Promise.all([
+      RecurringTransaction.countDocuments({ user: userId, isActive: true }),
+      Budget.findOne({ user: userId, month: now.getMonth() + 1, year: now.getFullYear() }).lean(),
+      Goal.find({ user: userId, status: 'active' }).lean(),
+    ]);
+
+    // Recommendation 4: אין קבועות בכלל
+    if (recurringCount === 0) {
+      recommendations.push({
+        type: 'recurring_missing',
+        suggestion: 'לא הגדרת תשלומים קבועים עדיין. לחץ על "זיהוי אוטומטי" כדי לגלות דפוסים מההיסטוריה שלך.',
+        priority: 'high',
+        actionUrl: '/recurring',
+        actionLabel: 'לדף קבועות',
+      });
+    }
+
+    // Recommendation 5: אין תקציב לחודש הנוכחי
+    if (!currentBudget) {
+      const monthNames = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+      recommendations.push({
+        type: 'budget_missing',
+        suggestion: `לא הוגדר תקציב לחודש ${monthNames[now.getMonth()]}. הגדרת תקציב עוזרת למנוע חריגות.`,
+        priority: 'medium',
+        actionUrl: '/budget',
+        actionLabel: 'הגדר תקציב',
+      });
+    }
+
+    // Recommendation 6: יעדים שלא בtrack
+    if (offTrackGoals.length > 0) {
+      for (const goal of offTrackGoals) {
+        const progress = goal.currentAmount / goal.targetAmount;
+        const monthsLeft = goal.targetDate
+          ? Math.max(0, Math.round((new Date(goal.targetDate) - now) / (30 * 24 * 60 * 60 * 1000)))
+          : null;
+
+        if (monthsLeft !== null && monthsLeft > 0) {
+          const needed = (goal.targetAmount - goal.currentAmount) / monthsLeft;
+          const current = goal.monthlyContribution || 0;
+          if (needed > current * 1.1) {
+            const extra = Math.ceil(needed - current);
+            recommendations.push({
+              type: 'goal_behind',
+              goalName: goal.name,
+              suggestion: `יעד "${goal.name}" מפגר. הגדל הפקדה חודשית ב-₪${extra} כדי לסיים בזמן (${monthsLeft} חודשים נותרו).`,
+              priority: 'medium',
+              actionUrl: '/goals',
+              actionLabel: 'לדף יעדים',
+              progress: Math.round(progress * 100),
+            });
+          }
+        }
+      }
+    }
+
     // Sort by priority
     const priorityMap = { high: 1, medium: 2, low: 3 };
     recommendations.sort((a, b) => priorityMap[a.priority] - priorityMap[b.priority]);
@@ -250,7 +316,7 @@ export const getSpendingRecommendations = async (req, res) => {
     res.json({
       status: 'success',
       data: {
-        recommendations: recommendations.slice(0, 10),
+        recommendations: recommendations.slice(0, 12),
         totalRecommendations: recommendations.length,
         topPriorities: recommendations.filter(r => r.priority === 'high').length,
       },

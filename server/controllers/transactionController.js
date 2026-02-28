@@ -159,3 +159,108 @@ export const addTransaction = async (req, res) => {
     }
   }
 };
+
+// --- תוספת/תיקון: פונקציית עריכת עסקה חסרה (PUT) ---
+// @desc   עדכון עסקה קיימת וחישוב מחדש של יתרות העו"ש
+// @route  PUT /api/transactions/:id
+export const updateTransaction = async (req, res) => {
+  const { id } = req.params;
+  let { date, description, amount, type, category, account } = req.body;
+
+  if (!date || !description || !amount || !type) {
+    return res.status(400).json({ message: 'נא למלא תאריך, תיאור, סכום וסוג' });
+  }
+
+  const finalType = normalizeType(type);
+  const finalAccount = normalizeAccount(account);
+  const numericAmount = Math.abs(Number(amount));
+  const supportsTransactions = process.env.DB_SUPPORTS_TRANSACTIONS === 'true';
+
+  try {
+    const oldTransaction = await Transaction.findOne({ _id: id, user: req.user._id });
+    if (!oldTransaction) {
+      return res.status(404).json({ message: 'העסקה לא נמצאה' });
+    }
+
+    // חישוב התיקון ליתרה:
+    // 1. מבטלים את הפעולה הישנה
+    const oldAccount = oldTransaction.account || 'checking';
+    const oldReverseAmount = oldTransaction.type === 'הכנסה' ? -oldTransaction.amount : oldTransaction.amount;
+    
+    // 2. מחילים את הפעולה החדשה
+    const newApplyAmount = finalType === 'הכנסה' ? numericAmount : -numericAmount;
+
+    if (supportsTransactions) {
+      const session = await mongoose.startSession();
+      session.startTransaction();
+      try {
+        // עדכון העסקה
+        oldTransaction.date = date;
+        oldTransaction.description = description;
+        oldTransaction.amount = numericAmount;
+        oldTransaction.type = finalType;
+        oldTransaction.category = category;
+        oldTransaction.account = finalAccount;
+        await oldTransaction.save({ session });
+
+        // אם לא שינינו את החשבון (לדוגמה נשאר בעו"ש), פשוט סוכמים את ההפרש
+        if (oldAccount === finalAccount) {
+          const netChange = oldReverseAmount + newApplyAmount;
+          if (netChange !== 0) {
+            await FinanceProfile.updateOne(
+              { user: req.user._id },
+              { $inc: { [oldAccount]: netChange } },
+              { session }
+            );
+          }
+        } else {
+          // במידה והמשתמש העביר עסקה מעו"ש למזומן או להפך, מתקנים את שני החשבונות
+          await FinanceProfile.updateOne(
+            { user: req.user._id },
+            { $inc: { [oldAccount]: oldReverseAmount, [finalAccount]: newApplyAmount } },
+            { session }
+          );
+        }
+
+        await session.commitTransaction();
+        session.endSession();
+        res.json(oldTransaction);
+      } catch (err) {
+        await session.abortTransaction();
+        session.endSession();
+        if (err.code === 11000) {
+            return res.status(409).json({ message: 'עסקה זו כבר קיימת במערכת' });
+        }
+        throw err;
+      }
+    } else {
+      // לוגיקה זהה ללא טרנזקציות
+      oldTransaction.date = date;
+      oldTransaction.description = description;
+      oldTransaction.amount = numericAmount;
+      oldTransaction.type = finalType;
+      oldTransaction.category = category;
+      oldTransaction.account = finalAccount;
+      await oldTransaction.save();
+
+      if (oldAccount === finalAccount) {
+        const netChange = oldReverseAmount + newApplyAmount;
+        if (netChange !== 0) {
+          await FinanceProfile.updateOne(
+            { user: req.user._id },
+            { $inc: { [oldAccount]: netChange } }
+          );
+        }
+      } else {
+        await FinanceProfile.updateOne(
+          { user: req.user._id },
+          { $inc: { [oldAccount]: oldReverseAmount, [finalAccount]: newApplyAmount } }
+        );
+      }
+      res.json(oldTransaction);
+    }
+  } catch (error) {
+    console.error('Update transaction error:', error);
+    res.status(500).json({ message: 'שגיאה בעדכון העסקה' });
+  }
+};

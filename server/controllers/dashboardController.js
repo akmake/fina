@@ -1,45 +1,57 @@
 // server/controllers/dashboardController.js
+import mongoose from 'mongoose';
 import Transaction from '../models/Transaction.js';
 import Project from '../models/Project.js';
-import Account from '../models/Account.js';
-import { startOfMonth, subMonths, endOfMonth } from 'date-fns';
+import FinanceProfile from '../models/FinanceProfile.js';
+import { startOfMonth, subMonths } from 'date-fns';
 
 export const getDashboardData = async (req, res, next) => {
     try {
-        const userId = req.user._id; // מגיע מה-requireAuth middleware
+        // המרה קריטית של מזהה המשתמש ל-ObjectId כדי ששאילתות Aggregate יעבדו
+        const userObjectId = new mongoose.Types.ObjectId(req.user._id.toString());
         const today = new Date();
 
-        // 1. הגדרת טווחי תאריכים
         const thisMonthStart = startOfMonth(today);
         const prevMonthStart = startOfMonth(subMonths(today, 1));
-        const prevMonthEnd = endOfMonth(subMonths(today, 1));
 
-        // 2. ביצוע כל השאילתות במקביל לשיפור ביצועים
         const [
-            accounts,
+            financeProfile,
             monthlyAggregation,
             categoryAggregation,
             projects,
-            balanceChartDataRaw
+            balanceFlowRaw
         ] = await Promise.all([
-            Account.find({ userId }).lean(),
+            FinanceProfile.findOne({ user: req.user._id }).lean(),
+            
+            // חישוב הכנסות והוצאות - עכשיו משתמש ב-userObjectId
             Transaction.aggregate([
-                { $match: { userId, date: { $gte: prevMonthStart } } },
+                { $match: { user: userObjectId, date: { $gte: prevMonthStart } } },
                 { $group: {
                     _id: { month: { $month: "$date" }, type: "$type" },
                     total: { $sum: "$amount" }
                 }}
             ]),
+            
             Transaction.aggregate([
-                 { $match: { userId, type: 'הוצאה', date: { $gte: prevMonthStart } } },
+                 { $match: { user: userObjectId, type: 'הוצאה', date: { $gte: prevMonthStart } } },
                  { $group: {
                      _id: { category: "$category", month: { $month: "$date" } },
                      total: { $sum: "$amount" }
                  }}
             ]),
-            Project.find({ owner: userId }).sort({ createdAt: -1 }).lean(),
+            
+            // משיכת פרויקטים: מכסה את כל האופציות האפשריות לשם השדה במסד הנתונים שלך
+            Project.find({ 
+                $or: [
+                    { user: req.user._id }, 
+                    { userId: req.user._id }, 
+                    { owner: req.user._id }
+                ] 
+            }).sort({ createdAt: -1 }).lean(),
+            
+            // חישוב נתוני הגרף (תזרים נקי יומי) 
             Transaction.aggregate([
-                { $match: { userId } },
+                { $match: { user: userObjectId, date: { $gte: subMonths(today, 1) } } },
                 { $sort: { date: 1 } },
                 { $group: {
                     _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
@@ -49,20 +61,20 @@ export const getDashboardData = async (req, res, next) => {
             ])
         ]);
 
-        // 3. עיבוד נתוני סיכום חודשי
         const thisMonthNum = today.getMonth() + 1;
         const prevMonthNum = prevMonthStart.getMonth() + 1;
+        
         const monthlySummary = {
             thisMonth: { income: 0, expense: 0 },
             prevMonth: { income: 0, expense: 0 }
         };
+
         monthlyAggregation.forEach(item => {
             const target = item._id.month === thisMonthNum ? monthlySummary.thisMonth : monthlySummary.prevMonth;
             if (item._id.type === 'הכנסה') target.income = item.total;
             if (item._id.type === 'הוצאה') target.expense = item.total;
         });
 
-        // 4. עיבוד נתוני קטגוריות
         const categorySummary = {};
         categoryAggregation.forEach(item => {
             const categoryName = item._id.category;
@@ -76,14 +88,17 @@ export const getDashboardData = async (req, res, next) => {
             }
         });
 
-        // 5. עיבוד נתוני גרף
-        let cumulativeBalance = 0;
-        const balanceChartData = balanceChartDataRaw.map(item => {
-            cumulativeBalance += item.dailyChange;
-            return { date: item._id, balance: cumulativeBalance };
+        let cumulativeChange = 0;
+        const balanceChartData = balanceFlowRaw.map(item => {
+            cumulativeChange += item.dailyChange;
+            return { date: item._id, balance: cumulativeChange };
         });
 
-        // 6. הרכבת התגובה הסופית
+        const accounts = financeProfile ? [
+            { _id: '1', name: 'עובר ושב', balance: financeProfile.checking || 0 },
+            { _id: '2', name: 'מזומן', balance: financeProfile.cash || 0 }
+        ] : [];
+
         res.json({
             accounts,
             monthlySummary,
@@ -93,6 +108,7 @@ export const getDashboardData = async (req, res, next) => {
         });
 
     } catch (error) {
-        next(error); // העברת השגיאה ל-errorHandler
+        console.error('Dashboard Error:', error);
+        next(error); 
     }
 };

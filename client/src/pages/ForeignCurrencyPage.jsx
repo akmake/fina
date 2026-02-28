@@ -65,6 +65,25 @@ export default function ForeignCurrencyPage() {
     try { await api.delete(`/foreign-currency/${id}`); toast.success('נמחק'); load(); } catch { toast.error('שגיאה'); }
   };
 
+  const fetchExchangeRate = async (currency) => {
+    if (!currency || currency === 'OTHER') return;
+    const toastId = toast.loading('מושך שער עדכני...');
+    try {
+      const { data } = await api.get(`/foreign-currency/rates?currencies=${currency}`);
+      const rate = data.rates?.[currency];
+      if (rate) {
+        setForm(prev => ({ ...prev, exchangeRate: rate.toFixed(4) }));
+        const ageMin = Math.round((Date.now() - data.cachedAt) / 60000);
+        const cacheMsg = ageMin < 1 ? 'טרי' : `מלפני ${ageMin} דקות`;
+        toast.success(`שער ${currency}: ₪${rate.toFixed(2)} (${cacheMsg})`, { id: toastId });
+      } else {
+        toast.error('לא נמצא שער למטבע', { id: toastId });
+      }
+    } catch {
+      toast.error('שגיאה במשיכת השער. נא להזין ידנית.', { id: toastId });
+    }
+  };
+
   // Group by currency for chart
   const pieData = byCurrencyData.map(g => ({ name: CURRENCIES[g.currency] || g.currency, value: g.totalInILS }));
   const barData = byCurrencyData.map(g => ({
@@ -202,10 +221,19 @@ export default function ForeignCurrencyPage() {
             </div>
             <Input placeholder="שם האחזקה *" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
             <Input type="number" placeholder="כמות *" value={form.amountInCurrency} onChange={e => setForm({...form, amountInCurrency: e.target.value})} />
+            
             <div className="grid grid-cols-2 gap-2">
               <Input type="number" step="0.01" placeholder="שער קנייה (₪)" value={form.purchaseRate} onChange={e => setForm({...form, purchaseRate: e.target.value})} />
-              <Input type="number" step="0.01" placeholder="שער נוכחי (₪)" value={form.exchangeRate} onChange={e => setForm({...form, exchangeRate: e.target.value})} />
+              
+              {/* --- תיקון: כפתור שאיבת שער מט"ח מהאינטרנט --- */}
+              <div className="flex gap-2 relative group">
+                <Input type="number" step="0.01" placeholder="שער נוכחי (₪)" value={form.exchangeRate} onChange={e => setForm({...form, exchangeRate: e.target.value})} />
+                <Button type="button" variant="outline" size="icon" onClick={() => fetchExchangeRate(form.currency)} title="משוך שער אוטומטית">
+                  <Globe className="h-4 w-4 text-blue-500" />
+                </Button>
+              </div>
             </div>
+            
             <Input placeholder="בנק / מוסד" value={form.institution} onChange={e => setForm({...form, institution: e.target.value})} />
             <Input placeholder="הערות" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
           </div>

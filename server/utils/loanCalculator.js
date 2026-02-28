@@ -64,7 +64,13 @@ export function calculateDynamicSchedule({ loan, rateHistory }) {
           totalPayment = remainingBalance * (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, remainingTerm)) / (Math.pow(1 + monthlyInterestRate, remainingTerm) - 1);
       }
       principalPayment = totalPayment - interestPayment;
-    } else { // קרן שווה
+    } 
+    // --- תוספת/תיקון: תמיכה בהלוואת בלון בחישוב הדינמי בשרת ---
+    else if (repaymentType === 'בלון') {
+      principalPayment = (i === termInMonths) ? remainingBalance : 0;
+      totalPayment = principalPayment + interestPayment;
+    } 
+    else { // קרן שווה
       principalPayment = principalPerMonth;
       totalPayment = principalPayment + interestPayment;
     }

@@ -33,8 +33,11 @@ export default function MortgagePage() {
   const [showRefinance, setShowRefinance] = useState(null);
   const [showPrime, setShowPrime] = useState(null);
   const [refinanceResult, setRefinanceResult] = useState(null);
+  
+  // --- תיקון: הוספת 'newRepaymentType' לסטייט הראשוני של טופס המיחזור ---
+  const [refinanceForm, setRefinanceForm] = useState({ newRate: '', newTermMonths: '', newRepaymentType: 'שפיצר' });
+
   const [primeResult, setPrimeResult] = useState(null);
-  const [refinanceForm, setRefinanceForm] = useState({ newRate: '', newTermMonths: '' });
 
   const [form, setForm] = useState({
     propertyAddress: '', propertyValue: '', purchasePrice: '', purchaseDate: '',
@@ -106,9 +109,11 @@ export default function MortgagePage() {
 
   const handleRefinance = async (id) => {
     try {
+      // --- תיקון: הוספת שליחת שיטת ההחזר לשרת ---
       const { data } = await api.post(`/mortgages/${id}/simulate-refinance`, {
         newRate: Number(refinanceForm.newRate),
         newTermMonths: Number(refinanceForm.newTermMonths),
+        newRepaymentType: refinanceForm.newRepaymentType || 'שפיצר'
       });
       setRefinanceResult(data);
     } catch { toast.error('שגיאה בסימולציה'); }
@@ -159,14 +164,14 @@ export default function MortgagePage() {
                   <p className="text-xs text-gray-500">{m.bank} • {formatDate(m.startDate)}</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => { setShowRefinance(m._id); setRefinanceResult(null); setRefinanceForm({ newRate:'', newTermMonths:'' }); }}><Calculator className="h-4 w-4 me-1" />מיחזור</Button>
+                  <Button size="sm" variant="outline" onClick={() => { setShowRefinance(m._id); setRefinanceResult(null); setRefinanceForm({ newRate:'', newTermMonths:'', newRepaymentType: 'שפיצר' }); }}><Calculator className="h-4 w-4 me-1" />מיחזור</Button>
                   <Button size="sm" variant="outline" onClick={() => handlePrimeScenario(m._id)}><BarChart3 className="h-4 w-4 me-1" />פריים</Button>
                   <Button size="sm" variant="ghost" className="text-red-500" onClick={() => handleDelete(m._id)}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-4 gap-3 mb-4 text-center text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-center text-sm">
                 <div><p className="text-gray-500 text-xs">יתרה</p><p className="font-bold text-red-600">{formatCurrency(m.totalCurrentBalance)}</p></div>
                 <div><p className="text-gray-500 text-xs">החזר חודשי</p><p className="font-bold">{formatCurrency(m.totalMonthlyPayment)}</p></div>
                 <div><p className="text-gray-500 text-xs">ריבית משוקללת</p><p className="font-bold">{formatPercent(m.weightedInterestRate)}</p></div>
@@ -199,18 +204,30 @@ export default function MortgagePage() {
       <Dialog open={!!showRefinance} onOpenChange={() => setShowRefinance(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>סימולציית מיחזור</DialogTitle></DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div><label className="text-xs text-gray-500">ריבית חדשה (%)</label><Input type="number" step="0.1" value={refinanceForm.newRate} onChange={e => setRefinanceForm({...refinanceForm, newRate: e.target.value})} /></div>
             <div><label className="text-xs text-gray-500">תקופה (חודשים)</label><Input type="number" value={refinanceForm.newTermMonths} onChange={e => setRefinanceForm({...refinanceForm, newTermMonths: e.target.value})} /></div>
+            
+            {/* --- תיקון: שדה בחירת שיטת ההחזר לסימולציה --- */}
+            <div>
+              <label className="text-xs text-gray-500">שיטת החזר</label>
+              <Select value={refinanceForm.newRepaymentType || 'שפיצר'} onValueChange={v => setRefinanceForm({...refinanceForm, newRepaymentType: v})}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="שפיצר">שפיצר</SelectItem>
+                  <SelectItem value="קרן שווה">קרן שווה</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <Button onClick={() => handleRefinance(showRefinance)} className="w-full">חשב</Button>
           {refinanceResult && (
             <div className="mt-3 space-y-2 text-sm">
               <div className="grid grid-cols-2 gap-2">
-                <Card><CardContent className="pt-3 text-center"><p className="text-xs text-gray-500">החזר חודשי חדש</p><p className="font-bold text-lg">{formatCurrency(refinanceResult.newMonthlyPayment)}</p></CardContent></Card>
+                <Card><CardContent className="pt-3 text-center"><p className="text-xs text-gray-500">החזר חודשי מתחיל</p><p className="font-bold text-lg">{formatCurrency(refinanceResult.newMonthlyPayment)}</p></CardContent></Card>
                 <Card><CardContent className="pt-3 text-center"><p className="text-xs text-gray-500">חיסכון חודשי</p><p className="font-bold text-lg text-green-600">{formatCurrency(refinanceResult.monthlySavings)}</p></CardContent></Card>
               </div>
-              <Card><CardContent className="pt-3 text-center"><p className="text-xs text-gray-500">חיסכון כולל</p><p className="font-bold text-xl text-green-600">{formatCurrency(refinanceResult.totalSavings)}</p></CardContent></Card>
+              <Card><CardContent className="pt-3 text-center"><p className="text-xs text-gray-500">חיסכון כולל בתקופה ({refinanceResult.newRepaymentType})</p><p className="font-bold text-xl text-green-600">{formatCurrency(refinanceResult.totalSavings)}</p></CardContent></Card>
             </div>
           )}
         </DialogContent>
@@ -248,7 +265,7 @@ export default function MortgagePage() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editing ? 'עריכת משכנתא' : 'משכנתא חדשה'}</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <div><label className="text-xs text-gray-500">כתובת הנכס</label><Input value={form.propertyAddress} onChange={e => setForm({...form, propertyAddress: e.target.value})} /></div>

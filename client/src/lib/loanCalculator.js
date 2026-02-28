@@ -83,3 +83,34 @@ export function calculateKerenShavaSchedule({ principal, annualRate, termInMonth
   }
   return schedule;
 }
+
+// --- תוספת/תיקון: נוסחת החזר בלון (גרייס) חלקי ---
+/**
+ * מחשב לוח סילוקין להלוואה בשיטת "בלון" (תשלום ריבית בלבד כל חודש, והקרן בסוף).
+ * @returns {Array<object>} מערך אובייקטים המייצג את לוח הסילוקין.
+ */
+export function calculateBalloonSchedule({ principal, annualRate, termInMonths, startDate }) {
+  const schedule = [];
+  const monthlyInterestRate = annualRate / 100 / 12;
+  const start = new Date(startDate);
+
+  for (let i = 1; i <= termInMonths; i++) {
+    const interestPayment = principal * monthlyInterestRate;
+    // הקרן משולמת במלואה רק בחודש האחרון של ההלוואה
+    const principalPayment = (i === termInMonths) ? principal : 0;
+    const totalPayment = principalPayment + interestPayment;
+    const remainingBalance = (i === termInMonths) ? 0 : principal;
+
+    const paymentDate = addMonths(start, i);
+
+    schedule.push({
+      paymentNumber: i,
+      date: paymentDate,
+      principal: parseFloat(principalPayment.toFixed(2)),
+      interest: parseFloat(interestPayment.toFixed(2)),
+      totalPayment: parseFloat(totalPayment.toFixed(2)),
+      remainingBalance: parseFloat(Math.max(0, remainingBalance).toFixed(2)),
+    });
+  }
+  return schedule;
+}

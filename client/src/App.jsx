@@ -16,7 +16,7 @@ import SmartAnalyticsDashboard from "@/pages/SmartAnalyticsDashboard";
 import FinancePage             from "@/pages/FinancePage";
 import ImportPage              from "@/pages/ImportPage";
 import ManagementPage          from "@/pages/ManagementPage";
-
+import DiscountImportPage      from './pages/DiscountImportPage';
 /* Investments */
 import InvestmentsPage from "@/pages/InvestmentsPage";
 import DepositsPage    from "@/pages/DepositsPage";
@@ -88,6 +88,7 @@ export default function App() {
           <Route path="import"            element={<ImportPage />}              />
           <Route path="import/excel"      element={<ExcelImportPage />}         />
           <Route path="management"        element={<ManagementPage />}          />
+          <Route path="/discount-import" element={<DiscountImportPage />} />
 
           {/* Investments */}
           <Route path="investments" element={<InvestmentsPage />} />

@@ -54,7 +54,7 @@ export default function DebtPage() {
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><CreditCard className="h-7 w-7 text-red-500" /> ניהול חובות</h1>
         <p className="text-sm text-gray-500 mt-1">סקירת כל החובות ואסטרטגיית פירעון</p>
@@ -101,7 +101,7 @@ export default function DebtPage() {
             <Card>
               <CardHeader><CardTitle className="text-sm">יתרות חובות לפי {strategyLabel}</CardTitle></CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
+                <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={barData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" fontSize={10} />
@@ -155,7 +155,7 @@ export default function DebtPage() {
 
               {simResult && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="text-center p-3 bg-white dark:bg-slate-800 rounded-lg">
                       <p className="text-xs text-gray-500">חודשים שנחסכו</p>
                       <p className="text-lg font-bold text-green-600">{simResult.savedMonths}</p>

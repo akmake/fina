@@ -71,24 +71,37 @@ export const simulateRefinance = async (req, res) => {
     const mortgage = await Mortgage.findOne({ _id: req.params.id, user: req.user._id });
     if (!mortgage) return res.status(404).json({ message: 'משכנתא לא נמצאה' });
 
-    const { newRate, newTermMonths } = req.body;
+    // --- תוספת/תיקון: קבלת סוג ההחזר המבוקש מהלקוח לסימולציה ---
+    const { newRate, newTermMonths, newRepaymentType = 'שפיצר' } = req.body;
     const totalBalance = mortgage.totalCurrentBalance;
 
-    // חישוב שפיצר חדש
     const monthlyRate = (newRate / 100) / 12;
     let newMonthlyPayment;
-    if (monthlyRate === 0) {
-      newMonthlyPayment = totalBalance / newTermMonths;
-    } else {
-      newMonthlyPayment = totalBalance * (monthlyRate * Math.pow(1 + monthlyRate, newTermMonths)) /
-        (Math.pow(1 + monthlyRate, newTermMonths) - 1);
+    let newTotalPayments = 0;
+
+    // --- תוספת/תיקון: תמיכה גם בשפיצר וגם בקרן שווה בסימולטור המיחזור ---
+    if (newRepaymentType === 'קרן שווה') {
+      const principalPerMonth = totalBalance / newTermMonths;
+      // בקרן שווה התשלום הראשון הוא הגבוה ביותר, ולכן נציג אותו כ"החזר חודשי" להשוואה
+      newMonthlyPayment = principalPerMonth + (totalBalance * monthlyRate);
+
+      for (let i = 1; i <= newTermMonths; i++) {
+        newTotalPayments += principalPerMonth + ((totalBalance - (i - 1) * principalPerMonth) * monthlyRate);
+      }
+    } else { // ברירת מחדל: שפיצר
+      if (monthlyRate === 0) {
+        newMonthlyPayment = totalBalance / newTermMonths;
+      } else {
+        newMonthlyPayment = totalBalance * (monthlyRate * Math.pow(1 + monthlyRate, newTermMonths)) /
+          (Math.pow(1 + monthlyRate, newTermMonths) - 1);
+      }
+      newTotalPayments = newMonthlyPayment * newTermMonths;
     }
 
     const currentMonthlyPayment = mortgage.totalMonthlyPayment;
     const currentTotalRemaining = mortgage.tracks.reduce((sum, t) => {
       return sum + (t.monthlyPayment * (t.remainingMonths || t.termInMonths));
     }, 0);
-    const newTotalPayments = newMonthlyPayment * newTermMonths;
 
     res.json({
       currentMonthlyPayment,
@@ -99,6 +112,7 @@ export const simulateRefinance = async (req, res) => {
       totalSavings: Math.round(currentTotalRemaining - newTotalPayments),
       newRate,
       newTermMonths,
+      newRepaymentType // מחזירים גם את השיטה לטובת הלקוח
     });
   } catch (error) {
     console.error('Error simulating refinance:', error);

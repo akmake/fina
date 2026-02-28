@@ -1,7 +1,6 @@
 /**
  * Smart Category Classification Engine
- * 
- * Advanced ML-like algorithm for intelligent transaction categorization
+ * * Advanced ML-like algorithm for intelligent transaction categorization
  * Uses multiple heuristics, pattern matching, and fuzzy logic
  */
 
@@ -249,7 +248,19 @@ class SmartCategoryEngine {
    * Certain categories occur at specific times
    */
   async timePatternMatching(transaction) {
-    const hour = new Date(transaction.date).getHours();
+    const date = new Date(transaction.date);
+    const hour = date.getHours();
+    const minutes = date.getMinutes();
+
+    // --- תוספת/תיקון: התעלמות במידה ואין שעה אמיתית (מופיע כ-00:00 מהאקסלים של הבנקים) ---
+    if (hour === 0 && minutes === 0) {
+      return {
+        category: null,
+        confidence: 0,
+        strategy: 'time_pattern',
+        weight: 0.1,
+      };
+    }
     
     const timePatterns = {
       'קפה': { hours: [7, 8, 9, 14, 15], confidence: 0.6 },
@@ -490,7 +501,8 @@ class SmartCategoryEngine {
    * Extract common words for analysis
    */
   extractCommonWords(text) {
-    const stopWords = ['את', 'של', 'את', 'זה', 'הוא', 'היא'];
+    // --- תוספת/תיקון: הוסרה הכפילות של המילה 'את' ---
+    const stopWords = ['את', 'של', 'זה', 'הוא', 'היא'];
     const words = text.split(/\s+/).filter(w => !stopWords.includes(w) && w.length > 2);
     return words.slice(0, 5);
   }
@@ -507,6 +519,133 @@ class SmartCategoryEngine {
    */
   clearCache() {
     this.cache.clear();
+  }
+
+  /**
+   * Classify a batch of transactions efficiently — pre-fetches all DB data once
+   * instead of 6 queries per transaction.
+   * @param {Object[]} transactions - Array of transactions (must share the same user)
+   * @returns {Object[]} Array of { transactionId, category, confidence }
+   */
+  async classifyBatch(transactions) {
+    if (!transactions || transactions.length === 0) return [];
+
+    const userId = transactions[0].user;
+
+    // ── Pre-fetch כל הנתונים בbatch אחד ──────────────────────────────
+    const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
+    const [historicalTxns, dayAggregate] = await Promise.all([
+      // כל עסקאות המשתמש מ-6 חודשים אחרונים — למerchant + amount patterns
+      Transaction.find({ user: userId, date: { $gte: sixMonthsAgo } })
+        .select('description rawDescription amount category date')
+        .lean(),
+      // Aggregate יום-בשבוע → category distribution
+      Transaction.aggregate([
+        { $match: { user: typeof userId === 'string' ? userId : userId } },
+        { $group: { _id: { dow: { $dayOfWeek: '$date' }, cat: '$category' }, count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    // בנה מפת יום → { category: count }
+    const dayPatterns = {};
+    for (const row of dayAggregate) {
+      const dow = row._id.dow;
+      const cat = row._id.cat;
+      if (!dayPatterns[dow]) dayPatterns[dow] = {};
+      dayPatterns[dow][cat] = (dayPatterns[dow][cat] || 0) + row.count;
+    }
+
+    // ── קלסף כל עסקה ללא queries נוספים ──────────────────────────────
+    return transactions.map(tx => {
+      const results = [
+        this.keywordMatchSync(tx),
+        this._merchantMatchFromCache(tx, historicalTxns),
+        this._amountMatchFromCache(tx, historicalTxns),
+        this._historicalMatchFromCache(tx, dayPatterns),
+        this.timePatternMatching(tx),          // sync בלבד (ללא DB)
+        this.descriptionNLPAnalysisSync(tx),
+      ];
+      const prediction = this.aggregateResults(results, tx);
+      return { transactionId: tx._id, ...prediction };
+    });
+  }
+
+  /** Sync version of keywordMatching (no DB) */
+  keywordMatchSync(transaction) {
+    const keywords = {
+      'דלק': ['gas', 'דלק', 'station', 'תדלוק', 'bp', 'delek', 'paz'],
+      'מסעדה': ['rest', 'restaurant', 'pizza', 'burger', 'café', 'cafe', 'bar', 'מסעדה', 'אוכל'],
+      'קניות': ['shop', 'mall', 'store', 'market', 'supermarket', 'סוריק', 'זול', 'carrefour', 'rami'],
+      'בריאות': ['pharmacy', 'dr', 'doctor', 'clinic', 'hospital', 'health', 'medical', 'בריאות'],
+      'תחבורה': ['taxi', 'bus', 'train', 'uber', 'moovit', 'raid', 'ido', 'egged', 'תחבורה'],
+      'בילוי': ['cinema', 'movie', 'sport', 'gym', 'pool', 'sports', 'entertainment', 'בילוי'],
+      'ביטוח': ['insurance', 'ביטוח'],
+      'דמי שכרה': ['rent', 'lease', 'landlord', 'דיור', 'דמי'],
+      'חשמל מים': ['electricity', 'water', 'אגד', 'חשמל', 'מים', 'גז'],
+      'פלאפון': ['phone', 'cellular', 'mobile', 'telecom', 'pelephone', 'cellcom', 'רביד', 'טלפון'],
+    };
+    const description = transaction.description.toLowerCase();
+    let bestMatch = null;
+    let bestScore = 0;
+    for (const [category, keywordList] of Object.entries(keywords)) {
+      for (const keyword of keywordList) {
+        const score = this.fuzzyMatch(description, keyword);
+        if (score > bestScore) { bestScore = score; bestMatch = category; }
+      }
+    }
+    return { category: bestMatch, confidence: bestScore, strategy: 'keyword_matching', weight: 0.25 };
+  }
+
+  /** Merchant matching using pre-fetched array */
+  _merchantMatchFromCache(transaction, historicalTxns) {
+    const merchant = this.extractMerchant(transaction.description);
+    if (!merchant) return { category: null, confidence: 0, strategy: 'merchant_mapping', weight: 0.2 };
+
+    const re = new RegExp(merchant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    const similar = historicalTxns.filter(t => re.test(t.rawDescription || t.description));
+    if (similar.length === 0) return { category: null, confidence: 0, strategy: 'merchant_mapping', weight: 0.2 };
+
+    const freq = {};
+    similar.forEach(t => { freq[t.category] = (freq[t.category] || 0) + 1; });
+    const [cat, cnt] = Object.entries(freq).sort(([, a], [, b]) => b - a)[0];
+    return { category: cat, confidence: (cnt / similar.length) * 0.95, strategy: 'merchant_mapping', weight: 0.2 };
+  }
+
+  /** Amount matching using pre-fetched array */
+  _amountMatchFromCache(transaction, historicalTxns) {
+    const range = transaction.amount * 0.15;
+    const similar = historicalTxns.filter(
+      t => t.amount >= transaction.amount - range && t.amount <= transaction.amount + range,
+    ).slice(0, 20);
+    if (similar.length === 0) return { category: null, confidence: 0, strategy: 'amount_pattern', weight: 0.15 };
+
+    const freq = {};
+    similar.forEach(t => { freq[t.category] = (freq[t.category] || 0) + 1; });
+    const [cat, cnt] = Object.entries(freq).sort(([, a], [, b]) => b - a)[0];
+    return { category: cat, confidence: (cnt / similar.length) * 0.8, strategy: 'amount_pattern', weight: 0.15 };
+  }
+
+  /** Historical day-of-week matching using pre-fetched aggregate */
+  _historicalMatchFromCache(transaction, dayPatterns) {
+    const dow = new Date(transaction.date).getDay() + 1; // MongoDB $dayOfWeek: 1=Sun
+    const cats = dayPatterns[dow];
+    if (!cats) return { category: null, confidence: 0, strategy: 'historical_pattern', weight: 0.15 };
+
+    const total = Object.values(cats).reduce((s, v) => s + v, 0);
+    if (total < 5) return { category: null, confidence: 0, strategy: 'historical_pattern', weight: 0.15 };
+
+    const [cat, cnt] = Object.entries(cats).sort(([, a], [, b]) => b - a)[0];
+    return { category: cat, confidence: (cnt / total) * 0.7, strategy: 'historical_pattern', weight: 0.15 };
+  }
+
+  /** Sync NLP analysis (no DB) */
+  descriptionNLPAnalysisSync(transaction) {
+    const desc = transaction.description.toLowerCase();
+    const entities = this.extractEntities(desc);
+    if (entities.includes('payment') || entities.includes('transfer')) {
+      return { category: 'העברה', confidence: 0.8, strategy: 'nlp_analysis', weight: 0.1 };
+    }
+    return { category: null, confidence: 0, strategy: 'nlp_analysis', weight: 0.1 };
   }
 
   /**

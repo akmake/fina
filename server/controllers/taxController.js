@@ -116,9 +116,12 @@ export const calculateTax = async (req, res) => {
     // קרן השתלמות — עד 2.5% מהשכר (תקרה)
     const eduCeiling = Math.min(monthlyGross, 15712);
     const monthlyEduDeductible = Math.min(educationFund, eduCeiling * 0.025);
+    
+    // --- תוספת/תיקון: קיזוז קרן השתלמות מההכנסה החייבת לעצמאיים בלבד ---
+    const annualEduDeduction = employmentType === 'self_employed' ? (monthlyEduDeductible * 12) : 0;
 
-    // הכנסה חייבת
-    const annualTaxableIncome = Math.max(0, annualGross - annualPensionDeduction - hasTaxExemptIncome * 12);
+    // הכנסה חייבת מתוקנת
+    const annualTaxableIncome = Math.max(0, annualGross - annualPensionDeduction - annualEduDeduction - hasTaxExemptIncome * 12);
 
     // ── חישוב מס הכנסה ─────────────────
     const grossIncomeTax = calculateBracketTax(annualTaxableIncome, TAX_BRACKETS);
@@ -155,6 +158,7 @@ export const calculateTax = async (req, res) => {
         creditValue: Math.round(totalCreditValue),
         donationCredit: Math.round(donationCredit),
         pensionDeduction: Math.round(annualPensionDeduction),
+        eduDeduction: Math.round(annualEduDeduction), // --- תוספת: הצגת ההטבה החדשה שחושבה בתוצאות ---
         finalAnnual: Math.round(finalIncomeTax),
         finalMonthly: Math.round(finalIncomeTax / 12),
       },

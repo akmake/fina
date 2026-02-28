@@ -33,7 +33,8 @@ const loanSchema = new mongoose.Schema(
     },
     repaymentType: {
       type: String,
-      enum: ['שפיצר', 'קרן שווה'],
+      // --- תוספת/תיקון: הוספת 'בלון' לרשימת השיטות המותרות ---
+      enum: ['שפיצר', 'קרן שווה', 'בלון'],
       required: true,
     },
     // ----- שדה זה מוסר -----

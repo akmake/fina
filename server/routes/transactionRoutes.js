@@ -1,5 +1,6 @@
 import express from 'express';
-import { getTransactions, addTransaction, deleteTransaction } from '../controllers/transactionController.js';
+// הוספנו כאן את updateTransaction לייבוא
+import { getTransactions, addTransaction, deleteTransaction, updateTransaction } from '../controllers/transactionController.js';
 import requireAuth from '../middlewares/requireAuth.js';
 
 const router = express.Router();
@@ -12,6 +13,8 @@ router.route('/')
   .post(addTransaction);
 
 router.route('/:id')
-  .delete(deleteTransaction);
+  .delete(deleteTransaction)
+  // הוספנו כאן את נתיב ה-PUT לעריכה
+  .put(updateTransaction);
 
 export default router;

@@ -1,6 +1,10 @@
 // server/controllers/foreignCurrencyController.js
 import ForeignCurrency from '../models/ForeignCurrency.js';
 
+// ── Cache שערי חליפין ──────────────────────────────
+const ratesCache = new Map(); // currency → { rate, fetchedAt }
+const CACHE_TTL  = 6 * 60 * 60 * 1000; // 6 שעות
+
 const CURRENCY_LABELS = {
   USD: 'דולר אמריקאי',
   EUR: 'אירו',
@@ -17,6 +21,84 @@ const CURRENCY_LABELS = {
 const CURRENCY_SYMBOLS = {
   USD: '$', EUR: '€', GBP: '£', CHF: 'Fr', JPY: '¥',
   CAD: 'C$', AUD: 'A$', BTC: '₿', ETH: 'Ξ', OTHER: '',
+};
+
+// GET /api/foreign-currency/rates?currencies=USD,EUR,BTC
+export const getExchangeRates = async (req, res) => {
+  try {
+    const requested = (req.query.currencies || '')
+      .split(',')
+      .map(c => c.trim().toUpperCase())
+      .filter(Boolean);
+
+    if (requested.length === 0) {
+      return res.status(400).json({ message: 'יש לציין לפחות מטבע אחד (currencies=USD,BTC)' });
+    }
+
+    const now = Date.now();
+    const result = {};
+    let oldestFetchedAt = now;
+
+    const stale = requested.filter(c => {
+      const cached = ratesCache.get(c);
+      if (cached && now - cached.fetchedAt < CACHE_TTL) {
+        result[c] = cached.rate;
+        if (cached.fetchedAt < oldestFetchedAt) oldestFetchedAt = cached.fetchedAt;
+        return false;
+      }
+      return true;
+    });
+
+    if (stale.length > 0) {
+      const cryptoList = stale.filter(c => ['BTC', 'ETH'].includes(c));
+      const fiatList   = stale.filter(c => !['BTC', 'ETH', 'OTHER'].includes(c));
+
+      const fetches = [];
+
+      if (cryptoList.length > 0) {
+        const idMap = { BTC: 'bitcoin', ETH: 'ethereum' };
+        const ids   = cryptoList.map(c => idMap[c]).join(',');
+        fetches.push(
+          fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=ils`)
+            .then(r => r.json())
+            .then(data => {
+              cryptoList.forEach(c => {
+                const rate = data[idMap[c]]?.ils;
+                if (rate) {
+                  ratesCache.set(c, { rate, fetchedAt: now });
+                  result[c] = rate;
+                }
+              });
+            })
+        );
+      }
+
+      if (fiatList.length > 0) {
+        fetches.push(
+          fetch(`https://api.exchangerate-api.com/v4/latest/ILS`)
+            .then(r => r.json())
+            .then(data => {
+              fiatList.forEach(c => {
+                const rateFromILS = data.rates?.[c];
+                if (rateFromILS) {
+                  const rate = 1 / rateFromILS; // ILS per 1 unit of currency
+                  ratesCache.set(c, { rate, fetchedAt: now });
+                  result[c] = rate;
+                }
+              });
+            })
+        );
+      }
+
+      await Promise.allSettled(fetches);
+      oldestFetchedAt = now;
+    }
+
+    res.json({ rates: result, cachedAt: oldestFetchedAt });
+  } catch (error) {
+    console.error('Error fetching exchange rates:', error);
+    res.status(500).json({ message: 'שגיאה בטעינת שערי חליפין' });
+  }
 };
 
 // GET /api/foreign-currency

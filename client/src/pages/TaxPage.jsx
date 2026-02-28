@@ -63,7 +63,7 @@ export default function TaxPage() {
   })) || [];
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><Calculator className="h-7 w-7 text-blue-500" /> מחשבון מס הכנסה</h1>
         <p className="text-sm text-gray-500 mt-1">חישוב מס הכנסה, ביטוח לאומי ומס בריאות — מדרגות 2025/2026</p>
@@ -142,7 +142,7 @@ export default function TaxPage() {
               </Card>
 
               {/* Breakdown */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Card><CardContent className="pt-4 text-center">
                   <p className="text-xs text-gray-500">מס הכנסה</p>
                   <p className="text-lg font-bold text-red-600">{formatCurrency(result.incomeTax.finalMonthly)}</p>

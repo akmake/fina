@@ -1,5 +1,6 @@
 // server/controllers/recurringController.js
 import RecurringTransaction from '../models/RecurringTransaction.js';
+import Transaction from '../models/Transaction.js';
 import { addDays, addWeeks, addMonths, addYears, isBefore, isAfter, startOfDay } from 'date-fns';
 
 // ──────────────────────────────────────────────────
@@ -19,6 +20,89 @@ const calculateNextExecution = (recurring, fromDate = new Date()) => {
     }
     case 'yearly': return addYears(base, 1);
     default: return addMonths(base, 1);
+  }
+};
+
+// ──────────────────────────────────────────────────
+// @desc   זיהוי אוטומטי של דפוסים חוזרים מהיסטוריית עסקאות
+// @route  GET /api/recurring/detect
+// ──────────────────────────────────────────────────
+export const detectRecurringPatterns = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
+
+    // שלוף כל עסקאות המשתמש מ-6 חודשים אחרונים
+    const [allTxns, existingRecurring] = await Promise.all([
+      Transaction.find({ user: userId, date: { $gte: sixMonthsAgo } })
+        .select('description rawDescription amount type category date')
+        .lean(),
+      RecurringTransaction.find({ user: userId }).select('description amount').lean(),
+    ]);
+
+    // בנה Set של תיאורים שכבר מוגדרים כקבועות
+    const existingDescriptions = new Set(
+      existingRecurring.map(r => r.description.trim().toLowerCase())
+    );
+
+    // קבץ לפי תיאור מנורמל
+    const groups = {};
+    for (const tx of allTxns) {
+      const key = tx.description.trim().toLowerCase();
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(tx);
+    }
+
+    const candidates = [];
+
+    for (const [key, txns] of Object.entries(groups)) {
+      // דלג על דפוסים שכבר קיימים
+      if (existingDescriptions.has(key)) continue;
+      // דרוש לפחות 2 הופעות
+      if (txns.length < 2) continue;
+
+      // בדוק שמופיע ב-2+ חודשים שונים
+      const months = new Set(txns.map(t => {
+        const d = new Date(t.date);
+        return `${d.getFullYear()}-${d.getMonth()}`;
+      }));
+      if (months.size < 2) continue;
+
+      // בדוק עקביות סכום (±15%)
+      const amounts = txns.map(t => t.amount);
+      const avgAmount = amounts.reduce((s, a) => s + a, 0) / amounts.length;
+      const allSimilar = amounts.every(a => Math.abs(a - avgAmount) / avgAmount <= 0.15);
+      if (!allSimilar) continue;
+
+      // זהה יום-בחודש דומינטי
+      const days = txns.map(t => new Date(t.date).getDate());
+      const dayFreq = {};
+      days.forEach(d => { dayFreq[d] = (dayFreq[d] || 0) + 1; });
+      const [dominantDay, dayCount] = Object.entries(dayFreq).sort(([, a], [, b]) => b - a)[0];
+      const dayConsistency = dayCount / txns.length;
+
+      // ציון ביטחון: חודשים שונים * עקביות יום
+      const confidence = Math.min(1, (months.size / 6) * 0.6 + dayConsistency * 0.4);
+
+      candidates.push({
+        description: txns[0].description,
+        amount: Math.round(avgAmount * 100) / 100,
+        type: txns[0].type,
+        category: txns[0].category || 'כללי',
+        occurrenceCount: txns.length,
+        monthsCount: months.size,
+        suggestedDay: parseInt(dominantDay),
+        confidence: Math.round(confidence * 100) / 100,
+      });
+    }
+
+    // מיין לפי confidence ואז occurrenceCount
+    candidates.sort((a, b) => b.confidence - a.confidence || b.occurrenceCount - a.occurrenceCount);
+
+    res.json({ candidates: candidates.slice(0, 20) });
+  } catch (error) {
+    console.error('Error detecting recurring patterns:', error);
+    res.status(500).json({ message: 'שגיאה בזיהוי דפוסים חוזרים' });
   }
 };
 

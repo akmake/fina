@@ -4,12 +4,13 @@ import * as XLSX from 'xlsx';
 import { format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { he } from 'date-fns/locale';
 
-// --- אייקונים ---
+// --- אייקונים (הוספתי את האייקונים הנדרשים לפיצ'ר החדש) ---
 import { 
     Plus, Upload, Check, AlertCircle, Loader2, 
     ArrowUpRight, ArrowDownLeft, Wallet, CreditCard,
     Calendar, Search, Filter, Briefcase, ShoppingBag, 
-    Coffee, Home, Car, Zap, MoreHorizontal, Trash2
+    Coffee, Home, Car, Zap, MoreHorizontal, Trash2,
+    Tag, Edit3, Calculator, X, Save
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
@@ -114,8 +115,13 @@ export default function FinanceDashboardPage() {
     const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
     
+    // --- State של חקר בית עסק ---
     const [selectedMerchant, setSelectedMerchant] = useState(null);
     const [isMerchantDetailOpen, setIsMerchantDetailOpen] = useState(false);
+    const [editCategoryMode, setEditCategoryMode] = useState(false);
+    const [selectedNewCategory, setSelectedNewCategory] = useState('');
+    const [customCategory, setCustomCategory] = useState('');
+    const [updatingCategory, setUpdatingCategory] = useState(false);
 
     // ייבוא
     const [importState, setImportState] = useState('idle');
@@ -158,9 +164,59 @@ export default function FinanceDashboardPage() {
         fetchCategories();
     }, []);
 
+    // --- לוגיקת חקר בית עסק מעודכנת ---
     const handleTransactionClick = (merchantName) => {
         setSelectedMerchant(merchantName);
         setIsMerchantDetailOpen(true);
+        setEditCategoryMode(false);
+        setSelectedNewCategory('');
+        setCustomCategory('');
+    };
+
+    const merchantHistory = useMemo(() => {
+        if (!selectedMerchant) return [];
+        return transactions.filter(t => t.description === selectedMerchant);
+    }, [transactions, selectedMerchant]);
+
+    const merchantTotal = useMemo(() => {
+        return merchantHistory.reduce((sum, t) => {
+            return t.type === 'הכנסה' ? sum + t.amount : sum - t.amount;
+        }, 0);
+    }, [merchantHistory]);
+
+    const currentMerchantCategory = merchantHistory.length > 0 ? merchantHistory[0].category : 'כללי';
+
+    const handleBulkCategoryUpdate = async () => {
+        const isCustom = selectedNewCategory === 'custom';
+        const finalCategoryString = isCustom ? customCategory : selectedNewCategory;
+        
+        if (!finalCategoryString || finalCategoryString.trim() === '') {
+            return alert('נא לבחור או להקליד קטגוריה חוקית');
+        }
+
+        setUpdatingCategory(true);
+        try {
+            // הפיכת ה-ID לשם קטגוריה אם בחרנו מהרשימה
+            let catNameToSave = finalCategoryString;
+            if (!isCustom) {
+                const found = categories.find(c => c._id === finalCategoryString);
+                if (found) catNameToSave = found.name;
+            }
+
+            for (const t of merchantHistory) {
+                if (t.category !== catNameToSave) {
+                    await api.put(`/transactions/${t._id}`, { ...t, category: catNameToSave });
+                }
+            }
+            
+            setEditCategoryMode(false);
+            fetchTransactions(); // מרענן כדי לראות את השינוי בכל המקומות
+        } catch (error) {
+            console.error(error);
+            alert('שגיאה בעדכון הקטגוריות');
+        } finally {
+            setUpdatingCategory(false);
+        }
     };
 
     const handleFormChange = (name, value) => setForm(prev => ({ ...prev, [name]: value }));
@@ -387,26 +443,95 @@ export default function FinanceDashboardPage() {
                 </div>
             </div>
 
-            {/* Dialogs */}
+            {/* --- המודל החדש והמשודרג של חקר בית עסק --- */}
             <Dialog open={isMerchantDetailOpen} onOpenChange={setIsMerchantDetailOpen}>
-                <DialogContent className="rounded-[40px] p-0 overflow-hidden bg-white max-w-sm border-none shadow-2xl">
-                    <div className="bg-slate-50 p-10 text-center">
-                        <div className="mx-auto h-20 w-20 bg-white rounded-3xl flex items-center justify-center shadow-md mb-6 rotate-3">
-                            <ShoppingBag className="h-10 w-10 text-slate-800" />
+                <DialogContent className="rounded-[40px] p-0 overflow-hidden bg-white max-w-sm sm:max-w-md border-none shadow-2xl flex flex-col max-h-[90vh]">
+                    <div className="bg-slate-50 p-6 sm:p-10 text-center relative shrink-0">
+                        <div className="mx-auto h-16 w-16 sm:h-20 sm:w-20 bg-white rounded-3xl flex items-center justify-center shadow-md mb-4 sm:mb-6 rotate-3">
+                            <ShoppingBag className="h-8 w-8 sm:h-10 sm:w-10 text-slate-800" />
                         </div>
-                        <DialogTitle className="text-2xl font-bold text-slate-900">{selectedMerchant}</DialogTitle>
-                        <p className="text-slate-500 font-medium mt-2">היסטוריית עסקאות</p>
+                        <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900">{selectedMerchant}</DialogTitle>
+                        <p className="text-slate-500 font-medium mt-1 mb-4">היסטוריית עסקאות</p>
+
+                        {/* אזור עריכת קטגוריה במודל */}
+                        <div className="bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-3 text-right">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Tag className="h-4 w-4 text-slate-400" />
+                                    <span className="text-sm text-slate-600 font-medium">קטגוריה נוכחית:</span>
+                                </div>
+                                
+                                {!editCategoryMode ? (
+                                    <Badge 
+                                        className="cursor-pointer hover:bg-blue-600 transition-colors text-sm px-3 py-1 bg-blue-100 text-blue-700 font-normal mt-2 sm:mt-0 self-start sm:self-auto"
+                                        onClick={() => {
+                                            setEditCategoryMode(true);
+                                            const catId = categories.find(c => c.name === currentMerchantCategory)?._id || '';
+                                            setSelectedNewCategory(catId);
+                                        }}
+                                        title="לחץ לעריכה גורפת לבית עסק זה"
+                                    >
+                                        {currentMerchantCategory} <Edit3 className="h-3 w-3 ms-2 inline" />
+                                    </Badge>
+                                ) : (
+                                    <div className="flex flex-col gap-2 w-full mt-2">
+                                        <div className="flex items-center gap-2">
+                                            <Select value={selectedNewCategory} onValueChange={setSelectedNewCategory}>
+                                                <SelectTrigger className="h-10 text-sm rounded-xl flex-1 bg-slate-50 border-slate-200">
+                                                    <SelectValue placeholder="בחר קטגוריה" />
+                                                </SelectTrigger>
+                                                <SelectContent className="rounded-2xl">
+                                                    {categories.map(c => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}
+                                                    <SelectItem value="custom" className="text-blue-600 font-bold"><Plus className="h-3 w-3 me-1 inline"/> קטגוריה חדשה...</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <Button size="icon" onClick={handleBulkCategoryUpdate} disabled={updatingCategory} className="h-10 w-10 shrink-0 bg-blue-600 rounded-xl hover:bg-blue-700">
+                                                {updatingCategory ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4" />}
+                                            </Button>
+                                            <Button size="icon" variant="ghost" className="h-10 w-10 shrink-0 text-red-500 rounded-xl hover:bg-red-50" onClick={() => setEditCategoryMode(false)}>
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                        {selectedNewCategory === 'custom' && (
+                                            <Input 
+                                                placeholder="הקלד שם קטגוריה חדשה..." 
+                                                className="h-10 text-sm rounded-xl bg-slate-50 border-slate-200"
+                                                value={customCategory}
+                                                onChange={(e) => setCustomCategory(e.target.value)}
+                                            />
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                    <div className="p-6 max-h-[40vh] overflow-y-auto">
-                        {transactions.filter(t => t.description === selectedMerchant).map((trx, i) => (
-                            <div key={i} className="flex justify-between items-center p-4 hover:bg-slate-50 rounded-3xl transition-colors mb-1">
+
+                    <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-white">
+                        {merchantHistory.map((trx, i) => (
+                            <div key={i} className="flex justify-between items-center p-3 sm:p-4 hover:bg-slate-50 rounded-2xl transition-colors mb-1 border border-transparent hover:border-slate-100">
                                 <span className="text-sm font-medium text-slate-500">{format(new Date(trx.date), 'dd/MM/yy')}</span>
-                                <span className="font-bold text-slate-900 font-mono text-lg">{formatCurrency(trx.amount)}</span>
+                                <span className={`font-bold font-mono text-base sm:text-lg ${trx.type === 'הכנסה' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                                    {trx.type === 'הכנסה' ? '+' : '-'}{formatCurrency(trx.amount)}
+                                </span>
                             </div>
                         ))}
+                        {merchantHistory.length === 0 && <p className="text-center text-slate-400 py-4">לא נמצאו עסקאות</p>}
                     </div>
-                    <div className="p-6 border-t border-slate-100">
-                        <Button variant="outline" className="w-full h-12 rounded-3xl border-slate-200 text-slate-700 font-bold" onClick={() => setIsMerchantDetailOpen(false)}>סגור</Button>
+
+                    <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 shrink-0">
+                        {/* סיכום כספי מתקדם */}
+                        <div className={`p-4 rounded-2xl flex items-center justify-between mb-4 ${merchantTotal < 0 ? 'bg-red-50/50 border border-red-100' : 'bg-emerald-50/50 border border-emerald-100'}`}>
+                            <div className="flex items-center gap-2">
+                                <Calculator className={`h-5 w-5 ${merchantTotal < 0 ? 'text-red-500' : 'text-emerald-500'}`} />
+                                <span className={`text-sm sm:text-base font-medium ${merchantTotal < 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+                                    {merchantTotal < 0 ? 'סך הכל הוצאות:' : 'סך הכל הכנסות:'}
+                                </span>
+                            </div>
+                            <span className={`text-xl sm:text-2xl font-bold ${merchantTotal < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                {formatCurrency(Math.abs(merchantTotal))}
+                            </span>
+                        </div>
+                        <Button variant="outline" className="w-full h-12 rounded-2xl border-slate-200 text-slate-700 font-bold hover:bg-slate-100" onClick={() => setIsMerchantDetailOpen(false)}>סגור</Button>
                     </div>
                 </DialogContent>
             </Dialog>
@@ -415,7 +540,7 @@ export default function FinanceDashboardPage() {
                 <DialogContent className="rounded-[32px] p-8 border-none shadow-2xl">
                     <DialogHeader><DialogTitle className="text-2xl font-bold text-center">קטגוריה חדשה</DialogTitle></DialogHeader>
                     <div className="py-6"><Input className="h-14 rounded-3xl bg-slate-50 border-transparent text-center text-lg" placeholder="שם הקטגוריה..." value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} /></div>
-                    <DialogFooter><Button onClick={() => handleSaveNewCategory(currentMerchantForNewCategory)} className="w-full h-12 rounded-3xl bg-slate-900 font-bold">שמור קטגוריה</Button></DialogFooter>
+                    <DialogFooter><Button onClick={() => handleSaveNewCategory(currentMerchantForNewCategory)} className="w-full h-12 rounded-3xl bg-slate-900 font-bold hover:bg-slate-800">שמור קטגוריה</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
 
@@ -468,11 +593,11 @@ export default function FinanceDashboardPage() {
                     <DialogFooter className="p-6 bg-slate-50 border-t border-slate-100">
                         {['mapping', 'confirming'].includes(importState) ? (
                             <div className="flex gap-4 w-full">
-                                <Button variant="ghost" onClick={resetImportProcess} className="flex-1 h-12 rounded-3xl font-bold text-slate-500">ביטול</Button>
-                                <Button onClick={handleConfirmImport} className="flex-1 h-12 rounded-3xl bg-slate-900 font-bold text-white shadow-lg shadow-slate-900/20">המשך</Button>
+                                <Button variant="ghost" onClick={resetImportProcess} className="flex-1 h-12 rounded-3xl font-bold text-slate-500 hover:bg-slate-200">ביטול</Button>
+                                <Button onClick={handleConfirmImport} className="flex-1 h-12 rounded-3xl bg-slate-900 font-bold text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800">המשך</Button>
                             </div>
                         ) : (
-                            <Button onClick={resetImportProcess} className="w-full h-12 rounded-3xl bg-white border border-slate-200 font-bold text-slate-900 shadow-sm">סגור</Button>
+                            <Button onClick={resetImportProcess} className="w-full h-12 rounded-3xl bg-white border border-slate-200 font-bold text-slate-900 shadow-sm hover:bg-slate-50">סגור</Button>
                         )}
                     </DialogFooter>
                 </DialogContent>

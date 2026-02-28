@@ -391,16 +391,18 @@ export default function SmartAnalyticsDashboard() {
           <CardHeader><CardTitle>פירוט יעילות הוצאות</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { value: analytics.summary?.totalIncome,  label: 'הכנסה',          color: 'green' },
-                { value: analytics.summary?.totalExpense, label: 'הוצאות',         color: 'red'   },
-                { value: analytics.summary?.netFlow,      label: 'זמין לחיסכון',  color: 'blue'  },
-              ].map(({ value, label, color }) => (
-                <div key={label} className={`text-center p-4 bg-gradient-to-br from-${color}-100 to-${color}-50 dark:from-${color}-900/20 dark:to-${color}-900/10 rounded-lg`}>
-                  <p className={`text-2xl font-bold text-${color}-600`}>{formatCurrency(value)}</p>
-                  <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">{label}</p>
-                </div>
-              ))}
+              <div className="text-center p-4 bg-gradient-to-br from-green-100 to-green-50 dark:from-green-900/20 dark:to-green-900/10 rounded-lg">
+                <p className="text-2xl font-bold text-green-600">{formatCurrency(analytics.summary?.totalIncome)}</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">הכנסה</p>
+              </div>
+              <div className="text-center p-4 bg-gradient-to-br from-red-100 to-red-50 dark:from-red-900/20 dark:to-red-900/10 rounded-lg">
+                <p className="text-2xl font-bold text-red-600">{formatCurrency(analytics.summary?.totalExpense)}</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">הוצאות</p>
+              </div>
+              <div className="text-center p-4 bg-gradient-to-br from-blue-100 to-blue-50 dark:from-blue-900/20 dark:to-blue-900/10 rounded-lg">
+                <p className="text-2xl font-bold text-blue-600">{formatCurrency(analytics.summary?.netFlow)}</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">זמין לחיסכון</p>
+              </div>
             </div>
           </CardContent>
         </Card>

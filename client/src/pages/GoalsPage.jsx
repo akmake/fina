@@ -184,7 +184,7 @@ export default function GoalsPage() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editing ? 'עריכת יעד' : 'יעד חדש'}</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2"><label className="text-xs text-gray-500">שם היעד *</label><Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="קניית דירה, חתונה..." /></div>

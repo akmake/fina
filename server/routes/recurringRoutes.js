@@ -1,16 +1,18 @@
 // server/routes/recurringRoutes.js
 import express from 'express';
-import { 
-  getRecurringTransactions, 
-  addRecurringTransaction, 
-  updateRecurringTransaction, 
+import {
+  getRecurringTransactions,
+  addRecurringTransaction,
+  updateRecurringTransaction,
   deleteRecurringTransaction,
   toggleRecurringTransaction,
-  getCashflowForecast
+  getCashflowForecast,
+  detectRecurringPatterns,
 } from '../controllers/recurringController.js';
 
 const router = express.Router();
 
+router.get('/detect',        detectRecurringPatterns);
 router.get('/',              getRecurringTransactions);
 router.get('/cashflow',      getCashflowForecast);
 router.post('/',             addRecurringTransaction);
