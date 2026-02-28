@@ -1,3 +1,4 @@
+import Transaction from '../models/Transaction.js';
 import MerchantMap from '../models/MerchantMap.js';
 import CategoryRule from '../models/CategoryRule.js';
 
@@ -122,26 +123,38 @@ export async function parseTransactions(cleanedData, fileType, userId) {
     const mapper = (row) => createTransactionObject(row, userId, fileType);
     const initialTransactions = cleanedData.map(mapper).filter(Boolean);
 
-    const [merchantMaps, categoryRules] = await Promise.all([
+    const genericNames = ['כללי', 'שונות', '', 'null', 'undefined'];
+
+    const [merchantMaps, categoryRules, existingTxns] = await Promise.all([
         MerchantMap.find({}).populate('category').lean(),
         CategoryRule.find({}).populate('category').lean(),
+        // Load all distinct (description → category) pairs for this user
+        Transaction.find(
+            { user: userId, category: { $exists: true, $nin: genericNames } },
+            { description: 1, category: 1 }
+        ).lean(),
     ]);
 
     const merchantMapCache = new Map(merchantMaps.map(m => [m.originalName, m]));
+
+    // Build a name → category map from existing transactions (first occurrence wins)
+    const existingCategoryByName = new Map();
+    for (const t of existingTxns) {
+        if (t.description && !existingCategoryByName.has(t.description)) {
+            existingCategoryByName.set(t.description, t.category);
+        }
+    }
+
     const merchantsThatNeedMapping = new Set();
 
     const transactions = initialTransactions.map(trx => {
         let finalDescription = trx.description;
         let finalCategoryName = trx.category;
-        
-        // בודקים האם הקטגוריה שהגיעה מהקובץ היא "קטגוריה אמיתית" ולא סתם "כללי"
-        const genericNames = ['כללי', 'שונות', '', 'null', 'undefined'];
-        let categoryIsGeneric = genericNames.includes(finalCategoryName);
-        
-        // אם הקטגוריה לא גנרית (כלומר היא "עיצוב הבית" או "מזון"), אז מצאנו קטגוריה!
-        let categoryFound = !categoryIsGeneric; 
 
-        // שלב 1: מיפוי ידני (גובר על הכל - אם המשתמש קבע אחרת בעבר)
+        // שלב 0: האם הקטגוריה מהקובץ היא אמיתית?
+        let categoryFound = !genericNames.includes(finalCategoryName);
+
+        // שלב 1: מיפוי ידני (MerchantMap)
         const mapping = merchantMapCache.get(trx.rawDescription);
         if (mapping) {
             finalDescription = mapping.newName;
@@ -154,7 +167,7 @@ export async function parseTransactions(cleanedData, fileType, userId) {
             }
         }
 
-        // שלב 2: חוקים אוטומטיים (רק אם לא מצאנו קטגוריה טובה עדיין)
+        // שלב 2: חוקים אוטומטיים
         if (!categoryFound) {
             for (const rule of categoryRules) {
                 const keyword = rule.searchString || rule.keyword || '';
@@ -168,7 +181,17 @@ export async function parseTransactions(cleanedData, fileType, userId) {
             }
         }
 
-        // שלב 3: רק אם בסוף באמת אין קטגוריה (לא מהקובץ, לא ממיפוי ולא מחוקים) - תוסיף למיפוי
+        // שלב 3: בדיקה בעסקאות קיימות של המשתמש (לפי שם מוצג או שם מקורי)
+        if (!categoryFound) {
+            const existingCat = existingCategoryByName.get(finalDescription)
+                             || existingCategoryByName.get(trx.rawDescription);
+            if (existingCat && !genericNames.includes(existingCat)) {
+                finalCategoryName = existingCat;
+                categoryFound = true;
+            }
+        }
+
+        // שלב 4: אם עדיין אין קטגוריה - דורש מיפוי ידני
         if (!categoryFound) {
             merchantsThatNeedMapping.add(trx.rawDescription);
         }

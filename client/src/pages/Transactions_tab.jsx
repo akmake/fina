@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
-import { format, isSameMonth } from 'date-fns';
+import { format, isSameMonth, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Upload, Search, ChevronDown, Loader2 } from 'lucide-react';
 
@@ -16,8 +16,6 @@ import MerchantDialog from '@/components/transactions/MerchantDialog';
 import ImportWizard from '@/components/transactions/ImportWizard';
 import AddTransactionForm from '@/components/transactions/AddTransactionForm';
 
-const PAGE_SIZE = 150;
-
 export default function TransactionsPage() {
   // ─── Data ───────────────────────────────────────────────────
   const [transactions, setTransactions] = useState([]);
@@ -25,6 +23,8 @@ export default function TransactionsPage() {
   const [loading,      setLoading]      = useState(true);
   const [loadingMore,  setLoadingMore]  = useState(false);
   const [hasMore,      setHasMore]      = useState(true);
+  // Tracks the start of the oldest month currently loaded
+  const [oldestMonth,  setOldestMonth]  = useState(null);
 
   // ─── Filters ────────────────────────────────────────────────
   const [filterType,  setFilterType]  = useState('all');
@@ -47,10 +47,10 @@ export default function TransactionsPage() {
   const fileInputRef = useRef(null);
 
   // ─── Helpers ─────────────────────────────────────────────────
-  const fetchPage = useCallback(async (before = null) => {
-    const params = new URLSearchParams({ limit: PAGE_SIZE });
-    if (before) params.set('before', before);
-    const res = await api.get(`/transactions?${params}`);
+  const fetchMonth = useCallback(async (monthDate) => {
+    const from = startOfMonth(monthDate).toISOString();
+    const to   = endOfMonth(monthDate).toISOString();
+    const res  = await api.get(`/transactions?from=${from}&to=${to}`);
     return res.data || [];
   }, []);
 
@@ -58,44 +58,62 @@ export default function TransactionsPage() {
   useEffect(() => {
     const init = async () => {
       try {
-        const [data, catRes] = await Promise.all([
-          fetchPage(),
+        const [latestRes, catRes] = await Promise.all([
+          api.get('/transactions?limit=1'),
           api.get('/categories'),
         ]);
-        setTransactions(data);
-        setHasMore(data.length >= PAGE_SIZE);
         setCategories(catRes.data || []);
+        const latest = latestRes.data?.[0];
+        if (!latest) { setHasMore(false); return; }
+
+        const effectiveMonth = startOfMonth(new Date(latest.date));
+        const data = await fetchMonth(effectiveMonth);
+        setTransactions(data);
+        setOldestMonth(effectiveMonth);
+        setHasMore(true);
       } catch (err) { console.error(err); }
       finally { setLoading(false); }
     };
     init();
-  }, [fetchPage]);
+  }, [fetchMonth]);
 
-  // ─── Load more (infinite scroll) ─────────────────────────────
+  // ─── Load more — month by month ───────────────────────────────
   const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore || !transactions.length) return;
+    if (loadingMore || !hasMore || !oldestMonth) return;
     setLoadingMore(true);
     try {
-      const oldest = transactions[transactions.length - 1].date;
-      const data = await fetchPage(oldest);
-      if (data.length === 0) {
-        setHasMore(false);
-      } else {
+      // 1. Is there anything older than the current oldest month?
+      const checkRes = await api.get(
+        `/transactions?before=${startOfMonth(oldestMonth).toISOString()}&limit=1`
+      );
+      if (!checkRes.data?.length) { setHasMore(false); return; }
+
+      // 2. Load the full month that contains that older transaction
+      const targetMonth = startOfMonth(new Date(checkRes.data[0].date));
+      const data = await fetchMonth(targetMonth);
+      if (data.length > 0) {
         setTransactions(prev => [...prev, ...data]);
-        setHasMore(data.length >= PAGE_SIZE);
+        setOldestMonth(targetMonth);
+      } else {
+        setHasMore(false);
       }
     } catch (err) { console.error(err); }
     finally { setLoadingMore(false); }
-  }, [loadingMore, hasMore, transactions, fetchPage]);
+  }, [loadingMore, hasMore, oldestMonth, fetchMonth]);
 
   // ─── Refresh (after add/delete) ──────────────────────────────
   const refresh = useCallback(async () => {
     try {
-      const data = await fetchPage();
+      const latestRes = await api.get('/transactions?limit=1');
+      const latest = latestRes.data?.[0];
+      if (!latest) { setTransactions([]); setHasMore(false); return; }
+      const effectiveMonth = startOfMonth(new Date(latest.date));
+      const data = await fetchMonth(effectiveMonth);
       setTransactions(data);
-      setHasMore(data.length >= PAGE_SIZE);
+      setOldestMonth(effectiveMonth);
+      setHasMore(true);
     } catch (err) { console.error(err); }
-  }, [fetchPage]);
+  }, [fetchMonth]);
 
   // ─── Intersection Observer ───────────────────────────────────
   useEffect(() => {

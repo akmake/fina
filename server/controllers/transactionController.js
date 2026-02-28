@@ -14,12 +14,20 @@ const normalizeAccount = (account) => {
     return map[account] || account || 'checking';
 };
 
-// @desc   קבלת עסקאות של המשתמש (תמיכה ב-?before=DATE&limit=N לפגינציה)
+// @desc   קבלת עסקאות של המשתמש
 // @route  GET /api/transactions
+// Query params: ?from=DATE&to=DATE (month range) | ?before=DATE&limit=N (cursor) | ?limit=N (latest N)
 export const getTransactions = async (req, res) => {
   try {
     const filter = { user: req.user._id };
-    if (req.query.before) filter.date = { $lt: new Date(req.query.before) };
+
+    if (req.query.from || req.query.to) {
+      filter.date = {};
+      if (req.query.from) filter.date.$gte = new Date(req.query.from);
+      if (req.query.to)   filter.date.$lte = new Date(req.query.to);
+    } else if (req.query.before) {
+      filter.date = { $lt: new Date(req.query.before) };
+    }
 
     let query = Transaction.find(filter).sort({ date: -1 });
     if (req.query.limit) query = query.limit(Math.min(parseInt(req.query.limit), 2000));
