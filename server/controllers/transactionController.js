@@ -196,19 +196,34 @@ export const updateTransaction = async (req, res) => {
       return res.status(404).json({ message: 'העסקה לא נמצאה' });
     }
 
-    // חישוב התיקון ליתרה:
-    // 1. מבטלים את הפעולה הישנה
     const oldAccount = oldTransaction.account || 'checking';
     const oldReverseAmount = oldTransaction.type === 'הכנסה' ? -oldTransaction.amount : oldTransaction.amount;
-    
-    // 2. מחילים את הפעולה החדשה
     const newApplyAmount = finalType === 'הכנסה' ? numericAmount : -numericAmount;
+
+    // --- תוספת קריטית: למידה אוטומטית למילון הגלובלי ---
+    // המערכת תזכור את הקטגוריה לשם המקורי בכל ייבוא עתידי של כל המשתמשים
+    const rawDesc = oldTransaction.rawDescription || oldTransaction.description;
+    const updateGlobalDictionary = async () => {
+      if (category && category !== 'כללי') {
+        try {
+          await MerchantMap.findOneAndUpdate(
+            { originalName: rawDesc },
+            {
+              $set: { newName: description, categoryName: category },
+              $unset: { category: 1 } // ניקוי שיוכים ישנים כדי לא להתנגש בייבוא
+            },
+            { upsert: true }
+          );
+        } catch (err) {
+          console.error("Error updating global memory:", err);
+        }
+      }
+    };
 
     if (supportsTransactions) {
       const session = await mongoose.startSession();
       session.startTransaction();
       try {
-        // עדכון העסקה
         oldTransaction.date = date;
         oldTransaction.description = description;
         oldTransaction.amount = numericAmount;
@@ -217,7 +232,6 @@ export const updateTransaction = async (req, res) => {
         oldTransaction.account = finalAccount;
         await oldTransaction.save({ session });
 
-        // אם לא שינינו את החשבון (לדוגמה נשאר בעו"ש), פשוט סוכמים את ההפרש
         if (oldAccount === finalAccount) {
           const netChange = oldReverseAmount + newApplyAmount;
           if (netChange !== 0) {
@@ -228,7 +242,6 @@ export const updateTransaction = async (req, res) => {
             );
           }
         } else {
-          // במידה והמשתמש העביר עסקה מעו"ש למזומן או להפך, מתקנים את שני החשבונות
           await FinanceProfile.updateOne(
             { user: req.user._id },
             { $inc: { [oldAccount]: oldReverseAmount, [finalAccount]: newApplyAmount } },
@@ -238,17 +251,16 @@ export const updateTransaction = async (req, res) => {
 
         await session.commitTransaction();
         session.endSession();
-        res.json(oldTransaction);
+        
+        await updateGlobalDictionary(); // שמירה לזיכרון הגלובלי מחוץ לטרנזקציה
+        return res.json(oldTransaction);
       } catch (err) {
         await session.abortTransaction();
         session.endSession();
-        if (err.code === 11000) {
-            return res.status(409).json({ message: 'עסקה זו כבר קיימת במערכת' });
-        }
+        if (err.code === 11000) return res.status(409).json({ message: 'עסקה זו כבר קיימת במערכת' });
         throw err;
       }
     } else {
-      // לוגיקה זהה ללא טרנזקציות
       oldTransaction.date = date;
       oldTransaction.description = description;
       oldTransaction.amount = numericAmount;
@@ -271,13 +283,16 @@ export const updateTransaction = async (req, res) => {
           { $inc: { [oldAccount]: oldReverseAmount, [finalAccount]: newApplyAmount } }
         );
       }
-      res.json(oldTransaction);
+      
+      await updateGlobalDictionary(); // שמירה לזיכרון הגלובלי
+      return res.json(oldTransaction);
     }
   } catch (error) {
     console.error('Update transaction error:', error);
     res.status(500).json({ message: 'שגיאה בעדכון העסקה' });
   }
 };
+
 
 // @desc   מחיקת כל עסקאות המשתמש + איפוס יתרות
 // @route  DELETE /api/transactions/all
@@ -306,11 +321,7 @@ export const bulkUpdateMerchant = async (req, res) => {
   }
 
   try {
-    // מצא דוגמה לעסקה כדי לקבל rawDescription
-    const sample = await Transaction.findOne({ user: userId, description: originalName });
-    const rawDescription = sample?.rawDescription || originalName;
-
-    // עדכן כל עסקאות המשתמש עם שם זה
+    // 1. עדכון העסקאות הנוכחיות של המשתמש במסד הנתונים
     const updateFields = {};
     if (newDisplayName && newDisplayName !== originalName) updateFields.description = newDisplayName;
     if (newCategory) updateFields.category = newCategory;
@@ -319,26 +330,36 @@ export const bulkUpdateMerchant = async (req, res) => {
       await Transaction.updateMany({ user: userId, description: originalName }, { $set: updateFields });
     }
 
-    // עדכן MerchantMap גלובלי (רק אם יש שינוי משמעותי)
-    const shouldUpdateCategory = newCategory && newCategory !== 'כללי';
-    const shouldUpdateName = newDisplayName && newDisplayName !== rawDescription;
+    // 2. משיכת כל ה-rawDescriptions (השמות המקוריים מהאקסל) כדי ללמד את המערכת על כל הווריאציות!
+    const transactions = await Transaction.find({ user: userId, description: originalName }).select('rawDescription description');
+    const uniqueRawDescriptions = [...new Set(transactions.map(t => t.rawDescription || t.description))];
+    
+    // אם אין עסקאות, לפחות נשמור את השם שהועבר כברירת מחדל
+    if (uniqueRawDescriptions.length === 0) uniqueRawDescriptions.push(originalName);
 
+    const shouldUpdateCategory = newCategory && newCategory !== 'כללי';
+    const shouldUpdateName = newDisplayName && newDisplayName !== originalName;
+
+    // 3. עדכון הטבלה הגלובלית (MerchantMap) לכל וריאציה בנפרד
     if (shouldUpdateCategory || shouldUpdateName) {
-      await MerchantMap.findOneAndUpdate(
-        { originalName: rawDescription },
-        {
-          $set: {
-            newName: newDisplayName || rawDescription,
-            ...(shouldUpdateCategory ? { categoryName: newCategory } : {}),
+      for (const rawDesc of uniqueRawDescriptions) {
+        await MerchantMap.findOneAndUpdate(
+          { originalName: rawDesc },
+          {
+            $set: {
+              newName: newDisplayName || originalName,
+              ...(shouldUpdateCategory ? { categoryName: newCategory } : {}),
+            },
+            $unset: { category: 1 } // חובה לנקות ObjectID ישן כדי שהפארסר יקרא את הטקסט נכון
           },
-        },
-        { upsert: true, new: true }
-      );
+          { upsert: true, new: true }
+        );
+      }
     }
 
-    res.json({ message: 'עודכן בהצלחה' });
+    res.json({ message: 'עודכן בהצלחה והמערכת למדה את הקטגוריה!' });
   } catch (error) {
     console.error('bulkUpdateMerchant error:', error);
-    res.status(500).json({ message: 'שגיאה בעדכון' });
+    res.status(500).json({ message: 'שגיאה בעדכון בית העסק' });
   }
 };
