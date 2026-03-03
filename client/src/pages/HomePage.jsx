@@ -2,11 +2,15 @@
 
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/Button';
 
 export default function HomePage() {
   return (
     <main className="min-h-[calc(100vh-4rem)] flex flex-col justify-center items-center px-4 sm:px-6 text-center">
+      <Helmet>
+        <title>ראשי | ניהול פיננסי אישי וחכם</title>
+      </Helmet>
       {/* ── Hero ── */}
       <motion.h1
         initial={{ opacity: 0, y: 30 }}
