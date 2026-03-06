@@ -10,9 +10,9 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      // The '@' alias now points directly to the 'src' directory
       '@': path.resolve(__dirname, 'src'),
     },
+    dedupe: ['react', 'react-dom'],
   },
   server: {
     port: 5173,
@@ -32,7 +32,18 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+            if (
+              id.includes('/react/') ||
+              id.includes('/react-dom/') ||
+              id.includes('/react-router') ||
+              id.includes('/react-router-dom/') ||
+              id.includes('/@react-oauth/') ||
+              id.includes('/@tanstack/react') ||
+              id.includes('/react-helmet') ||
+              id.includes('/react-hot-toast/') ||
+              id.includes('/react-window/') ||
+              id.includes('/sonner/')
+            ) {
               return 'vendor-react';
             }
             if (id.includes('@radix-ui') || id.includes('lucide-react') || id.includes('framer-motion')) {
