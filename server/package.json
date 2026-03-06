@@ -20,6 +20,7 @@
     "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^7.2.0",
     "express-validator": "^7.1.0",
+    "google-auth-library": "^10.6.1",
     "googleapis": "^153.0.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",

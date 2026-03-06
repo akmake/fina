@@ -13,10 +13,18 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true
     },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true // Ensures uniqueness only for documents that have this field
+    },
+    avatar: {
+      type: String
+    },
     // שונה מ-password ל-passwordHash כדי להתאים לקונטרולר
     passwordHash: { 
       type: String, 
-      required: true 
+      required: function() { return !this.googleId; } // Required only if not a Google user
     },
     role: { 
       type: String, 

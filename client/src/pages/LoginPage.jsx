@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { GoogleLogin } from '@react-oauth/google';
 import api from "@/utils/api";
 import { useAuthStore } from "@/stores/authStore";
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, ArrowRight } from "lucide-react";
@@ -24,6 +25,11 @@ export default function LoginPage() {
     });
   }, []);
 
+  const handleLoginSuccess = (user) => {
+    loginAction(user);
+    navigate('/');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
@@ -35,13 +41,31 @@ export default function LoginPage() {
       const { data } = await api.post('/auth/login', { email, password });
       
       if (data && data.user) {
-        loginAction(data.user);
-        navigate('/'); 
+        handleLoginSuccess(data.user);
       } else {
         throw new Error("תגובת השרת אינה מכילה פרטי משתמש.");
       }
     } catch (err) {
       setError(err.response?.data?.message || 'שם המשתמש או הסיסמה שגויים');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    if (loading) return;
+    setLoading(true);
+    setError("");
+
+    try {
+      const { data } = await api.post('/auth/google', { credential: credentialResponse.credential });
+      if (data && data.user) {
+        handleLoginSuccess(data.user);
+      } else {
+        throw new Error("תגובת השרת מ-Google אינה מכילה פרטי משתמש.");
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'ההתחברות עם גוגל נכשלה. נסה שוב.');
     } finally {
       setLoading(false);
     }
@@ -98,7 +122,7 @@ export default function LoginPage() {
               {/* סיסמה */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label htmlFor="password" class="block text-sm font-semibold text-gray-700">
+                  <label htmlFor="password" className="block text-sm font-semibold text-gray-700">
                     סיסמה
                   </label>
                   {/* אופציונלי: קישור לשכחתי סיסמה */}
@@ -145,6 +169,27 @@ export default function LoginPage() {
                 )}
               </button>
             </div>
+          </form>
+
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-white px-2 text-sm text-gray-500">או התחבר באמצעות</span>
+              </div>
+            </div>
+
+            <div className="flex justify-center">
+               <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => {
+                    setError('ההתחברות עם גוגל נכשלה. נסה שוב.');
+                    console.error('Google Login Failed');
+                  }}
+                  useOneTap
+                />
+            </div>
             
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
@@ -156,7 +201,6 @@ export default function LoginPage() {
               </p>
             </div>
 
-          </form>
         </div>
       </div>
 
