@@ -9,6 +9,7 @@ import CategoryRule from '../models/CategoryRule.js';
 import RecurringTransaction from '../models/RecurringTransaction.js';
 import Budget from '../models/Budget.js';
 import Goal from '../models/Goal.js';
+import FinanceProfile from '../models/FinanceProfile.js';
 import smartCategoryEngine from '../utils/smartCategoryEngine.js';
 import { getPaginationOptions, formatPaginatedResponse } from '../utils/pagination.js';
 import logger from '../utils/logger.js';
@@ -606,6 +607,168 @@ function calculateAverageByCategory(transactions) {
 
   return result;
 }
+
+// ==================== Weekly Action Plan ====================
+
+/**
+ * @desc   תוכנית פעולה שבועית — 3-5 פעולות קונקרטיות עם סכומים ספציפיים
+ * @route  GET /api/analytics/action-plan
+ */
+export const getWeeklyActionPlan = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year  = now.getFullYear();
+
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd   = new Date(year, month, 0, 23, 59, 59);
+
+    const [profile, budget, goals, thisMonthTx, recurringTx] = await Promise.all([
+      FinanceProfile.findOne({ user: userId }).lean(),
+      Budget.findOne({ user: userId, month, year }).lean(),
+      Goal.find({ user: userId, status: 'active' }).lean(),
+      Transaction.find({ user: userId, date: { $gte: monthStart, $lte: monthEnd } }).lean(),
+      RecurringTransaction.find({ user: userId, isActive: true }).lean(),
+    ]);
+
+    const actions = [];
+
+    // ── חישובי בסיס ──────────────────────────────────────────────
+    const thisIncome  = thisMonthTx.filter(t => t.type === 'הכנסה').reduce((s, t) => s + t.amount, 0);
+    const thisExpense = thisMonthTx.filter(t => t.type === 'הוצאה').reduce((s, t) => s + t.amount, 0);
+    const savingsRate = thisIncome > 0 ? (thisIncome - thisExpense) / thisIncome * 100 : 0;
+
+    const liquidAssets = (profile?.checking || 0) + (profile?.cash || 0);
+    const avgExpense   = recurringTx.filter(r => r.type === 'הוצאה' && !r.isPaused)
+                           .reduce((s, r) => s + (r.monthlyCost || 0), 0) || thisExpense || 5000;
+    const emergencyMonths = avgExpense > 0 ? liquidAssets / avgExpense : 0;
+
+    // ── Action 1: שיעור חיסכון נמוך ──────────────────────────────
+    if (savingsRate < 10 && thisIncome > 0) {
+      const targetSavings  = Math.round(thisIncome * 0.10);
+      const currentSavings = Math.max(0, thisIncome - thisExpense);
+      const gap            = targetSavings - currentSavings;
+      if (gap > 0) {
+        actions.push({
+          priority: 'high', icon: '💰',
+          title: 'העבר לחיסכון',
+          description: `שיעור החיסכון שלך הוא ${savingsRate.toFixed(0)}% — מתחת ל-10%. העבר ₪${gap.toLocaleString()} לחשבון חיסכון עוד החודש כדי להגיע ליעד.`,
+          amount: gap, actionLabel: 'לניהול פיננסי', actionUrl: '/finance',
+        });
+      }
+    }
+
+    // ── Action 2: קרן חירום לא מספיקה ───────────────────────────
+    if (emergencyMonths < 3) {
+      const targetLiquid  = avgExpense * 3;
+      const missing       = Math.round(targetLiquid - liquidAssets);
+      const monthlyBuild  = Math.round(missing / 6);
+      if (missing > 0) {
+        actions.push({
+          priority: 'high', icon: '🛡️',
+          title: 'בנה קרן חירום',
+          description: `יש לך ${emergencyMonths.toFixed(1)} חודשי הוצאות בנזילות — צריך 3 לפחות. הפרש ₪${monthlyBuild.toLocaleString()} בחודש ל-6 חודשים (חסר ₪${missing.toLocaleString()}).`,
+          amount: monthlyBuild, actionLabel: 'לפרופיל פיננסי', actionUrl: '/finance',
+        });
+      }
+    }
+
+    // ── Action 3: תקציב — קטגוריות שחרגו ────────────────────────
+    if (budget?.items?.length > 0) {
+      const categorySpend = {};
+      thisMonthTx.filter(t => t.type === 'הוצאה').forEach(t => {
+        categorySpend[t.category] = (categorySpend[t.category] || 0) + t.amount;
+      });
+
+      const overBudget = budget.items
+        .map(item => ({ ...item, actualSpent: categorySpend[item.category] || 0, overage: (categorySpend[item.category] || 0) - item.limit }))
+        .filter(item => item.overage > 0)
+        .sort((a, b) => b.overage - a.overage);
+
+      if (overBudget.length > 0) {
+        const worst    = overBudget[0];
+        const daysLeft = Math.max(1, monthEnd.getDate() - now.getDate());
+        const cutPerWeek = Math.round(worst.overage / Math.max(1, Math.floor(daysLeft / 7)));
+        actions.push({
+          priority: 'high', icon: '✂️',
+          title: `הפחת הוצאות: ${worst.category}`,
+          description: `חרגת ב-₪${Math.round(worst.overage).toLocaleString()} ב"${worst.category}" (₪${Math.round(worst.actualSpent).toLocaleString()} מתוך ₪${worst.limit.toLocaleString()}). נותרו ${daysLeft} ימים — הפחת ₪${cutPerWeek.toLocaleString()}/שבוע.`,
+          amount: Math.round(worst.overage), actionLabel: 'לתקציב', actionUrl: '/budget',
+        });
+      } else {
+        const nearCats = budget.items
+          .map(item => ({ ...item, actualSpent: categorySpend[item.category] || 0, pct: item.limit > 0 ? (categorySpend[item.category] || 0) / item.limit * 100 : 0 }))
+          .filter(item => item.pct >= 80 && item.pct < 100)
+          .sort((a, b) => b.pct - a.pct);
+        if (nearCats.length > 0) {
+          const near = nearCats[0];
+          actions.push({
+            priority: 'medium', icon: '⚠️',
+            title: `שים לב: ${near.category}`,
+            description: `ניצלת ${near.pct.toFixed(0)}% מהתקציב של "${near.category}". נותרו ₪${Math.round(near.limit - near.actualSpent).toLocaleString()} עד סוף החודש — האט את ההוצאות.`,
+            amount: Math.round(near.limit - near.actualSpent), actionLabel: 'לתקציב', actionUrl: '/budget',
+          });
+        }
+      }
+    } else {
+      actions.push({
+        priority: 'medium', icon: '📋',
+        title: 'צור תקציב חודשי',
+        description: 'אין לך תקציב מוגדר לחודש זה. בלי תקציב אי-אפשר לדעת אם אתה על המסלול הנכון — זה הצעד הראשון.',
+        amount: null, actionLabel: 'צור תקציב', actionUrl: '/budget',
+      });
+    }
+
+    // ── Action 4: יעדים מפגרים — כמה צריך להוסיף ──────────────
+    const behindGoals = goals.filter(g => {
+      if (!g.targetDate) return false;
+      const monthsLeft = (new Date(g.targetDate) - now) / (1000 * 60 * 60 * 24 * 30.44);
+      if (monthsLeft <= 0) return false;
+      const needed = (g.targetAmount - g.currentAmount) / monthsLeft;
+      return needed > (g.monthlyContribution || 0) * 1.05;
+    });
+
+    if (behindGoals.length > 0) {
+      const goal = behindGoals[0];
+      const monthsLeft = Math.max(1, Math.round((new Date(goal.targetDate) - now) / (1000 * 60 * 60 * 24 * 30.44)));
+      const needed     = Math.ceil((goal.targetAmount - goal.currentAmount) / monthsLeft);
+      const extra      = Math.max(1, needed - (goal.monthlyContribution || 0));
+      actions.push({
+        priority: 'medium', icon: '🎯',
+        title: `הגדל הפקדה: ${goal.name}`,
+        description: `יעד "${goal.name}" מפגר. נדרשת הפקדה של ₪${needed.toLocaleString()}/חודש אך אתה מפקיד ₪${(goal.monthlyContribution || 0).toLocaleString()}. הוסף ₪${extra.toLocaleString()}/חודש (${monthsLeft} חודשים נותרו).`,
+        amount: extra, actionLabel: 'לדף יעדים', actionUrl: '/goals',
+      });
+    }
+
+    // ── Action 5: כסף נזיל מוגזם ────────────────────────────────
+    if (liquidAssets > avgExpense * 8 && emergencyMonths >= 6) {
+      const idleCash = Math.round(liquidAssets - avgExpense * 6);
+      actions.push({
+        priority: 'low', icon: '📈',
+        title: 'העבר כסף למכשיר מניב',
+        description: `יש לך ${emergencyMonths.toFixed(0)} חודשי נזילות — מעל מה שצריך. ₪${idleCash.toLocaleString()} עומדים ללא תשואה. שקול פיקדון, קרן כספית או מניות.`,
+        amount: idleCash, actionLabel: 'לפיקדונות', actionUrl: '/deposits',
+      });
+    }
+
+    const order = { high: 0, medium: 1, low: 2 };
+    actions.sort((a, b) => order[a.priority] - order[b.priority]);
+
+    res.json({
+      status: 'success',
+      data: {
+        actions: actions.slice(0, 4),
+        generatedAt: now,
+        monthContext: { month, year, thisIncome, thisExpense, savingsRate: Math.round(savingsRate * 10) / 10 },
+      },
+    });
+  } catch (error) {
+    logger.error('Action plan generation failed', { error: error.message });
+    res.status(500).json({ message: 'Failed to generate action plan' });
+  }
+};
 
 // ==================== Seasonal Analysis ====================
 

@@ -6,6 +6,7 @@ import {
   getSpendingRecommendations,
   predictSpending,
   getSeasonalAnalysis,
+  getWeeklyActionPlan,
 } from '../controllers/analyticsController.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { catchAsync } from '../middlewares/errorHandler.js';
@@ -52,5 +53,6 @@ router.get('/recommendations', catchAsync(getSpendingRecommendations));
  */
 router.get('/predictions', catchAsync(predictSpending));
 router.get('/seasonal',    catchAsync(getSeasonalAnalysis));
+router.get('/action-plan', catchAsync(getWeeklyActionPlan));
 
 export default router;

@@ -5,7 +5,7 @@ import {
 import {
   ArrowUp, ArrowDown, Wallet, TrendingUp, Activity, CreditCard,
   Loader2, AlertCircle, Plus, Scale, Heart, ChevronLeft, Bell,
-  PieChart, Clock, PiggyBank, Shield, Lightbulb,
+  PieChart, Clock, PiggyBank, Shield, Lightbulb, X, CheckCircle2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
@@ -61,6 +61,8 @@ export default function FinanceDashboard() {
   const [healthScore,    setHealthScore]    = useState(null);
   const [alerts,         setAlerts]         = useState([]);
   const [recommendations,setRecommendations]= useState([]);
+  const [actionPlan,     setActionPlan]     = useState([]);
+  const [planDismissed,  setPlanDismissed]  = useState(false);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -86,6 +88,10 @@ export default function FinanceDashboard() {
         api.get('/analytics/recommendations').then(r => {
           const recs = r.data?.data?.recommendations || [];
           setRecommendations(recs.filter(rec => rec.priority === 'high').slice(0, 3));
+        }).catch(() => {});
+        // תוכנית פעולה שבועית
+        api.get('/analytics/action-plan').then(r => {
+          setActionPlan(r.data?.data?.actions || []);
         }).catch(() => {});
       } catch (err) {
         const msg = err.response?.data?.message || 'שגיאה בטעינת הנתונים';
@@ -227,6 +233,60 @@ export default function FinanceDashboard() {
           <Link to="/portfolio"><Plus className="me-2 h-4 w-4" />הוסף תנועה</Link>
         </Button>
       </div>
+
+      {/* ══ תוכנית פעולה שבועית ══ */}
+      {actionPlan.length > 0 && !planDismissed && (
+        <Card className="border-2 border-indigo-300 dark:border-indigo-700 shadow-lg bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/30 dark:to-slate-900">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                  <p className="font-bold text-indigo-800 dark:text-indigo-200 text-sm sm:text-base">תוכנית פעולה לחודש זה</p>
+                  <p className="text-xs text-indigo-500 dark:text-indigo-400">מה לעשות עכשיו — עם סכומים ספציפיים</p>
+                </div>
+              </div>
+              <button onClick={() => setPlanDismissed(true)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {actionPlan.map((action, i) => (
+                <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${
+                  action.priority === 'high'
+                    ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
+                    : action.priority === 'medium'
+                      ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800'
+                      : 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800'
+                }`}>
+                  <span className="text-xl flex-shrink-0 mt-0.5">{action.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <p className="font-semibold text-sm text-slate-800 dark:text-slate-100">{action.title}</p>
+                      {action.amount != null && (
+                        <span className={`text-sm font-bold flex-shrink-0 ${
+                          action.priority === 'high' ? 'text-red-600' : action.priority === 'medium' ? 'text-amber-600' : 'text-blue-600'
+                        }`}>
+                          ₪{action.amount.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">{action.description}</p>
+                    {action.actionUrl && (
+                      <Link to={action.actionUrl} className="inline-block mt-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 underline underline-offset-2">
+                        {action.actionLabel} ←
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats grid */}
       <section className="grid gap-3 sm:gap-6 grid-cols-2 lg:grid-cols-4">
