@@ -6,7 +6,7 @@ import {
   ChevronDown, Cpu, BarChart3, Receipt,
   CreditCard, Target, Moon, Sun, Lightbulb, Activity,
   Wallet, RefreshCw, Scale, GraduationCap, FileSpreadsheet, Upload,
-  Shield, Building2, Bell, Calculator, DownloadCloud, Baby, Globe, FileText,
+  Shield, Building2, Bell, Calculator, DownloadCloud, Baby, Globe, FileText, Hammer,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -61,10 +61,11 @@ const NAV_GROUPS = [
   {
     label: "תכנון",
     items: [
-      { to: "/goals",    label: "יעדים",    icon: Target,     auth: true },
-      { to: "/insurance", label: "ביטוח",   icon: Shield,     auth: true },
-      { to: "/tax",       label: "מחשבון מס", icon: Calculator, auth: true },
-      { to: "/projects",  label: "פרויקטים", icon: Target,     auth: true },
+      { to: "/goals",            label: "יעדים",         icon: Target,     auth: true },
+      { to: "/insurance",         label: "ביטוח",        icon: Shield,     auth: true },
+      { to: "/tax",               label: "מחשבון מס",    icon: Calculator, auth: true },
+      { to: "/projects",          label: "פרויקטים",     icon: Target,     auth: true },
+      { to: "/pergola-planner",   label: "מתכנן פרגולות", icon: Hammer,     auth: true },
     ],
   },
   {

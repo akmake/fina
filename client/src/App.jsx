@@ -50,6 +50,7 @@ const DebtPage             = lazy(() => import("@/pages/DebtPage"));
 const ChildSavingsPage     = lazy(() => import("@/pages/ChildSavingsPage"));
 const ForeignCurrencyPage  = lazy(() => import("@/pages/ForeignCurrencyPage"));
 const ReportsPage          = lazy(() => import("@/pages/ReportsPage"));
+const PergolaPlannerPage   = lazy(() => import("@/pages/PergolaPlannerPage"));
 
 function PageLoader() {
   return (
@@ -122,6 +123,9 @@ export default function App() {
             <Route path="child-savings"    element={<ChildSavingsPage />}    />
             <Route path="foreign-currency" element={<ForeignCurrencyPage />} />
             <Route path="reports"          element={<ReportsPage />}         />
+
+            {/* Tools */}
+            <Route path="pergola-planner"  element={<PergolaPlannerPage />}  />
 
             {/* Admin */}
             <Route path="admin/logs"          element={<AdminLogsPage />}     />
