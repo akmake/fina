@@ -31,32 +31,36 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (
-              id.includes('/react/') ||
-              id.includes('/react-dom/') ||
-              id.includes('/react-router') ||
-              id.includes('/react-router-dom/') ||
-              id.includes('/@react-oauth/') ||
-              id.includes('/@tanstack/react') ||
-              id.includes('/react-helmet') ||
-              id.includes('/react-hot-toast/') ||
-              id.includes('/react-window/') ||
-              id.includes('/sonner/')
-            ) {
-              return 'vendor-react';
-            }
-            if (id.includes('@radix-ui') || id.includes('lucide-react') || id.includes('framer-motion')) {
-              return 'vendor-ui';
-            }
-            if (id.includes('recharts') || id.includes('chart.js')) {
-              return 'vendor-charts';
-            }
-            if (id.includes('date-fns') || id.includes('axios') || id.includes('zustand')) {
-              return 'vendor-utils';
-            }
-            return 'vendor-other'; // שאר חבילות של צד שלישי
+          if (!id.includes('node_modules')) return;
+          // normalize Windows backslashes
+          const m = id.replace(/\\/g, '/');
+          if (
+            m.includes('/react/') ||
+            m.includes('/react-dom/') ||
+            m.includes('/react-is/') ||
+            m.includes('/scheduler/') ||
+            m.includes('/react-router') ||
+            m.includes('/react-icons/') ||
+            m.includes('/@react-oauth/') ||
+            m.includes('/@tanstack/react') ||
+            m.includes('/react-helmet') ||
+            m.includes('/react-hot-toast/') ||
+            m.includes('/react-window/') ||
+            m.includes('/sonner/') ||
+            m.includes('/@headlessui/')
+          ) {
+            return 'vendor-react';
           }
+          if (m.includes('@radix-ui') || m.includes('lucide-react') || m.includes('framer-motion')) {
+            return 'vendor-ui';
+          }
+          if (m.includes('recharts') || m.includes('chart.js')) {
+            return 'vendor-charts';
+          }
+          if (m.includes('date-fns') || m.includes('axios') || m.includes('zustand')) {
+            return 'vendor-utils';
+          }
+          return 'vendor-other';
         }
       }
     }
