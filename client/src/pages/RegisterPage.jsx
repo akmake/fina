@@ -136,7 +136,7 @@ export default function RegisterPage() {
 
               {/* סיסמה */}
               <div>
-                <label htmlFor="password" class="block text-sm font-semibold text-gray-700 mb-1">
+                <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-1">
                   סיסמה
                 </label>
                 <div className="mt-1 relative rounded-md shadow-sm">
@@ -166,7 +166,7 @@ export default function RegisterPage() {
 
               {/* אימות סיסמה */}
               <div>
-                <label htmlFor="confirmPassword" class="block text-sm font-semibold text-gray-700 mb-1">
+                <label htmlFor="confirmPassword" className="block text-sm font-semibold text-gray-700 mb-1">
                   אימות סיסמה
                 </label>
                 <div className="mt-1">

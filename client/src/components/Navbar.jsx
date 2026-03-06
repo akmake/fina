@@ -136,8 +136,8 @@ export default function Navbar() {
         >
           Fina
         </Link>
-        <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
-          <Menu className="h-6 w-6" />
+        <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} aria-label="פתח תפריט">
+          <Menu className="h-6 w-6" aria-hidden="true" />
         </Button>
       </div>
 
@@ -225,13 +225,13 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
             size="icon"
             onClick={toggleDark}
             className="h-8 w-8 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-            title={isDark ? "מצב בהיר" : "מצב כהה"}
+            aria-label={isDark ? "עבור למצב בהיר" : "עבור למצב כהה"}
           >
-            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {isDark ? <Sun className="h-4 w-4" aria-hidden="true" /> : <Moon className="h-4 w-4" aria-hidden="true" />}
           </Button>
           {onClose && (
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-              <X className="h-5 w-5" />
+            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8" aria-label="סגור תפריט">
+              <X className="h-5 w-5" aria-hidden="true" />
             </Button>
           )}
         </div>
@@ -279,6 +279,17 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
           );
         })}
       </nav>
+
+      {/* Privacy link */}
+      <div className="px-4 pb-2">
+        <Link
+          to="/privacy"
+          onClick={onClose}
+          className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+        >
+          מדיניות פרטיות ותנאי שימוש
+        </Link>
+      </div>
 
       {/* Footer — user section */}
       <div className="px-3 py-4 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">

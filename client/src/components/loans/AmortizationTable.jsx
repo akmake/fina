@@ -3,16 +3,12 @@
 import React from 'react';
 
 const AmortizationTable = ({ schedule }) => {
-  console.log('--- טבלת התשלומים נטענת ---');
-  console.log('קיבלתי schedule:', schedule);
-
   if (!schedule || schedule.length === 0) {
     return null;
   }
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  console.log('התאריך של "היום" לצורך השוואה:', today.toISOString());
 
   const formatCurrency = (num) => `₪${num.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('he-IL', { year: 'numeric', month: '2-digit' });
@@ -22,7 +18,6 @@ const AmortizationTable = ({ schedule }) => {
       <h3 className="text-base sm:text-lg font-bold p-3 sm:p-4 border-b">לוח סילוקין</h3>
       <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
         <table className="w-full text-xs sm:text-sm text-left min-w-[500px]">
-          {/* ... thead ... */}
           <thead className="bg-gray-50 text-gray-600">
             <tr>
               <th className="p-3">תשלום</th>
@@ -37,13 +32,6 @@ const AmortizationTable = ({ schedule }) => {
             {schedule.map((row) => {
               const paymentDate = new Date(row.date);
               const isPast = paymentDate < today;
-
-              // הדפסה לכל שורה בטבלה
-              console.log(
-                `מעבד שורה ${row.paymentNumber}:`,
-                `תאריך תשלום: ${paymentDate.toISOString()}`,
-                `האם עבר? ${isPast}`
-              );
 
               const rowClass = isPast
                 ? 'border-b last:border-b-0 bg-gray-100 text-gray-500'

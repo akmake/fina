@@ -1,138 +1,137 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
-/* Layout & Route Protection */
 import Layout         from "@/components/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
-/* Public Pages */
-import HomePage     from "@/pages/HomePage";
+/* Public Pages — loaded eagerly (small, always needed) */
 import LoginPage    from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 
-/* Core Finance */
-import FinanceDashboard        from "@/pages/FinanceDashboard";
-import TransactionsTab         from "@/pages/Transactions_tab";
-import SmartAnalyticsDashboard from "@/pages/SmartAnalyticsDashboard";
-import FinancePage             from "@/pages/FinancePage";
-import ImportPage              from "@/pages/ImportPage";
-import ManagementPage          from "@/pages/ManagementPage";
-import DiscountImportPage      from './pages/DiscountImportPage';
-/* Investments */
-import InvestmentsPage from "@/pages/InvestmentsPage";
-import DepositsPage    from "@/pages/DepositsPage";
-import FundsPage       from "@/pages/FundsPage";
+const PrivacyPage = lazy(() => import("@/pages/PrivacyPage"));
 
-/* Loans */
-import MyLoansPage    from "@/pages/MyLoansPage";
-import NewLoanPage    from "@/pages/NewLoanPage";
-import LoanDetailPage from "@/pages/LoanDetailPage";
+/* All other pages — lazy loaded on demand */
+const HomePage             = lazy(() => import("@/pages/HomePage"));
+const FinanceDashboard     = lazy(() => import("@/pages/FinanceDashboard"));
+const TransactionsTab      = lazy(() => import("@/pages/Transactions_tab"));
+const SmartAnalyticsDashboard = lazy(() => import("@/pages/SmartAnalyticsDashboard"));
+const FinancePage          = lazy(() => import("@/pages/FinancePage"));
+const ImportPage           = lazy(() => import("@/pages/ImportPage"));
+const ManagementPage       = lazy(() => import("@/pages/ManagementPage"));
+const DiscountImportPage   = lazy(() => import("@/pages/DiscountImportPage"));
+const InvestmentsPage      = lazy(() => import("@/pages/InvestmentsPage"));
+const DepositsPage         = lazy(() => import("@/pages/DepositsPage"));
+const FundsPage            = lazy(() => import("@/pages/FundsPage"));
+const MyLoansPage          = lazy(() => import("@/pages/MyLoansPage"));
+const NewLoanPage          = lazy(() => import("@/pages/NewLoanPage"));
+const LoanDetailPage       = lazy(() => import("@/pages/LoanDetailPage"));
+const ProjectsPage         = lazy(() => import("@/pages/ProjectsPage"));
+const NewProjectPage       = lazy(() => import("@/pages/NewProjectPage"));
+const ProjectPage          = lazy(() => import("@/pages/ProjectPage"));
+const ProfilePage          = lazy(() => import("@/pages/ProfilePage"));
+const SettingsPage         = lazy(() => import("@/pages/SettingsPage"));
+const NotFoundPage         = lazy(() => import("@/pages/NotFoundPage"));
+const SuggestionsPage      = lazy(() => import("@/pages/SuggestionsPage"));
+const AdminLogsPage        = lazy(() => import("@/pages/AdminLogsPage"));
+const UserActivityPage     = lazy(() => import("@/pages/UserActivityPage"));
+const BudgetPage           = lazy(() => import("@/pages/BudgetPage"));
+const RecurringPage        = lazy(() => import("@/pages/RecurringPage"));
+const CategoryInsightsPage = lazy(() => import("@/pages/CategoryInsightsPage"));
+const PensionPage          = lazy(() => import("@/pages/PensionPage"));
+const NetWorthPage         = lazy(() => import("@/pages/NetWorthPage"));
+const ExcelImportPage      = lazy(() => import("@/pages/ExcelImportPage"));
+const InsurancePage        = lazy(() => import("@/pages/InsurancePage"));
+const MortgagePage         = lazy(() => import("@/pages/MortgagePage"));
+const GoalsPage            = lazy(() => import("@/pages/GoalsPage"));
+const AlertsPage           = lazy(() => import("@/pages/AlertsPage"));
+const TaxPage              = lazy(() => import("@/pages/TaxPage"));
+const RealEstatePage       = lazy(() => import("@/pages/RealEstatePage"));
+const DebtPage             = lazy(() => import("@/pages/DebtPage"));
+const ChildSavingsPage     = lazy(() => import("@/pages/ChildSavingsPage"));
+const ForeignCurrencyPage  = lazy(() => import("@/pages/ForeignCurrencyPage"));
+const ReportsPage          = lazy(() => import("@/pages/ReportsPage"));
 
-/* Projects */
-import ProjectsPage   from "@/pages/ProjectsPage";
-import NewProjectPage from "@/pages/NewProjectPage";
-import ProjectPage    from "@/pages/ProjectPage";
-
-/* Account */
-import ProfilePage  from "@/pages/ProfilePage";
-import SettingsPage from "@/pages/SettingsPage";
-
-/* Misc */
-import NotFoundPage    from "@/pages/NotFoundPage";
-import SuggestionsPage from "@/pages/SuggestionsPage";
-import AdminLogsPage   from "@/pages/AdminLogsPage";
-import UserActivityPage from "@/pages/UserActivityPage";
-
-/* New Features */
-import BudgetPage      from "@/pages/BudgetPage";
-import RecurringPage   from "@/pages/RecurringPage";
-import CategoryInsightsPage from "@/pages/CategoryInsightsPage";
-import PensionPage     from "@/pages/PensionPage";
-import NetWorthPage    from "@/pages/NetWorthPage";
-import ExcelImportPage from "@/pages/ExcelImportPage";
-
-/* Extended Features */
-import InsurancePage       from "@/pages/InsurancePage";
-import MortgagePage        from "@/pages/MortgagePage";
-import GoalsPage           from "@/pages/GoalsPage";
-import AlertsPage          from "@/pages/AlertsPage";
-import TaxPage             from "@/pages/TaxPage";
-import RealEstatePage      from "@/pages/RealEstatePage";
-import DebtPage            from "@/pages/DebtPage";
-import ChildSavingsPage    from "@/pages/ChildSavingsPage";
-import ForeignCurrencyPage from "@/pages/ForeignCurrencyPage";
-import ReportsPage         from "@/pages/ReportsPage";
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+    </div>
+  );
+}
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Layout />}>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/" element={<Layout />}>
 
-        {/* ── Public ─────────────────────────────────────────── */}
-        <Route index           element={<Navigate to="/finance-dashboard" replace />} />
-        <Route path="login"    element={<LoginPage />}   />
-        <Route path="register" element={<RegisterPage />} />
+          {/* ── Public ─────────────────────────────────────────── */}
+          <Route index           element={<Navigate to="/finance-dashboard" replace />} />
+          <Route path="login"    element={<LoginPage />}    />
+          <Route path="register" element={<RegisterPage />} />
+          <Route path="privacy"  element={<PrivacyPage />}  />
 
-        {/* ── Protected ──────────────────────────────────────── */}
-        <Route element={<ProtectedRoute />}>
+          {/* ── Protected ──────────────────────────────────────── */}
+          <Route element={<ProtectedRoute />}>
 
-          {/* Old /dashboard → redirect to the real dashboard */}
-          <Route path="dashboard" element={<Navigate to="/finance-dashboard" replace />} />
+            <Route path="dashboard" element={<Navigate to="/finance-dashboard" replace />} />
 
-          {/* Finance */}
-          <Route path="finance-dashboard" element={<FinanceDashboard />}       />
-          <Route path="portfolio"         element={<TransactionsTab />}         />
-          <Route path="smart-analytics"   element={<SmartAnalyticsDashboard />} />
-          <Route path="finance"           element={<FinancePage />}             />
-          <Route path="budget"            element={<BudgetPage />}              />
-          <Route path="categories"        element={<CategoryInsightsPage />}    />
-          <Route path="recurring"         element={<RecurringPage />}           />
-          <Route path="net-worth"         element={<NetWorthPage />}            />
-          <Route path="import"            element={<ImportPage />}              />
-          <Route path="import/excel"      element={<ExcelImportPage />}         />
-          <Route path="management"        element={<ManagementPage />}          />
-          <Route path="/discount-import" element={<DiscountImportPage />} />
+            {/* Finance */}
+            <Route path="finance-dashboard" element={<FinanceDashboard />}        />
+            <Route path="portfolio"         element={<TransactionsTab />}          />
+            <Route path="smart-analytics"   element={<SmartAnalyticsDashboard />}  />
+            <Route path="finance"           element={<FinancePage />}              />
+            <Route path="budget"            element={<BudgetPage />}               />
+            <Route path="categories"        element={<CategoryInsightsPage />}     />
+            <Route path="recurring"         element={<RecurringPage />}            />
+            <Route path="net-worth"         element={<NetWorthPage />}             />
+            <Route path="import"            element={<ImportPage />}               />
+            <Route path="import/excel"      element={<ExcelImportPage />}          />
+            <Route path="management"        element={<ManagementPage />}           />
+            <Route path="/discount-import"  element={<DiscountImportPage />}       />
 
-          {/* Investments */}
-          <Route path="investments" element={<InvestmentsPage />} />
-          <Route path="deposits"    element={<DepositsPage />}    />
-          <Route path="funds"       element={<FundsPage />}       />
-          <Route path="pension"     element={<PensionPage />}     />
+            {/* Investments */}
+            <Route path="investments" element={<InvestmentsPage />} />
+            <Route path="deposits"    element={<DepositsPage />}    />
+            <Route path="funds"       element={<FundsPage />}       />
+            <Route path="pension"     element={<PensionPage />}     />
 
-          {/* Loans */}
-          <Route path="my-loans"       element={<MyLoansPage />}    />
-          <Route path="loans/new"      element={<NewLoanPage />}    />
-          <Route path="loans/:loanId"  element={<LoanDetailPage />} />
+            {/* Loans */}
+            <Route path="my-loans"       element={<MyLoansPage />}    />
+            <Route path="loans/new"      element={<NewLoanPage />}    />
+            <Route path="loans/:loanId"  element={<LoanDetailPage />} />
 
-          {/* Projects */}
-          <Route path="projects"      element={<ProjectsPage />}   />
-          <Route path="projects/new"  element={<NewProjectPage />} />
-          <Route path="projects/:id"  element={<ProjectPage />}    />
+            {/* Projects */}
+            <Route path="projects"      element={<ProjectsPage />}   />
+            <Route path="projects/new"  element={<NewProjectPage />} />
+            <Route path="projects/:id"  element={<ProjectPage />}    />
 
-          {/* Account */}
-          <Route path="profile"     element={<ProfilePage />}     />
-          <Route path="settings"    element={<SettingsPage />}    />
-          <Route path="suggestions" element={<SuggestionsPage />} />
+            {/* Account */}
+            <Route path="profile"     element={<ProfilePage />}     />
+            <Route path="settings"    element={<SettingsPage />}    />
+            <Route path="suggestions" element={<SuggestionsPage />} />
 
-          {/* Extended Features */}
-          <Route path="insurance"        element={<InsurancePage />}       />
-          <Route path="mortgage"         element={<MortgagePage />}        />
-          <Route path="goals"            element={<GoalsPage />}           />
-          <Route path="alerts"           element={<AlertsPage />}          />
-          <Route path="tax"              element={<TaxPage />}             />
-          <Route path="real-estate"      element={<RealEstatePage />}      />
-          <Route path="debts"            element={<DebtPage />}            />
-          <Route path="child-savings"    element={<ChildSavingsPage />}    />
-          <Route path="foreign-currency" element={<ForeignCurrencyPage />} />
-          <Route path="reports"          element={<ReportsPage />}         />
+            {/* Extended Features */}
+            <Route path="insurance"        element={<InsurancePage />}       />
+            <Route path="mortgage"         element={<MortgagePage />}        />
+            <Route path="goals"            element={<GoalsPage />}           />
+            <Route path="alerts"           element={<AlertsPage />}          />
+            <Route path="tax"              element={<TaxPage />}             />
+            <Route path="real-estate"      element={<RealEstatePage />}      />
+            <Route path="debts"            element={<DebtPage />}            />
+            <Route path="child-savings"    element={<ChildSavingsPage />}    />
+            <Route path="foreign-currency" element={<ForeignCurrencyPage />} />
+            <Route path="reports"          element={<ReportsPage />}         />
 
-          {/* Admin */}
-          <Route path="admin/logs" element={<AdminLogsPage />} />
-          <Route path="admin/user-activity" element={<UserActivityPage />} />
+            {/* Admin */}
+            <Route path="admin/logs"          element={<AdminLogsPage />}     />
+            <Route path="admin/user-activity" element={<UserActivityPage />}  />
+          </Route>
+
+          {/* ── 404 ────────────────────────────────────────────── */}
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
-
-        {/* ── 404 ────────────────────────────────────────────── */}
-        <Route path="*" element={<NotFoundPage />} />
-      </Route>
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 }

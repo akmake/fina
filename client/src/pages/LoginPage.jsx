@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
+  const [showForgotMsg, setShowForgotMsg] = useState(false);
   const loginAction = useAuthStore((s) => s.login);
   const navigate = useNavigate();
 
@@ -94,6 +95,25 @@ export default function LoginPage() {
             </div>
           )}
 
+          {showForgotMsg && (
+            <div className="rounded-lg bg-blue-50 p-4 border-r-4 border-blue-400 flex items-start">
+              <AlertCircle className="h-5 w-5 text-blue-500 ml-3 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm text-blue-700 font-medium">איפוס סיסמה</p>
+                <p className="text-sm text-blue-600 mt-1">
+                  פיצ'ר איפוס הסיסמה בפיתוח. לעת עתה — התחבר עם Google או צור חשבון חדש.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotMsg(false)}
+                  className="text-xs text-blue-500 hover:text-blue-700 mt-1 underline"
+                >
+                  סגור
+                </button>
+              </div>
+            </div>
+          )}
+
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             <div className="space-y-5">
               
@@ -126,9 +146,13 @@ export default function LoginPage() {
                     סיסמה
                   </label>
                   {/* אופציונלי: קישור לשכחתי סיסמה */}
-                  <a href="#" className="text-sm font-medium text-blue-600 hover:text-blue-500">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotMsg(true)}
+                    className="text-sm font-medium text-blue-600 hover:text-blue-500"
+                  >
                     שכחת סיסמה?
-                  </a>
+                  </button>
                 </div>
                 
                 <div className="relative mt-1">

@@ -82,7 +82,6 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log("Blocked by CORS:", origin); // לוג שיעזור לך להבין אם משהו נחסם
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -94,8 +93,8 @@ app.use(cors({
 }));
 
 // --- הגדרות גודל גוף הבקשה ---
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 app.use(cookieParser());
 app.use(mongoSanitize());
