@@ -607,6 +607,118 @@ function calculateAverageByCategory(transactions) {
   return result;
 }
 
+// ==================== Seasonal Analysis ====================
+
+/**
+ * @desc   ניתוח עונתי — הוצאות לפי חודש ורבעון על פני כל ההיסטוריה
+ * @route  GET /api/analytics/seasonal
+ */
+export const getSeasonalAnalysis = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const transactions = await Transaction.find({ user: userId, type: 'הוצאה' }).lean();
+
+    if (transactions.length === 0) {
+      return res.json({ status: 'success', data: { monthly: [], quarterly: [], insights: [], peakMonth: null, cheapestMonth: null } });
+    }
+
+    // ── 1. קיבוץ לפי חודש קלנדרי (ממוצע על פני שנים) ──
+    const monthlyMap  = {};
+    const monthYears  = {};
+
+    transactions.forEach(t => {
+      const d = new Date(t.date);
+      const m = d.getMonth();
+      const y = d.getFullYear();
+      if (!monthlyMap[m]) { monthlyMap[m] = 0; monthYears[m] = new Set(); }
+      monthlyMap[m] += t.amount;
+      monthYears[m].add(y);
+    });
+
+    const HMONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+    const SEASONS  = ['חורף','חורף','אביב','אביב','אביב','קיץ','קיץ','קיץ','סתיו','סתיו','סתיו','חורף'];
+
+    const monthly = Array.from({ length: 12 }, (_, i) => ({
+      month:  i + 1,
+      label:  HMONTHS[i],
+      season: SEASONS[i],
+      total:  Math.round(monthlyMap[i] || 0),
+      avg:    monthYears[i]?.size > 0 ? Math.round((monthlyMap[i] || 0) / monthYears[i].size) : 0,
+      years:  monthYears[i]?.size || 0,
+    })).filter(m => m.years > 0);
+
+    // ── 2. קיבוץ לפי רבעון ──
+    const quarterMap   = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    const quarterYears = { 1: new Set(), 2: new Set(), 3: new Set(), 4: new Set() };
+
+    transactions.forEach(t => {
+      const d = new Date(t.date);
+      const q = Math.floor(d.getMonth() / 3) + 1;
+      quarterMap[q] += t.amount;
+      quarterYears[q].add(d.getFullYear());
+    });
+
+    const QLABELS = { 1: 'ינואר–מרץ', 2: 'אפריל–יוני', 3: 'יולי–ספטמבר', 4: 'אוקטובר–דצמבר' };
+    const quarterly = [1, 2, 3, 4].map(q => ({
+      quarter: q,
+      label:   `רבעון ${q} (${QLABELS[q]})`,
+      total:   Math.round(quarterMap[q]),
+      avg:     quarterYears[q].size > 0 ? Math.round(quarterMap[q] / quarterYears[q].size) : 0,
+    }));
+
+    // ── 3. תובנות אוטומטיות ──
+    const insights = [];
+    const sorted    = [...monthly].sort((a, b) => b.avg - a.avg);
+    const peakMonth = sorted[0];
+    const cheapMonth = sorted[sorted.length - 1];
+    const allAvg    = monthly.reduce((s, m) => s + m.avg, 0) / (monthly.length || 1);
+
+    if (peakMonth) {
+      insights.push({ type: 'peak', icon: '📈', priority: 'medium',
+        text: `${peakMonth.label} הוא החודש היקר ביותר בממוצע (₪${peakMonth.avg.toLocaleString()})` });
+    }
+    if (cheapMonth && cheapMonth.month !== peakMonth?.month) {
+      insights.push({ type: 'trough', icon: '💡', priority: 'low',
+        text: `${cheapMonth.label} הוא החודש הזול ביותר (₪${cheapMonth.avg.toLocaleString()}) — מתאים לחיסכון` });
+    }
+
+    // עונות
+    if (quarterly[1].avg > quarterly[0].avg * 1.15) {
+      insights.push({ type: 'summer_spike', icon: '☀️', priority: 'medium',
+        text: 'הוצאות הקיץ (אפריל–יוני) גבוהות ב-15%+ מהחורף — שקול תכנון תקציב קיץ' });
+    }
+
+    // חגי תשרי (ספטמבר–אוקטובר)
+    const tishriM = monthly.filter(m => [9, 10].includes(m.month));
+    if (tishriM.length > 0) {
+      const tishriAvg = tishriM.reduce((s, m) => s + m.avg, 0) / tishriM.length;
+      if (tishriAvg > allAvg * 1.2) {
+        insights.push({ type: 'holiday', icon: '🍎', priority: 'high',
+          text: `ספטמבר–אוקטובר (חגי תשרי) עולים ${Math.round((tishriAvg / allAvg - 1) * 100)}% מעל הממוצע השנתי` });
+      }
+    }
+
+    // פסח (מרץ–אפריל)
+    const nisanM = monthly.filter(m => [3, 4].includes(m.month));
+    if (nisanM.length > 0) {
+      const nisanAvg = nisanM.reduce((s, m) => s + m.avg, 0) / nisanM.length;
+      if (nisanAvg > allAvg * 1.1) {
+        insights.push({ type: 'passover', icon: '🌸', priority: 'medium',
+          text: `מרץ–אפריל (פסח) גבוהים ב-${Math.round((nisanAvg / allAvg - 1) * 100)}% מהממוצע` });
+      }
+    }
+
+    res.json({
+      status: 'success',
+      data: { monthly, quarterly, insights, peakMonth, cheapestMonth: cheapMonth },
+    });
+  } catch (error) {
+    logger.error('Seasonal analysis failed', { error: error.message });
+    res.status(500).json({ message: 'Failed to calculate seasonal analysis' });
+  }
+};
+
 function calculateTrend(data) {
   if (data.length < 2) return 0;
 

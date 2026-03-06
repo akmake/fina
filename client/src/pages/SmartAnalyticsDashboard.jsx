@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import {
   AlertCircle, TrendingDown, Lightbulb,
-  Loader2, Zap, CalendarRange,
+  Loader2, Zap, CalendarRange, Sun,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -52,6 +52,15 @@ function RangeSelector({ value, onChange }) {
 export default function SmartAnalyticsDashboard() {
   const [dateRange, setDateRange]               = useState('3months');
   const [autoCategorizingCount, setAutoCount]   = useState(0);
+
+  // --- Seasonal ---
+  const { data: seasonalData } = useQuery({
+    queryKey: ['seasonal'],
+    queryFn: async () => {
+      const res = await api.get('/analytics/seasonal');
+      return res.data.data;
+    },
+  });
 
   // --- Analytics ---
   const { data: analyticsData, isLoading: analyticsLoading, refetch: refetchAnalytics } = useQuery({
@@ -181,11 +190,12 @@ export default function SmartAnalyticsDashboard() {
 
         {/* Tabs */}
         <Tabs defaultValue="trends" className="mb-6 sm:mb-8">
-          <TabsList className="grid w-full grid-cols-4 text-xs sm:text-sm">
+          <TabsList className="grid w-full grid-cols-5 text-xs sm:text-sm">
             <TabsTrigger value="trends">מגמות</TabsTrigger>
             <TabsTrigger value="categories">קטגוריות</TabsTrigger>
             <TabsTrigger value="predictions">תחזיות</TabsTrigger>
             <TabsTrigger value="patterns">דפוסים</TabsTrigger>
+            <TabsTrigger value="seasonal">עונתי</TabsTrigger>
           </TabsList>
 
           {/* Trends */}
@@ -321,6 +331,80 @@ export default function SmartAnalyticsDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Seasonal */}
+          <TabsContent value="seasonal" className="mt-4 space-y-6">
+            {!seasonalData ? (
+              <p className="text-center text-slate-400 py-10">אין מספיק נתונים לניתוח עונתי</p>
+            ) : (
+              <>
+                {/* תובנות */}
+                {seasonalData.insights?.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {seasonalData.insights.map((ins, i) => (
+                      <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${
+                        ins.priority === 'high'   ? 'border-red-200    bg-red-50    dark:bg-red-950/20'    :
+                        ins.priority === 'medium' ? 'border-amber-200  bg-amber-50  dark:bg-amber-950/20'  :
+                                                    'border-blue-200   bg-blue-50   dark:bg-blue-950/20'
+                      }`}>
+                        <span className="text-xl">{ins.icon}</span>
+                        <p className="text-sm text-slate-700 dark:text-slate-300">{ins.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* גרף חודשי */}
+                <Card className="dark:bg-slate-900">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Sun className="h-5 w-5 text-amber-500" />
+                      ממוצע הוצאות חודשי (על פני כל השנים)
+                    </CardTitle>
+                    <CardDescription>כמה מוצא החודש הזה בממוצע בכל שנה</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={seasonalData.monthly || []} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                        <YAxis tickFormatter={v => `₪${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10 }} width={50} />
+                        <Tooltip
+                          formatter={(v, name) => [formatCurrency(v), name === 'avg' ? 'ממוצע' : 'סה"כ']}
+                          labelFormatter={label => `חודש: ${label}`}
+                        />
+                        <Bar dataKey="avg" name="avg" radius={[4, 4, 0, 0]}
+                          fill="#3b82f6"
+                          label={{ position: 'top', formatter: v => v > 0 ? `₪${(v / 1000).toFixed(0)}k` : '', fontSize: 9 }}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                {/* גרף רבעוני */}
+                <Card className="dark:bg-slate-900">
+                  <CardHeader><CardTitle>ממוצע לפי רבעון</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {(seasonalData.quarterly || []).map((q, i) => {
+                        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
+                        return (
+                          <div key={i} className="p-3 rounded-lg text-center border dark:border-slate-700">
+                            <p className="text-xs text-slate-500 mb-1">{q.label}</p>
+                            <p className="text-xl font-bold" style={{ color: colors[i] }}>
+                              {formatCurrency(q.avg)}
+                            </p>
+                            <p className="text-xs text-slate-400 mt-1">ממוצע שנתי</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </TabsContent>
         </Tabs>
 

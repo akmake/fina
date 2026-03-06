@@ -14,6 +14,7 @@ import ForeignCurrency from '../models/ForeignCurrency.js';
 import ChildSavings from '../models/ChildSavings.js';
 import Insurance from '../models/Insurance.js';
 import Goal from '../models/Goal.js';
+import NetWorthSnapshot from '../models/NetWorthSnapshot.js';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
 // ──────────────────────────────────────────────────
@@ -307,5 +308,107 @@ export const getFinancialHealthScore = async (req, res) => {
   } catch (error) {
     console.error('Error calculating health score:', error);
     res.status(500).json({ message: 'שגיאה בחישוב ציון בריאות פיננסית' });
+  }
+};
+
+// ──────────────────────────────────────────────────
+// @desc   שמירת תמונת מצב חודשית של שווי נקי
+// @route  POST /api/net-worth/snapshot
+// ──────────────────────────────────────────────────
+export const saveNetWorthSnapshot = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const now = new Date();
+    const year  = now.getFullYear();
+    const month = now.getMonth() + 1;
+
+    const [profile, deposits, stocks, funds, loans, pensions, properties, mortgages, foreignCurrency, childSavings] = await Promise.all([
+      FinanceProfile.findOne({ user: userId }),
+      Deposit.find({ user: userId, status: 'active' }),
+      Stock.find({ user: userId }),
+      Fund.find({ user: userId }),
+      Loan.find({ user: userId }),
+      Pension.find({ user: userId, status: 'active' }),
+      RealEstate.find({ user: userId, status: 'owned' }),
+      Mortgage.find({ user: userId, status: 'active' }),
+      ForeignCurrency.find({ user: userId, status: 'active' }),
+      ChildSavings.find({ user: userId, status: 'active' }),
+    ]);
+
+    const checking        = profile?.checking || 0;
+    const cash            = profile?.cash || 0;
+    const depositsTotal   = deposits.reduce((s, d) => s + (d.futureValue || d.principal), 0);
+    const stocksTotal     = stocks.reduce((s, s2) => s + (s2.currentValueILS || s2.investedAmount * 3.7), 0);
+    const fundsTotal      = funds.reduce((s, f) => s + (f.current_value || f.invested_amount), 0);
+    const pensionTotal    = pensions.reduce((s, p) => s + (p.currentBalance || 0), 0);
+    const realEstateTotal = properties.reduce((s, p) => s + (p.currentEstimatedValue || 0), 0);
+    const fxTotal         = foreignCurrency.reduce((s, f) => s + (f.amountInILS || 0), 0);
+    const childTotal      = childSavings.reduce((s, c) => s + (c.currentBalance || 0), 0);
+
+    const assetsTotal = checking + cash + depositsTotal + stocksTotal + fundsTotal + pensionTotal + realEstateTotal + fxTotal + childTotal;
+
+    const loansTotal    = loans.reduce((s, l) => s + (l.principal || 0), 0);
+    const mortgagesTotal = mortgages.reduce((s, m) => s + (m.totalCurrentBalance || 0), 0);
+    const overdraft     = Math.abs(Math.min(0, checking));
+    const liabilitiesTotal = loansTotal + mortgagesTotal + overdraft;
+
+    const netWorth = assetsTotal - liabilitiesTotal;
+
+    const snapshot = await NetWorthSnapshot.findOneAndUpdate(
+      { user: userId, year, month },
+      {
+        assets: {
+          checking, cash,
+          deposits: depositsTotal, stocks: stocksTotal, funds: fundsTotal,
+          pension: pensionTotal, realEstate: realEstateTotal,
+          foreignCurrency: fxTotal, childSavings: childTotal,
+          total: assetsTotal,
+        },
+        liabilities: {
+          loans: loansTotal, mortgages: mortgagesTotal, overdraft,
+          total: liabilitiesTotal,
+        },
+        netWorth,
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    res.json({ snapshot, netWorth });
+  } catch (error) {
+    console.error('Error saving net worth snapshot:', error);
+    res.status(500).json({ message: 'שגיאה בשמירת תמונת מצב' });
+  }
+};
+
+// ──────────────────────────────────────────────────
+// @desc   היסטוריית שווי נקי (12 חודשים אחרונים)
+// @route  GET /api/net-worth/history
+// ──────────────────────────────────────────────────
+export const getNetWorthHistory = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const months = parseInt(req.query.months) || 12;
+
+    const snapshots = await NetWorthSnapshot.find({ user: userId })
+      .sort({ year: -1, month: -1 })
+      .limit(months)
+      .lean();
+
+    // מיון כרונולוגי לגרף
+    snapshots.sort((a, b) => (a.year * 100 + a.month) - (b.year * 100 + b.month));
+
+    const MONTH_NAMES = ['ינו', 'פבר', 'מרץ', 'אפר', 'מאי', 'יונ', 'יול', 'אוג', 'ספט', 'אוק', 'נוב', 'דצמ'];
+
+    const history = snapshots.map(s => ({
+      label: `${MONTH_NAMES[s.month - 1]} ${s.year}`,
+      netWorth: s.netWorth,
+      assets: s.assets.total,
+      liabilities: s.liabilities.total,
+    }));
+
+    res.json({ history });
+  } catch (error) {
+    console.error('Error fetching net worth history:', error);
+    res.status(500).json({ message: 'שגיאה בשליפת היסטוריה' });
   }
 };

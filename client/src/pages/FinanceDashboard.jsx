@@ -5,7 +5,7 @@ import {
 import {
   ArrowUp, ArrowDown, Wallet, TrendingUp, Activity, CreditCard,
   Loader2, AlertCircle, Plus, Scale, Heart, ChevronLeft, Bell,
-  PieChart, Clock,
+  PieChart, Clock, PiggyBank, Shield, Lightbulb,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
@@ -57,9 +57,10 @@ export default function FinanceDashboard() {
   const [accounts,     setAccounts]     = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState(null);
-  const [netWorth,     setNetWorth]     = useState(null);
-  const [healthScore,  setHealthScore]  = useState(null);
-  const [alerts,       setAlerts]       = useState([]);
+  const [netWorth,       setNetWorth]       = useState(null);
+  const [healthScore,    setHealthScore]    = useState(null);
+  const [alerts,         setAlerts]         = useState([]);
+  const [recommendations,setRecommendations]= useState([]);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -79,6 +80,13 @@ export default function FinanceDashboard() {
         setHealthScore(hsRes.data);
         const al = Array.isArray(alertsRes.data) ? alertsRes.data : (alertsRes.data?.alerts || []);
         setAlerts(al.filter(a => !a.isRead).slice(0, 5));
+        // שמירת תמונת מצב חודשית (ברקע, ללא חסימה)
+        api.post('/net-worth/snapshot').catch(() => {});
+        // המלצות ברקע
+        api.get('/analytics/recommendations').then(r => {
+          const recs = r.data?.data?.recommendations || [];
+          setRecommendations(recs.filter(rec => rec.priority === 'high').slice(0, 3));
+        }).catch(() => {});
       } catch (err) {
         const msg = err.response?.data?.message || 'שגיאה בטעינת הנתונים';
         setError(msg);
@@ -168,6 +176,24 @@ export default function FinanceDashboard() {
   const netChange      = calcChange(thisNet, prevNet);
   const topCatTotal    = stats.topCategories.reduce((s, c) => s + c.total, 0);
 
+  // שיעור חיסכון (Savings Rate)
+  const savingsRate = stats.thisIncome > 0
+    ? ((stats.thisIncome - stats.thisExpense) / stats.thisIncome) * 100
+    : 0;
+  const savingsRateColor =
+    savingsRate >= 20 ? 'text-green-600' :
+    savingsRate >= 10 ? 'text-amber-500' :
+    'text-red-600';
+
+  // קרן חירום — חודשי הוצאות ברמת הנזילות
+  const liquidBalance      = netWorth?.assets?.totalLiquid ?? totalBalance;
+  const avgMonthlyExpense  = stats.thisExpense > 0 ? stats.thisExpense : (stats.prevExpense || 1);
+  const emergencyMonths    = avgMonthlyExpense > 0 ? liquidBalance / avgMonthlyExpense : 0;
+  const emergencyColor =
+    emergencyMonths >= 6 ? 'text-green-600' :
+    emergencyMonths >= 3 ? 'text-amber-500' :
+    'text-red-600';
+
   const recentTxns = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
 
   if (loading) return (
@@ -208,6 +234,63 @@ export default function FinanceDashboard() {
         <StatCard title="הכנסות החודש"  value={stats.thisIncome}    icon={TrendingUp}  change={incomeChange}  changeType={incomeChange  >= 0 ? 'increase' : 'decrease'} />
         <StatCard title="הוצאות החודש"  value={stats.thisExpense}   icon={CreditCard}  change={expenseChange} changeType={expenseChange <= 0 ? 'increase' : 'decrease'} />
         <StatCard title="תזרים נקי"     value={thisNet}             icon={Activity}    change={netChange}     changeType={thisNet >= prevNet ? 'increase' : 'decrease'} subText="הכנסות פחות הוצאות" />
+      </section>
+
+      {/* Economic indicators — savings rate & emergency fund */}
+      <section className="grid gap-3 sm:gap-6 grid-cols-1 sm:grid-cols-2">
+        <Card className="overflow-hidden border-none shadow-md dark:bg-slate-900">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gray-50/50 dark:bg-slate-800/50 p-3 sm:p-4">
+            <CardTitle className="text-xs sm:text-sm font-semibold text-gray-600 dark:text-slate-400">שיעור חיסכון חודשי</CardTitle>
+            <PiggyBank className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent className="pt-3 sm:pt-4 p-3 sm:p-4">
+            <div className={`text-2xl sm:text-3xl font-bold tracking-tight ${savingsRateColor}`}>
+              {savingsRate.toFixed(1)}%
+            </div>
+            <div className="mt-2 text-xs text-gray-500 dark:text-slate-400">
+              {savingsRate >= 20
+                ? 'מצוין! מעל 20% — רמה כלכלית אידיאלית'
+                : savingsRate >= 10
+                  ? 'טוב — כוון ל-20% לצמיחה מהירה'
+                  : savingsRate >= 0
+                    ? 'נמוך — נסה לחסוך לפחות 10% מההכנסה'
+                    : 'גירעון — הוצאות עולות על הכנסות'}
+            </div>
+            <div className="mt-2 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${savingsRate >= 20 ? 'bg-green-500' : savingsRate >= 10 ? 'bg-amber-400' : 'bg-red-500'}`}
+                style={{ width: `${Math.min(100, Math.max(0, savingsRate))}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Link to="/net-worth">
+          <Card className="overflow-hidden border-none shadow-md dark:bg-slate-900 hover:shadow-lg transition-shadow cursor-pointer h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gray-50/50 dark:bg-slate-800/50 p-3 sm:p-4">
+              <CardTitle className="text-xs sm:text-sm font-semibold text-gray-600 dark:text-slate-400">קרן חירום</CardTitle>
+              <Shield className="h-4 w-4 text-blue-500" />
+            </CardHeader>
+            <CardContent className="pt-3 sm:pt-4 p-3 sm:p-4">
+              <div className={`text-2xl sm:text-3xl font-bold tracking-tight ${emergencyColor}`}>
+                {emergencyMonths.toFixed(1)} חודשים
+              </div>
+              <div className="mt-2 text-xs text-gray-500 dark:text-slate-400">
+                {emergencyMonths >= 6
+                  ? 'בטוח — יש לך כרית ביטחון מצוינת'
+                  : emergencyMonths >= 3
+                    ? 'סביר — כוון ל-6 חודשי הוצאות'
+                    : 'בסיכון — פחות מ-3 חודשים נזילים'}
+              </div>
+              <div className="mt-2 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${emergencyMonths >= 6 ? 'bg-green-500' : emergencyMonths >= 3 ? 'bg-amber-400' : 'bg-red-500'}`}
+                  style={{ width: `${Math.min(100, (emergencyMonths / 6) * 100)}%` }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </section>
 
       {/* Net Worth & Health Score */}
@@ -289,6 +372,38 @@ export default function FinanceDashboard() {
                 }`}>
                   <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <span>{a.message}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Smart Recommendations */}
+      {recommendations.length > 0 && (
+        <Card className="shadow-md border-none dark:bg-slate-900 border-r-4 border-r-indigo-500">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Lightbulb className="h-5 w-5 text-indigo-500" />
+                <span className="font-semibold text-slate-700 dark:text-slate-300">המלצות דחופות</span>
+              </div>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/smart-analytics">הצג הכל <ChevronLeft className="h-3 w-3 ms-1" /></Link>
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {recommendations.map((rec, i) => (
+                <div key={i} className="flex items-start gap-2 text-sm p-2 rounded bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400">
+                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <span>{rec.suggestion}</span>
+                    {rec.actionUrl && (
+                      <Link to={rec.actionUrl} className="mr-2 text-xs underline text-indigo-600 dark:text-indigo-400">
+                        {rec.actionLabel}
+                      </Link>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

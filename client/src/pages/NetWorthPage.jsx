@@ -1,22 +1,87 @@
 import { useState, useEffect } from 'react';
 import api from '@/utils/api';
 import { formatCurrency } from '@/utils/formatters';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
 import {
   TrendingUp, Shield, Wallet, PiggyBank, Scale, AlertTriangle,
-  CheckCircle, Info, Heart, BarChart3, ArrowUpRight, ArrowDownRight
+  CheckCircle, Info, Heart, BarChart3, ArrowUpRight, ArrowDownRight,
+  Calculator, Flame,
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  AreaChart, Area,
 } from 'recharts';
+
+// ─── Rule of 72 Calculator ────────────────────────────────────────────────
+const ISRAEL_INFLATION = 3.5; // ממוצע ישראלי שנתי
+
+function RuleOf72Card({ liquidAssets }) {
+  const [rate, setRate] = useState(5);
+  const years = rate > 0 ? (72 / rate).toFixed(1) : '—';
+  const realRate = Math.max(0, rate - ISRAEL_INFLATION);
+  const realYears = realRate > 0 ? (72 / realRate).toFixed(1) : '—';
+  const inflationLoss1Y = liquidAssets * (ISRAEL_INFLATION / 100);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Calculator className="h-5 w-5 text-indigo-500" />
+          כלל 72 — הכפלת הכסף
+        </CardTitle>
+        <CardDescription>
+          בשיעור ריבית X%, הכסף מוכפל בעוד 72/X שנים
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <label className="text-sm text-slate-600 dark:text-slate-400 mb-1 block">
+            ריבית שנתית: <span className="font-bold text-indigo-600">{rate}%</span>
+          </label>
+          <input
+            type="range" min={0.5} max={20} step={0.5} value={rate}
+            onChange={e => setRate(Number(e.target.value))}
+            className="w-full accent-indigo-600"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 text-center">
+            <p className="text-xs text-slate-500 mb-1">הכפלה נומינלית</p>
+            <p className="text-2xl font-extrabold text-indigo-600">{years}</p>
+            <p className="text-xs text-slate-500">שנים</p>
+          </div>
+          <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-center">
+            <p className="text-xs text-slate-500 mb-1">הכפלה ריאלית ({ISRAEL_INFLATION}% אינפלציה)</p>
+            <p className="text-2xl font-extrabold text-amber-600">{realYears}</p>
+            <p className="text-xs text-slate-500">שנים</p>
+          </div>
+        </div>
+        {liquidAssets > 0 && (
+          <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
+            <div className="flex items-center gap-2 mb-1">
+              <Flame className="h-4 w-4 text-red-500" />
+              <span className="text-sm font-semibold text-red-700 dark:text-red-400">שחיקת אינפלציה</span>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              הנכסים הנזילים שלך ({formatCurrency(liquidAssets)}) מאבדים כ-
+              <span className="font-bold text-red-600"> {formatCurrency(inflationLoss1Y)} </span>
+              בשנה בערך ריאלי — ודא שהם מרוויחים לפחות {ISRAEL_INFLATION}%
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function NetWorthPage() {
   const [netWorthData, setNetWorthData] = useState(null);
   const [healthData, setHealthData] = useState(null);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,12 +91,14 @@ export default function NetWorthPage() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [nwRes, healthRes] = await Promise.all([
+      const [nwRes, healthRes, historyRes] = await Promise.all([
         api.get('/net-worth'),
         api.get('/net-worth/health-score'),
+        api.get('/net-worth/history').catch(() => ({ data: { history: [] } })),
       ]);
       setNetWorthData(nwRes.data);
       setHealthData(healthRes.data);
+      setHistory(historyRes.data?.history || []);
     } catch (err) {
       console.error(err);
     }
@@ -160,6 +227,52 @@ export default function NetWorthPage() {
                 )}
               </CardContent>
             </Card>
+          </div>
+
+          {/* היסטוריית שווי נקי */}
+          {history.length > 1 && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mb-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-blue-500" />
+                    מגמת שווי נקי — 12 חודשים
+                  </CardTitle>
+                  <CardDescription>שווי נקי, נכסים והתחייבויות לאורך הזמן</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <AreaChart data={history} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="gradNW" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.15} />
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}    />
+                        </linearGradient>
+                        <linearGradient id="gradAssets" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor="#10b981" stopOpacity={0.1} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}   />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                      <YAxis tickFormatter={v => `₪${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10 }} width={55} />
+                      <Tooltip
+                        formatter={(v, name) => [formatCurrency(v), name === 'netWorth' ? 'שווי נקי' : name === 'assets' ? 'נכסים' : 'התחייבויות']}
+                      />
+                      <Legend formatter={v => v === 'netWorth' ? 'שווי נקי' : v === 'assets' ? 'נכסים' : 'התחייבויות'} />
+                      <Area type="monotone" dataKey="assets"      stroke="#10b981" strokeWidth={1.5} fill="url(#gradAssets)" dot={false} />
+                      <Area type="monotone" dataKey="liabilities" stroke="#ef4444" strokeWidth={1.5} fill="none" dot={false} />
+                      <Area type="monotone" dataKey="netWorth"    stroke="#3b82f6" strokeWidth={2.5} fill="url(#gradNW)" dot={{ r: 3, fill: '#3b82f6' }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* כלל 72 + אינפלציה */}
+          <div className="grid grid-cols-1 lg:grid-cols-1 gap-6 mb-6">
+            <RuleOf72Card liquidAssets={netWorthData.assets?.totalLiquid || 0} />
           </div>
         </>
       )}
