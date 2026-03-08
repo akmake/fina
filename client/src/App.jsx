@@ -51,6 +51,7 @@ const ChildSavingsPage     = lazy(() => import("@/pages/ChildSavingsPage"));
 const ForeignCurrencyPage  = lazy(() => import("@/pages/ForeignCurrencyPage"));
 const ReportsPage          = lazy(() => import("@/pages/ReportsPage"));
 const PergolaPlannerPage   = lazy(() => import("@/pages/PergolaPlannerPage"));
+const ElectricalCADPage    = lazy(() => import("@/pages/ElectricalCADPage"));
 
 function PageLoader() {
   return (
@@ -126,6 +127,8 @@ export default function App() {
 
             {/* Tools */}
             <Route path="pergola-planner"  element={<PergolaPlannerPage />}  />
+            <Route path="electrical"       element={<ElectricalCADPage />}   />
+            <Route path="electrical/:projectId" element={<ElectricalCADPage />} />
 
             {/* Admin */}
             <Route path="admin/logs"          element={<AdminLogsPage />}     />
