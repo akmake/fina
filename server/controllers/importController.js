@@ -97,20 +97,50 @@ export const processTransactions = async (req, res, next) => {
       });
     }
 
-    // 4. שמירת העסקאות המעובדות
+    // 4. סינון כפילויות: מצא עסקאות שכבר קיימות בתחום התאריכים
     let insertedCount = 0;
+    let skippedCount = 0;
+
     if (processedTransactions.length > 0) {
+      const dates = processedTransactions.map(t => new Date(t.date));
+      const minDate = new Date(Math.min(...dates));
+      const maxDate = new Date(Math.max(...dates));
+      minDate.setDate(minDate.getDate() - 1);
+      maxDate.setDate(maxDate.getDate() + 1);
+
+      const existingInRange = await Transaction.find({
+        user: userId,
+        date: { $gte: minDate, $lte: maxDate },
+      }, { date: 1, amount: 1, rawDescription: 1, description: 1, identifier: 1 }).lean();
+
+      const makeKey = (t) => {
+        const d = new Date(t.date);
+        return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}_${t.amount}_${(t.rawDescription || t.description || '').trim()}`;
+      };
+
+      const existingKeys = new Set(existingInRange.map(makeKey));
+      const existingIdentifiers = new Set(
+        existingInRange.filter(t => t.identifier).map(t => t.identifier)
+      );
+
+      const newTransactions = processedTransactions.filter(t => {
+        if (t.identifier && existingIdentifiers.has(t.identifier)) return false;
+        return !existingKeys.has(makeKey(t));
+      });
+      skippedCount = processedTransactions.length - newTransactions.length;
+
+      if (newTransactions.length > 0) {
         try {
-            const result = await Transaction.insertMany(processedTransactions, { ordered: false });
-            insertedCount = result.length;
+          const result = await Transaction.insertMany(newTransactions, { ordered: false });
+          insertedCount = result.length;
         } catch (error) {
-            if (error.code === 11000) {
-                // Handle duplicate key errors gracefully when ordered: false
-                insertedCount = error.insertedDocs?.length || error.result?.insertedCount || error.result?.nInserted || 0;
-            } else {
-                throw error;
-            }
+          if (error.code === 11000) {
+            insertedCount = error.insertedDocs?.length || error.result?.insertedCount || error.result?.nInserted || 0;
+          } else {
+            throw error;
+          }
         }
+      }
     }
 
     // 5. חישוב יתרות (כמו בקובץ הקודם)
@@ -140,7 +170,8 @@ export const processTransactions = async (req, res, next) => {
       await FinanceProfile.updateOne({ user: userId }, { $set: updates }, { upsert: true });
     }
 
-    res.json({ message: `הייבוא הושלם! נוספו ${insertedCount} עסקאות (חוקים הוחלו אוטומטית).` });
+    const skippedMsg = skippedCount > 0 ? ` (${skippedCount} עסקאות כבר היו קיימות ודולגו)` : '';
+    res.json({ message: `הייבוא הושלם! נוספו ${insertedCount} עסקאות חדשות.${skippedMsg}` });
   } catch (error) {
     console.error("Error processing transactions:", error);
     return next(new AppError(`שגיאה בעיבוד העסקאות: ${error.message}`, 500));

@@ -39,6 +39,7 @@ import debtRoutes from './routes/debtRoutes.js';
 import childSavingsRoutes from './routes/childSavingsRoutes.js';
 import foreignCurrencyRoutes from './routes/foreignCurrencyRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
+import scraperRoutes from './routes/scraperRoutes.js';
 
 // ייבוא מידלוור
 import rateLimiter from './middlewares/rateLimiter.js';
@@ -145,6 +146,7 @@ app.use('/api/debts', requireAuth, debtRoutes);
 app.use('/api/child-savings', requireAuth, childSavingsRoutes);
 app.use('/api/foreign-currency', requireAuth, foreignCurrencyRoutes);
 app.use('/api/reports', requireAuth, reportRoutes);
+app.use('/api/scrape', scraperRoutes);
 app.use('/api/logs', logsRoutes);
 
 // --- טיפול בשגיאות ---

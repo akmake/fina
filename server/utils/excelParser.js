@@ -107,6 +107,19 @@ const createTransactionObject = (row, userId, type) => {
         'ענף'
     ]) || 'כללי';
 
+    // Extra fields from the scraper (not present in manual Excel imports)
+    const scraperExtras = {};
+    if (row._source           != null) scraperExtras.source          = row._source;
+    if (row._status           != null) scraperExtras.status          = row._status;
+    if (row._processedDate    != null) scraperExtras.processedDate   = row._processedDate;
+    if (row._originalAmount   != null) scraperExtras.originalAmount  = row._originalAmount;
+    if (row._originalCurrency != null) scraperExtras.originalCurrency = row._originalCurrency;
+    if (row._scraperType      != null) scraperExtras.scraperType     = row._scraperType;
+    if (row._installments     != null) scraperExtras.installments    = row._installments;
+    if (row._identifier       != null) scraperExtras.identifier      = row._identifier;
+    if (row._scraperCategory  != null) scraperExtras.scraperCategory = row._scraperCategory;
+    if (row._memo             != null) scraperExtras.memo            = row._memo;
+
     return {
         user: userId,
         date,
@@ -116,6 +129,7 @@ const createTransactionObject = (row, userId, type) => {
         type: transactionType,
         account: 'checking',
         category: String(rawCategory).trim(),
+        ...scraperExtras,
     };
 };
 

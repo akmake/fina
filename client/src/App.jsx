@@ -52,6 +52,7 @@ const ForeignCurrencyPage  = lazy(() => import("@/pages/ForeignCurrencyPage"));
 const ReportsPage          = lazy(() => import("@/pages/ReportsPage"));
 const PergolaPlannerPage   = lazy(() => import("@/pages/PergolaPlannerPage"));
 const ElectricalCADPage    = lazy(() => import("@/pages/ElectricalCADPage"));
+const AutoImportPage       = lazy(() => import("@/pages/AutoImportPage"));
 
 function PageLoader() {
   return (
@@ -89,6 +90,7 @@ export default function App() {
             <Route path="net-worth"         element={<NetWorthPage />}             />
             <Route path="import"            element={<ImportPage />}               />
             <Route path="import/excel"      element={<ExcelImportPage />}          />
+            <Route path="import/auto"       element={<AutoImportPage />}           />
             <Route path="management"        element={<ManagementPage />}           />
             <Route path="/discount-import"  element={<DiscountImportPage />}       />
 

@@ -49,7 +49,22 @@ const transactionSchema = new mongoose.Schema({
         const map = { 'עו"ש': 'checking', 'מזומן': 'cash' };
         return map[v] || v;
     }
-  }
+  },
+
+  // ── שדות מהסקרייפר (לא קיימים בייבוא ידני) ──────────────────────────────
+  source: { type: String, default: 'manual' }, // 'manual' / 'max' / 'visaCal' וכו'
+  status: { type: String, enum: ['completed', 'pending'], default: 'completed' },
+  processedDate: { type: Date },
+  originalAmount: { type: Number },
+  originalCurrency: { type: String },
+  scraperType: { type: String, enum: ['normal', 'installments'] },
+  installments: {
+    number: { type: Number },
+    total:  { type: Number },
+  },
+  identifier: { type: String },  // אסמכתא מהאתר
+  scraperCategory: { type: String }, // קטגוריה מהאתר (לא הקטגוריה הפנימית שלנו)
+  memo: { type: String },
 }, {
   timestamps: true,
 });
