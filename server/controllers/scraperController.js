@@ -2,6 +2,57 @@ import { createScraper, CompanyTypes } from 'israeli-bank-scrapers';
 import { parseTransactions } from '../utils/excelParser.js';
 import AppError from '../utils/AppError.js';
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * israeli-bank-scrapers — מבנה הנתונים המלא
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * scraper.scrape(credentials) מחזיר:
+ * {
+ *   success: boolean,
+ *   errorType?: 'invalidPassword' | 'changePassword' | 'timeout' | 'generic',
+ *   accounts?: [
+ *     {
+ *       accountNumber: string,
+ *       balance?: number,          // יתרת חשבון (בנקים בדרך כלל, כרטיסי אשראי לא תמיד)
+ *       txns: Transaction[]
+ *     }
+ *   ],
+ *   futureDebits?: [              // חיובים עתידיים (מתי יצא הכסף מחשבון הבנק)
+ *     {
+ *       amount: number,
+ *       amountCurrency: string,
+ *       chargeDate?: string,       // ISO date
+ *       bankAccountNumber?: string
+ *     }
+ *   ]
+ * }
+ *
+ * Transaction:
+ * {
+ *   type:             'normal' | 'installments',
+ *   identifier?:      string | number,  // אסמכתא
+ *   date:             string,           // ISO — תאריך הרכישה
+ *   processedDate:    string,           // ISO — תאריך החיוב בפועל
+ *   originalAmount:   number,           // סכום במטבע מקורי (לקניות בחו"ל)
+ *   originalCurrency: string,           // מטבע מקורי (ILS, USD, EUR...)
+ *   chargedAmount:    number,           // סכום בש"ח — תלוי בחברה! ראה הערת סימנים למטה
+ *   chargedCurrency?: string,
+ *   description:      string,           // שם בית העסק
+ *   memo?:            string,           // הערות חופשיות
+ *   status:           'completed' | 'pending',   // ממתינה = עדיין לא חויבה!
+ *   installments?:    { number: number, total: number }, // תשלום X מתוך Y
+ *   category?:        string,           // קטגוריה מהאתר (לא תמיד קיים)
+ * }
+ *
+ * אפשרויות createScraper רלוונטיות:
+ *   combineInstallments: false     → כל תשלום = עסקה נפרדת (מה שיש לנו)
+ *   futureMonthsToScrape: number   → שלוף עסקאות עתידיות N חודשים קדימה
+ *   additionalTransactionInformation: true → מידע מעמיק יותר (אטי יותר)
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ */
+
 // Extra scraped fields — passed as underscore-prefixed keys through the Excel parser pipeline
 const extraFields = (txn, source) => ({
   _processedDate:    txn.processedDate ? new Date(txn.processedDate) : null,
@@ -16,162 +67,174 @@ const extraFields = (txn, source) => ({
   _source:           source,
 });
 
-// Generic toRow for all scrapers:
-// chargedAmount < 0 = expense, > 0 = income (universal convention in the library)
-const toRowGeneric = (source) => (txn) => ({
-  'תאריך עסקה': new Date(txn.date),
-  'שם בית העסק': txn.description || txn.memo || 'לא ידוע',
-  'סכום בש"ח': -(txn.chargedAmount || 0), // negate: scraper negative→expense, cal parser positive→expense
-  ...extraFields(txn, source),
-});
+// ── קונבנציית chargedAmount ────────────────────────────────────────────────────
+// israeli-bank-scrapers v6+:
+// כרטיסי אשראי + בנקים:  שלילי chargedAmount = הוצאה/חיוב, חיובי = הכנסה/זיכוי
+// ─────────────────────────────────────────────────────────────────────────────
 
-const toRowMax = (txn) => {
-  const charged = txn.chargedAmount || 0;
-  const base = {
+// Credit card toRow (Max, CAL, Isracard, Amex):
+// negative chargedAmount = expense (charge to card)
+// positive = refund/credit
+const toRowCreditCard = (source) => (txn) => {
+  // Use || so chargedAmount===0 (e.g. pending foreign) falls through to originalAmount
+  const charged = txn.chargedAmount || txn.originalAmount || 0;
+  return {
     'תאריך עסקה': new Date(txn.date),
     'שם בית העסק': txn.description || txn.memo || 'לא ידוע',
-    ...extraFields(txn, 'max'),
+    'סכום בש"ח': Math.abs(charged),
+    ...extraFields(txn, source),
+    _transactionType: charged <= 0 ? 'הוצאה' : 'הכנסה',
   };
-  return charged <= 0
-    ? { ...base, 'סכום חיוב': Math.abs(charged) }
-    : { ...base, 'סכום זיכוי': charged };
+};
+
+// Bank toRow (Hapoalim, Leumi, Discount...):
+// negative chargedAmount = debit/expense, positive = credit/income
+const toRowBank = (source) => (txn) => {
+  const charged = txn.chargedAmount || txn.originalAmount || 0;
+  return {
+    'תאריך עסקה': new Date(txn.date),
+    'שם בית העסק': txn.description || txn.memo || 'לא ידוע',
+    'סכום בש"ח': Math.abs(charged),
+    ...extraFields(txn, source),
+    _transactionType: charged < 0 ? 'הוצאה' : 'הכנסה',
+  };
 };
 
 // credFields: which credential fields this company needs (order matters for display)
 const COMPANY_CONFIG = {
-  // ── כרטיסי אשראי ──────────────────────────────────────────────────────────
+  // ── כרטיסי אשראי — חיובי = הוצאה ─────────────────────────────────────────
   max: {
     companyId: CompanyTypes.max,
     fileType: 'max',
     name: 'מקס',
     credFields: ['username', 'password'],
-    toRow: toRowMax,
+    toRow: toRowCreditCard('max'),
   },
   visaCal: {
     companyId: CompanyTypes.visaCal,
     fileType: 'cal',
     name: 'כאל',
     credFields: ['username', 'password'],
-    toRow: toRowGeneric('visaCal'),
+    toRow: toRowCreditCard('visaCal'),
   },
   isracard: {
     companyId: CompanyTypes.isracard,
     fileType: 'cal',
     name: 'ישראכרט',
     credFields: ['id', 'card6Digits', 'password'],
-    toRow: toRowGeneric('isracard'),
+    toRow: toRowCreditCard('isracard'),
   },
   amex: {
     companyId: CompanyTypes.amex,
     fileType: 'cal',
     name: 'אמריקן אקספרס',
     credFields: ['id', 'card6Digits', 'password'],
-    toRow: toRowGeneric('amex'),
+    toRow: toRowCreditCard('amex'),
   },
 
-  // ── בנקים ──────────────────────────────────────────────────────────────────
+  // ── בנקים — שלילי = הוצאה ─────────────────────────────────────────────────
   hapoalim: {
     companyId: CompanyTypes.hapoalim,
     fileType: 'cal',
     name: 'בנק הפועלים',
     credFields: ['userCode', 'password'],
-    toRow: toRowGeneric('hapoalim'),
+    toRow: toRowBank('hapoalim'),
   },
   leumi: {
     companyId: CompanyTypes.leumi,
     fileType: 'cal',
     name: 'בנק לאומי',
     credFields: ['username', 'password'],
-    toRow: toRowGeneric('leumi'),
+    toRow: toRowBank('leumi'),
   },
   discount: {
     companyId: CompanyTypes.discount,
     fileType: 'cal',
     name: 'בנק דיסקונט',
     credFields: ['id', 'password', 'num'],
-    toRow: toRowGeneric('discount'),
+    toRow: toRowBank('discount'),
   },
   mercantile: {
     companyId: CompanyTypes.mercantile,
     fileType: 'cal',
     name: 'מרכנתיל',
     credFields: ['id', 'password', 'num'],
-    toRow: toRowGeneric('mercantile'),
+    toRow: toRowBank('mercantile'),
   },
   mizrahi: {
     companyId: CompanyTypes.mizrahi,
     fileType: 'cal',
     name: 'מזרחי-טפחות',
     credFields: ['username', 'password'],
-    toRow: toRowGeneric('mizrahi'),
+    toRow: toRowBank('mizrahi'),
   },
   otsarHahayal: {
     companyId: CompanyTypes.otsarHahayal,
     fileType: 'cal',
     name: 'אוצר החייל',
     credFields: ['username', 'password'],
-    toRow: toRowGeneric('otsarHahayal'),
+    toRow: toRowBank('otsarHahayal'),
   },
   beinleumi: {
     companyId: CompanyTypes.beinleumi,
     fileType: 'cal',
     name: 'הבינלאומי',
     credFields: ['username', 'password'],
-    toRow: toRowGeneric('beinleumi'),
+    toRow: toRowBank('beinleumi'),
   },
   union: {
     companyId: CompanyTypes.union,
     fileType: 'cal',
     name: 'איגוד',
     credFields: ['username', 'password'],
-    toRow: toRowGeneric('union'),
+    toRow: toRowBank('union'),
   },
   massad: {
     companyId: CompanyTypes.massad,
     fileType: 'cal',
     name: 'מסד',
     credFields: ['username', 'password'],
-    toRow: toRowGeneric('massad'),
+    toRow: toRowBank('massad'),
   },
   yahav: {
     companyId: CompanyTypes.yahav,
     fileType: 'cal',
     name: 'יהב',
     credFields: ['username', 'nationalID', 'password'],
-    toRow: toRowGeneric('yahav'),
+    toRow: toRowBank('yahav'),
   },
   beyahadBishvilha: {
     companyId: CompanyTypes.beyahadBishvilha,
     fileType: 'cal',
     name: 'ביחד בשבילה',
     credFields: ['id', 'password'],
-    toRow: toRowGeneric('beyahadBishvilha'),
+    toRow: toRowBank('beyahadBishvilha'),
   },
   behatsdaa: {
     companyId: CompanyTypes.behatsdaa,
     fileType: 'cal',
     name: 'בהצדעה',
     credFields: ['id', 'password'],
-    toRow: toRowGeneric('behatsdaa'),
+    toRow: toRowBank('behatsdaa'),
   },
   pagi: {
     companyId: CompanyTypes.pagi,
     fileType: 'cal',
     name: 'פאגי',
     credFields: ['username', 'password'],
-    toRow: toRowGeneric('pagi'),
+    toRow: toRowBank('pagi'),
   },
   oneZero: {
     companyId: CompanyTypes.oneZero,
     fileType: 'cal',
     name: 'One Zero',
     credFields: ['email', 'password'],
-    toRow: toRowGeneric('oneZero'),
+    toRow: toRowBank('oneZero'),
   },
 };
 
 export const scrapeCompany = async (req, res, next) => {
-  const { company, startDate, ...formFields } = req.body;
+  const { company, startDate, incomesOnly, ...formFields } = req.body;
   const userId = req.user._id;
 
   const config = COMPANY_CONFIG[company];
@@ -205,10 +268,47 @@ export const scrapeCompany = async (req, res, next) => {
       return next(new AppError(errMsg, 401));
     }
 
-    // Transactions
-    const cleanedData = (result.accounts || []).flatMap(account =>
-      account.txns.map(config.toRow)
+    // Raw debug info — full scraper output per account
+    const rawAccounts = (result.accounts || []).map(account => ({
+      accountNumber: account.accountNumber || null,
+      balance: account.balance ?? null,
+      txnCount: (account.txns || []).length,
+      txns: (account.txns || []).map(txn => ({
+        date: txn.date,
+        processedDate: txn.processedDate,
+        description: txn.description,
+        memo: txn.memo,
+        originalAmount: txn.originalAmount,
+        originalCurrency: txn.originalCurrency,
+        chargedAmount: txn.chargedAmount,
+        chargedCurrency: txn.chargedCurrency,
+        status: txn.status,
+        type: txn.type,
+        identifier: txn.identifier,
+        installments: txn.installments,
+        category: txn.category,
+      })),
+    }));
+
+    // Transactions — optionally filter to incomes only (chargedAmount > 0) for bank accounts
+    const allTxns = (result.accounts || []).flatMap(account =>
+      account.txns.map(txn => ({ ...txn, _accountNumber: account.accountNumber || null }))
     );
+
+    // DEBUG: log first 3 raw transactions to check chargedAmount sign
+    if (allTxns.length > 0) {
+      console.log(`[scraper-debug] company=${company}, first 3 raw txns:`);
+      allTxns.slice(0, 3).forEach((t, i) => {
+        console.log(`  [${i}] desc="${t.description}" chargedAmount=${t.chargedAmount} originalAmount=${t.originalAmount}`);
+      });
+    }
+
+    const txnsToProcess = incomesOnly ? allTxns.filter(t => (t.chargedAmount || 0) > 0) : allTxns;
+    const cleanedData = txnsToProcess.map(txn => {
+      const row = config.toRow(txn);
+      if (txn._accountNumber) row._cardNumber = txn._accountNumber;
+      return row;
+    });
 
     // Account balances (banks return this, credit cards usually don't)
     const balances = (result.accounts || [])
@@ -219,12 +319,12 @@ export const scrapeCompany = async (req, res, next) => {
     const futureDebits = result.futureDebits || [];
 
     if (cleanedData.length === 0) {
-      return res.json({ transactions: [], unseenMerchants: [], balances, futureDebits });
+      return res.json({ transactions: [], unseenMerchants: [], balances, futureDebits, rawAccounts });
     }
 
     const { transactions, unseenMerchants } = await parseTransactions(cleanedData, config.fileType, userId);
 
-    res.json({ transactions, unseenMerchants, balances, futureDebits });
+    res.json({ transactions, unseenMerchants, balances, futureDebits, rawAccounts });
   } catch (error) {
     console.error(`${config.name} scrape error:`, error);
     return next(new AppError(`שגיאה בגישה ל${config.name}: ${error.message}`, 500));

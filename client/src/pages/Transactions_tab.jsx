@@ -104,6 +104,11 @@ export default function TransactionsPage() {
   // ─── Refresh (after add/delete) ──────────────────────────────
   const refresh = useCallback(async () => {
     try {
+      // Clear stale search results so UI shows fresh DB data
+      setSearchQuery('');
+      setSearchResults(null);
+      searchVersionRef.current++;
+
       const latestRes = await api.get('/transactions?limit=1');
       const latest = latestRes.data?.[0];
       if (!latest) { setTransactions([]); setHasMore(false); return; }
@@ -127,6 +132,31 @@ export default function TransactionsPage() {
     return () => observer.disconnect();
   }, [loadMore]);
 
+  // ─── Search (server-side for full history) ────────────────────
+  const [searchResults, setSearchResults] = useState(null); // null = not searching
+  const searchTimerRef = useRef(null);
+  const searchVersionRef = useRef(0);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults(null);
+      searchVersionRef.current++;
+      return;
+    }
+    clearTimeout(searchTimerRef.current);
+    const version = ++searchVersionRef.current;
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const typeParam = filterType !== 'all' ? `&type=${filterType}` : '';
+        const { data } = await api.get(`/transactions/search?q=${encodeURIComponent(searchQuery.trim())}${typeParam}`);
+        if (version === searchVersionRef.current) setSearchResults(data);
+      } catch {
+        if (version === searchVersionRef.current) setSearchResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(searchTimerRef.current);
+  }, [searchQuery, filterType]);
+
   // ─── Derived state ───────────────────────────────────────────
   // Effective month = most recent loaded transaction's month
   const effectiveMonth = useMemo(() =>
@@ -136,18 +166,14 @@ export default function TransactionsPage() {
 
   // Filtered + grouped by month
   const filteredTransactions = useMemo(() => {
+    // If we have server search results, use those
+    if (searchResults !== null) return searchResults;
+
     let result = transactions;
     if (filterType === 'expense') result = result.filter(t => t.type === 'הוצאה');
     if (filterType === 'income')  result = result.filter(t => t.type === 'הכנסה');
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(t =>
-        t.description.toLowerCase().includes(q) ||
-        (t.category && t.category.toLowerCase().includes(q))
-      );
-    }
     return result;
-  }, [transactions, filterType, searchQuery]);
+  }, [transactions, filterType, searchResults]);
 
   const groupedByMonth = useMemo(() => {
     const groups = {};
@@ -369,7 +395,6 @@ export default function TransactionsPage() {
         isOpen={isMerchantDialogOpen}
         onOpenChange={setIsMerchantDialogOpen}
         merchantName={selectedMerchant}
-        allTransactions={transactions}
         categories={categories}
         onRefresh={refresh}
       />

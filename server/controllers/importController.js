@@ -3,7 +3,8 @@ import { parseTransactions } from '../utils/excelParser.js';
 import Transaction from '../models/Transaction.js';
 import FinanceProfile from '../models/FinanceProfile.js';
 import MerchantMap from '../models/MerchantMap.js';
-import CategoryRule from '../models/CategoryRule.js'; // ייבוא מודל החוקים
+import Category from '../models/Category.js';
+import CategoryRule from '../models/CategoryRule.js';
 import AppError from '../utils/AppError.js';
 
 export const uploadAndParse = async (req, res, next) => {
@@ -29,10 +30,17 @@ export const uploadAndParse = async (req, res, next) => {
 /**
  * פונקציית עזר להחלת חוקים על עסקה בודדת בזיכרון (לפני שמירה)
  */
+const GENERIC_CATEGORIES = ['כללי', 'שונות', '', 'null', 'undefined'];
+
 const applyRulesToTransactionInMemory = (transaction, rules) => {
   // שמירת השם המקורי אם עדיין לא נשמר
   if (!transaction.originalDescription) {
     transaction.originalDescription = transaction.description;
+  }
+
+  // אם כבר יש קטגוריה אמיתית (למשל מ-MerchantMap ב-parseTransactions) — לא דורסים
+  if (transaction.category && !GENERIC_CATEGORIES.includes(transaction.category)) {
+    return transaction;
   }
 
   for (const rule of rules) {
@@ -53,7 +61,6 @@ const applyRulesToTransactionInMemory = (transaction, rules) => {
       if (rule.newName) {
         transaction.description = rule.newName;
       }
-      // ברגע שמצאנו חוק מתאים, אפשר לעצור (או להמשיך אם רוצים חוקים דורסים - כרגע עוצרים בראשון)
       break; 
     }
   }
@@ -85,16 +92,23 @@ export const processTransactions = async (req, res, next) => {
       return applyRulesToTransactionInMemory(transactionObj, rules);
     });
 
-    // 3. שמירת מיפויים (MerchantMap) - אופציונלי, למקרים ידניים בעתיד
+    // 3. שמירת מיפויים (MerchantMap) עם שם קטגוריה טקסטואלי
     if (newMappings && newMappings.length > 0) {
-      const mappingDocs = newMappings.map(m => ({
-        originalName: m.originalName,
-        newName: m.newName,
-        category: m.category || null,
-      }));
-      await MerchantMap.insertMany(mappingDocs, { ordered: false }).catch(err => {
-        if (err.code !== 11000) throw err;
-      });
+      const allCategories = await Category.find({}, { _id: 1, name: 1 }).lean();
+      for (const m of newMappings) {
+        const catName = m.categoryName || (m.category ? allCategories.find(c => String(c._id) === String(m.category))?.name : null);
+        await MerchantMap.findOneAndUpdate(
+          { originalName: m.originalName },
+          {
+            $set: {
+              newName: m.newName || m.originalName,
+              ...(catName ? { categoryName: catName } : {}),
+            },
+            $unset: { category: 1 },
+          },
+          { upsert: true }
+        ).catch(() => {});
+      }
     }
 
     // 4. סינון כפילויות: מצא עסקאות שכבר קיימות בתחום התאריכים
@@ -111,11 +125,14 @@ export const processTransactions = async (req, res, next) => {
       const existingInRange = await Transaction.find({
         user: userId,
         date: { $gte: minDate, $lte: maxDate },
-      }, { date: 1, amount: 1, rawDescription: 1, description: 1, identifier: 1 }).lean();
+      }, { date: 1, amount: 1, rawDescription: 1, description: 1, identifier: 1, processedDate: 1, installments: 1 }).lean();
 
       const makeKey = (t) => {
         const d = new Date(t.date);
-        return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}_${t.amount}_${(t.rawDescription || t.description || '').trim()}`;
+        const pd = t.processedDate ? new Date(t.processedDate) : null;
+        const pdKey = pd ? `_pd${pd.getUTCFullYear()}-${pd.getUTCMonth()}-${pd.getUTCDate()}` : '';
+        const instKey = t.installments?.number != null ? `_i${t.installments.number}` : '';
+        return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}_${t.amount}_${(t.rawDescription || t.description || '').trim()}${pdKey}${instKey}`;
       };
 
       const existingKeys = new Set(existingInRange.map(makeKey));

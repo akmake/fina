@@ -65,12 +65,13 @@ const transactionSchema = new mongoose.Schema({
   identifier: { type: String },  // אסמכתא מהאתר
   scraperCategory: { type: String }, // קטגוריה מהאתר (לא הקטגוריה הפנימית שלנו)
   memo: { type: String },
+  cardNumber: { type: String },
 }, {
   timestamps: true,
 });
 
-// אינדקס למניעת כפילויות זהות לחלוטין
-transactionSchema.index({ user: 1, date: 1, description: 1, amount: 1, type: 1 }, { unique: true });
+// אינדקס למניעת כפילויות — כולל processedDate כדי לא לחסום תשלומים שונים של אותה עסקה
+transactionSchema.index({ user: 1, date: 1, description: 1, amount: 1, type: 1, processedDate: 1 }, { unique: true });
 
 // Additional indexes for common queries
 transactionSchema.index({ user: 1, date: -1 }); // For user transactions sorted by date

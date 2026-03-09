@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { Edit3, X, Check, Tag, Save, Loader2 } from 'lucide-react';
+import { Edit3, X, Check, Tag, Save, Loader2, CreditCard } from 'lucide-react';
 import api from '@/utils/api';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/Button';
@@ -9,18 +9,32 @@ import { Input } from '@/components/ui/Input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from './utils';
 
-export default function MerchantDialog({ isOpen, onOpenChange, merchantName, allTransactions, categories, onRefresh }) {
+const SOURCE_LABELS = {
+  max: 'מקס', visaCal: 'כאל', isracard: 'ישראכרט', amex: 'אמריקן אקספרס',
+  hapoalim: 'הפועלים', leumi: 'לאומי', discount: 'דיסקונט', mizrahi: 'מזרחי',
+};
+
+export default function MerchantDialog({ isOpen, onOpenChange, merchantName, categories, onRefresh }) {
   const [editCategoryMode, setEditCategoryMode] = useState(false);
   const [selectedNewCategory, setSelectedNewCategory] = useState('');
   const [customCategory, setCustomCategory]     = useState('');
   const [updatingCategory, setUpdatingCategory] = useState(false);
   const [editNameMode, setEditNameMode]         = useState(false);
   const [newMerchantName, setNewMerchantName]   = useState('');
+  const [merchantHistory, setMerchantHistory]   = useState([]);
+  const [loadingHistory, setLoadingHistory]      = useState(false);
 
-  const merchantHistory = useMemo(() =>
-    allTransactions.filter(t => t.description === merchantName),
-    [allTransactions, merchantName]
-  );
+  // Fetch ALL transactions for this merchant from server
+  useEffect(() => {
+    if (!isOpen || !merchantName) { setMerchantHistory([]); return; }
+    let cancelled = false;
+    setLoadingHistory(true);
+    api.get(`/transactions/merchant/${encodeURIComponent(merchantName)}`)
+      .then(res => { if (!cancelled) setMerchantHistory(res.data || []); })
+      .catch(() => { if (!cancelled) setMerchantHistory([]); })
+      .finally(() => { if (!cancelled) setLoadingHistory(false); });
+    return () => { cancelled = true; };
+  }, [isOpen, merchantName]);
 
   const merchantTotal = useMemo(() =>
     merchantHistory.reduce((sum, t) => t.type === 'הכנסה' ? sum + t.amount : sum - t.amount, 0),
@@ -29,6 +43,22 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, all
 
   const currentCategory = merchantHistory[0]?.category || 'כללי';
 
+  // Group card numbers by source (credit card company)
+  const cardsBySource = useMemo(() => {
+    const map = {};
+    merchantHistory.forEach(t => {
+      if (!t.cardNumber) return;
+      const src = t.source || 'לא ידוע';
+      if (!map[src]) map[src] = new Set();
+      map[src].add(t.cardNumber);
+    });
+    return Object.entries(map).map(([source, cards]) => ({
+      source,
+      label: SOURCE_LABELS[source] || source,
+      cards: [...cards],
+    }));
+  }, [merchantHistory]);
+
   const handleSaveName = async () => {
     const trimmed = newMerchantName.trim();
     if (!trimmed || trimmed === merchantName) { setEditNameMode(false); return; }
@@ -36,6 +66,7 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, all
     try {
       await api.post('/transactions/merchant-bulk', { originalName: merchantName, newDisplayName: trimmed });
       setEditNameMode(false);
+      onOpenChange(false);
       await onRefresh();
     } catch { alert('שגיאה בשינוי השם'); }
     finally { setUpdatingCategory(false); }
@@ -61,6 +92,11 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, all
       setEditCategoryMode(false);
       setCustomCategory('');
       setSelectedNewCategory('');
+      // Reload merchant history to reflect category change
+      try {
+        const { data } = await api.get(`/transactions/merchant/${encodeURIComponent(merchantName)}`);
+        setMerchantHistory(data || []);
+      } catch { /* ignore - will show stale data */ }
       await onRefresh();
     } catch { alert('שגיאה בעדכון הקטגוריה'); }
     finally { setUpdatingCategory(false); }
@@ -90,21 +126,13 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, all
           </button>
 
           {/* Name row */}
-          <div className="pr-4 flex items-center gap-2 mb-0.5">
+          <div className="pr-0 mb-0.5">
             {!editNameMode ? (
-              <>
-                <DialogTitle className="text-[17px] font-bold text-white leading-tight flex-1 truncate">
-                  {merchantName}
-                </DialogTitle>
-                <button
-                  onClick={() => { setEditNameMode(true); setNewMerchantName(merchantName); }}
-                  className="shrink-0 p-1 rounded-full hover:bg-white/10 transition-colors"
-                >
-                  <Edit3 className="h-3.5 w-3.5 text-white/70" />
-                </button>
-              </>
+              <DialogTitle className="text-[17px] font-bold text-white leading-tight truncate pl-10">
+                {merchantName}
+              </DialogTitle>
             ) : (
-              <>
+              <div className="flex items-center gap-2">
                 <input
                   value={newMerchantName}
                   onChange={e => setNewMerchantName(e.target.value)}
@@ -118,11 +146,21 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, all
                 <button onClick={() => setEditNameMode(false)} className="shrink-0 h-7 w-7 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors">
                   <X className="h-3 w-3 text-white/60" />
                 </button>
-              </>
+              </div>
             )}
           </div>
 
-          <p className="text-white/40 text-[11px] font-medium pr-4 mb-3">{merchantHistory.length} עסקאות</p>
+          <div className="flex items-center gap-3 mb-3">
+            <p className="text-white/40 text-[11px] font-medium">{loadingHistory ? '...' : `${merchantHistory.length} עסקאות`}</p>
+            {!editNameMode && (
+              <button
+                onClick={() => { setEditNameMode(true); setNewMerchantName(merchantName); }}
+                className="inline-flex items-center gap-1 text-[10px] font-medium text-white/50 hover:text-white/80 transition-colors"
+              >
+                <Edit3 className="h-3 w-3" /> שנה שם
+              </button>
+            )}
+          </div>
 
           {/* Total */}
           <div className="flex items-end justify-between">
@@ -133,6 +171,19 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, all
               {merchantTotal < 0 ? 'הוצאות' : 'הכנסות'}
             </span>
           </div>
+
+          {/* Card numbers by source */}
+          {cardsBySource.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {cardsBySource.map(({ label, cards }) => (
+                <div key={label} className="inline-flex items-center gap-1.5 bg-white/10 rounded-full px-2.5 py-1">
+                  <CreditCard className="h-3 w-3 text-white/50" />
+                  <span className="text-[10px] font-medium text-white/70">{label}:</span>
+                  <span className="text-[10px] font-bold text-white/90">{cards.join(', ')}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Category row */}
@@ -182,13 +233,18 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, all
 
         {/* Transaction list */}
         <div className="overflow-y-auto flex-1 bg-white">
-          {merchantHistory.length === 0 ? (
+          {loadingHistory ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-slate-300" />
+            </div>
+          ) : merchantHistory.length === 0 ? (
             <p className="text-center text-slate-400 py-12 text-sm">לא נמצאו עסקאות</p>
           ) : (
             <div className="divide-y divide-slate-50">
               {merchantHistory.map((trx, i) => {
                 const d = new Date(trx.date);
                 const isIncome = trx.type === 'הכנסה';
+                const inst = trx.installments;
                 return (
                   <div key={i} className="flex items-center gap-3.5 px-5 py-3 hover:bg-slate-50/70 transition-colors">
                     <div className={`h-10 w-10 rounded-2xl flex flex-col items-center justify-center shrink-0 ${isIncome ? 'bg-emerald-50' : 'bg-slate-100'}`}>
@@ -197,7 +253,15 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, all
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-800 leading-tight">{format(d, 'EEEE', { locale: he })}</p>
-                      <p className="text-xs text-slate-400">{format(d, 'yyyy')}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                        <span className="text-xs text-slate-400">{format(d, 'yyyy')}</span>
+                        {trx.cardNumber && (
+                          <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">···{trx.cardNumber}</span>
+                        )}
+                        {inst?.number && inst?.total && (
+                          <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{inst.number}/{inst.total}</span>
+                        )}
+                      </div>
                     </div>
                     <span className={`text-base font-bold tabular-nums shrink-0 ${isIncome ? 'text-emerald-600' : 'text-slate-900'}`}>
                       {isIncome ? '+' : '−'}{formatCurrency(trx.amount)}

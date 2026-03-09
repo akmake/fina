@@ -24,6 +24,9 @@ export const CategoryIcon = ({ category }) => {
 export const TransactionCard = ({ transaction, onClick, onDelete }) => {
   const isExpense = transaction.type === 'הוצאה';
   const sign = isExpense ? '' : '+';
+  const isPending = transaction.status === 'pending';
+  const inst = transaction.installments;
+  const isForeign = transaction.originalCurrency && transaction.originalCurrency !== 'ILS';
 
   const handleDelete = (e) => {
     e.stopPropagation();
@@ -33,17 +36,39 @@ export const TransactionCard = ({ transaction, onClick, onDelete }) => {
   return (
     <div
       onClick={onClick}
-      className="group relative bg-white/80 backdrop-blur-md p-4 rounded-3xl border border-white/40 shadow-sm hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300 cursor-pointer flex items-center justify-between mb-3"
+      className={`group relative bg-white/80 backdrop-blur-md p-4 rounded-3xl border shadow-sm hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300 cursor-pointer flex items-center justify-between mb-3 ${isPending ? 'border-amber-200 bg-amber-50/60' : 'border-white/40'}`}
     >
       <div className="flex items-center gap-4">
         <CategoryIcon category={transaction.category} />
         <div className="flex flex-col">
-          <span className="font-bold text-slate-900 text-[15px] tracking-tight group-hover:text-blue-600 transition-colors">
-            {transaction.description}
-          </span>
-          <span className="text-xs font-medium text-slate-400 mt-1 flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-900 text-[15px] tracking-tight group-hover:text-blue-600 transition-colors">
+              {transaction.description}
+            </span>
+            {isPending && (
+              <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md">
+                ממתין
+              </span>
+            )}
+          </div>
+          <span className="text-xs font-medium text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
             <span className="bg-slate-100 px-2 py-0.5 rounded-md">{transaction.category}</span>
             <span>{format(new Date(transaction.date), 'd בMMM', { locale: he })}</span>
+            {inst?.number && inst?.total && (
+              <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md font-medium">
+                תשלום {inst.number} מתוך {inst.total}
+                {inst.total > 1 && (
+                  <span className="text-blue-400 font-normal mr-1">
+                    (סה״כ {formatCurrency(transaction.amount * inst.total)})
+                  </span>
+                )}
+              </span>
+            )}
+            {isForeign && (
+              <span className="bg-slate-50 text-slate-500 px-2 py-0.5 rounded-md">
+                {transaction.originalAmount?.toLocaleString()} {transaction.originalCurrency}
+              </span>
+            )}
           </span>
         </div>
       </div>

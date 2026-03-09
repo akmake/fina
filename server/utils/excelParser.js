@@ -65,10 +65,18 @@ const createTransactionObject = (row, userId, type) => {
     const description = String(descriptionVal).trim();
 
     let amount, transactionType;
-    if (type === 'max') {
+
+    // Scraper imports pass _transactionType explicitly — use it directly to avoid sign ambiguity.
+    if (row._transactionType) {
+        const rawAmt = getValue(["סכום בש\"ח", "סכום עסקה", "סכום חיוב", "Amount", "amount"]);
+        if (rawAmt == null) return null;
+        amount = Math.abs(parseFloat(String(rawAmt).replace(/,/g, '')));
+        if (isNaN(amount) || amount === 0) return null;
+        transactionType = row._transactionType;
+    } else if (type === 'max') {
         const chargeAmountStr = String(getValue(['סכום חיוב', 'סכום לתשלום', 'Amount', 'amount']) || '0').replace(/,/g, '');
         const creditAmountStr = String(getValue(['סכום זיכוי', 'זיכוי']) || '0').replace(/,/g, '');
-        
+
         const chargeAmount = parseFloat(chargeAmountStr);
         const creditAmount = parseFloat(creditAmountStr);
 
@@ -79,7 +87,7 @@ const createTransactionObject = (row, userId, type) => {
             amount = Math.abs(creditAmount);
             transactionType = 'הכנסה';
         } else {
-            return null; // אם אין סכום, מדלגים
+            return null;
         }
     } else if (type === 'isracard') {
         const amountValue = getValue(['סכום חיוב']);
@@ -119,6 +127,7 @@ const createTransactionObject = (row, userId, type) => {
     if (row._identifier       != null) scraperExtras.identifier      = row._identifier;
     if (row._scraperCategory  != null) scraperExtras.scraperCategory = row._scraperCategory;
     if (row._memo             != null) scraperExtras.memo            = row._memo;
+    if (row._cardNumber       != null) scraperExtras.cardNumber      = row._cardNumber;
 
     return {
         user: userId,

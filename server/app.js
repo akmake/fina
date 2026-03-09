@@ -40,6 +40,7 @@ import childSavingsRoutes from './routes/childSavingsRoutes.js';
 import foreignCurrencyRoutes from './routes/foreignCurrencyRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import scraperRoutes from './routes/scraperRoutes.js';
+import calRoutes from './routes/calRoutes.js';
 
 // ייבוא מידלוור
 import rateLimiter from './middlewares/rateLimiter.js';
@@ -54,6 +55,10 @@ const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGO_URI);
     logger.info(`MongoDB Connected: ${conn.connection.host}`);
+
+    // Sync indexes (drops old unique index, creates new one with processedDate)
+    const Transaction = (await import('./models/Transaction.js')).default;
+    await Transaction.syncIndexes();
   } catch (error) {
     logger.error(`MongoDB Connection Error: ${error.message}`);
     process.exit(1);
@@ -147,6 +152,7 @@ app.use('/api/child-savings', requireAuth, childSavingsRoutes);
 app.use('/api/foreign-currency', requireAuth, foreignCurrencyRoutes);
 app.use('/api/reports', requireAuth, reportRoutes);
 app.use('/api/scrape', scraperRoutes);
+app.use('/api/cal',   calRoutes);
 app.use('/api/logs', logsRoutes);
 
 // --- טיפול בשגיאות ---

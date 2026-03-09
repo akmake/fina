@@ -40,6 +40,46 @@ export const getTransactions = async (req, res) => {
   }
 };
 
+// @desc   חיפוש עסקאות בכל ההיסטוריה
+// @route  GET /api/transactions/search?q=QUERY&type=expense|income
+export const searchTransactions = async (req, res) => {
+  try {
+    const { q, type } = req.query;
+    if (!q || !q.trim()) return res.json([]);
+
+    const filter = {
+      user: req.user._id,
+      $or: [
+        { description: { $regex: q.trim(), $options: 'i' } },
+        { category:    { $regex: q.trim(), $options: 'i' } },
+      ],
+    };
+    if (type === 'expense') filter.type = 'הוצאה';
+    if (type === 'income')  filter.type = 'הכנסה';
+
+    const transactions = await Transaction.find(filter).sort({ date: -1 }).limit(500);
+    res.json(transactions);
+  } catch (error) {
+    console.error("Search transactions error:", error);
+    res.status(500).json({ message: 'שגיאת שרת בחיפוש' });
+  }
+};
+
+// @desc   כל העסקאות של בית עסק מסוים
+// @route  GET /api/transactions/merchant/:name
+export const getMerchantTransactions = async (req, res) => {
+  try {
+    const transactions = await Transaction.find({
+      user: req.user._id,
+      description: req.params.name,
+    }).sort({ date: -1 });
+    res.json(transactions);
+  } catch (error) {
+    console.error("Get merchant transactions error:", error);
+    res.status(500).json({ message: 'שגיאת שרת' });
+  }
+};
+
 // @desc   מחיקת עסקה והחזרת היתרה
 // @route  DELETE /api/transactions/:id
 export const deleteTransaction = async (req, res) => {
@@ -321,7 +361,17 @@ export const bulkUpdateMerchant = async (req, res) => {
   }
 
   try {
-    // 1. עדכון העסקאות הנוכחיות של המשתמש במסד הנתונים
+    // 1. קודם כל משלים את ה-rawDescriptions לפני שהעדכון משנה את ה-description
+    const existingTxns = await Transaction.find(
+      { user: userId, description: originalName },
+      { rawDescription: 1, description: 1 }
+    ).lean();
+    const uniqueRawDescriptions = [...new Set(
+      existingTxns.map(t => t.rawDescription || t.description).filter(Boolean)
+    )];
+    if (uniqueRawDescriptions.length === 0) uniqueRawDescriptions.push(originalName);
+
+    // 2. עדכון העסקאות במסד הנתונים
     const updateFields = {};
     if (newDisplayName && newDisplayName !== originalName) updateFields.description = newDisplayName;
     if (newCategory) updateFields.category = newCategory;
@@ -330,17 +380,10 @@ export const bulkUpdateMerchant = async (req, res) => {
       await Transaction.updateMany({ user: userId, description: originalName }, { $set: updateFields });
     }
 
-    // 2. משיכת כל ה-rawDescriptions (השמות המקוריים מהאקסל) כדי ללמד את המערכת על כל הווריאציות!
-    const transactions = await Transaction.find({ user: userId, description: originalName }).select('rawDescription description');
-    const uniqueRawDescriptions = [...new Set(transactions.map(t => t.rawDescription || t.description))];
-    
-    // אם אין עסקאות, לפחות נשמור את השם שהועבר כברירת מחדל
-    if (uniqueRawDescriptions.length === 0) uniqueRawDescriptions.push(originalName);
-
+    // 3. עדכון הטבלה הגלובלית (MerchantMap) לכל וריאציה
     const shouldUpdateCategory = newCategory && newCategory !== 'כללי';
     const shouldUpdateName = newDisplayName && newDisplayName !== originalName;
 
-    // 3. עדכון הטבלה הגלובלית (MerchantMap) לכל וריאציה בנפרד
     if (shouldUpdateCategory || shouldUpdateName) {
       for (const rawDesc of uniqueRawDescriptions) {
         await MerchantMap.findOneAndUpdate(
@@ -350,7 +393,7 @@ export const bulkUpdateMerchant = async (req, res) => {
               newName: newDisplayName || originalName,
               ...(shouldUpdateCategory ? { categoryName: newCategory } : {}),
             },
-            $unset: { category: 1 } // חובה לנקות ObjectID ישן כדי שהפארסר יקרא את הטקסט נכון
+            $unset: { category: 1 }
           },
           { upsert: true, new: true }
         );
