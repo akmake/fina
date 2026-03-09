@@ -76,8 +76,8 @@ const extraFields = (txn, source) => ({
 // negative chargedAmount = expense (charge to card)
 // positive = refund/credit
 const toRowCreditCard = (source) => (txn) => {
-  // Use || so chargedAmount===0 (e.g. pending foreign) falls through to originalAmount
-  const charged = txn.chargedAmount || txn.originalAmount || 0;
+  // Use ?? so chargedAmount===0 doesn't incorrectly fall through to originalAmount
+  const charged = txn.chargedAmount ?? txn.originalAmount ?? 0;
   return {
     'תאריך עסקה': new Date(txn.date),
     'שם בית העסק': txn.description || txn.memo || 'לא ידוע',
@@ -90,7 +90,7 @@ const toRowCreditCard = (source) => (txn) => {
 // Bank toRow (Hapoalim, Leumi, Discount...):
 // negative chargedAmount = debit/expense, positive = credit/income
 const toRowBank = (source) => (txn) => {
-  const charged = txn.chargedAmount || txn.originalAmount || 0;
+  const charged = txn.chargedAmount ?? txn.originalAmount ?? 0;
   return {
     'תאריך עסקה': new Date(txn.date),
     'שם בית העסק': txn.description || txn.memo || 'לא ידוע',

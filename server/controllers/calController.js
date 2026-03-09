@@ -241,27 +241,51 @@ function parsePendingTransactions(data) {
     .map(t => convertPendingTransaction(t));
 }
 
+// ── עזר: קודי סוג עסקה (מתואם עם israeli-bank-scrapers TrnTypeCode) ──────
+const TRN_TYPE = { regular: '5', credit: '6', installments: '8', standingOrder: '9' };
+
 // ── עזר: המר עסקה מ-getFilteredTransactions ──────────────────────────────
 function convertTransaction(t) {
   const rawAmt   = t.trnAmt ?? 0;
-  const charged  = (t.amtBeforeConvAndIndex ?? rawAmt) * -1;
+  const typeCode = String(t.trnTypeCode ?? t.transactionTypeCode ?? '');
+
+  // chargedAmount = ILS charge for this billing period (negated: negative = expense)
+  const charged = (t.amtBeforeConvAndIndex ?? rawAmt) * -1;
+
+  // originalAmount = original-currency amount with sign (credit/refund → positive, else → negative)
+  const originalAmount = rawAmt * (typeCode === TRN_TYPE.credit ? 1 : -1);
+
   const numOfPay = t.numOfPayments;
+  const curPay   = t.curPaymentNum ?? 1;
   const installments = numOfPay
-    ? { number: t.curPaymentNum ?? 1, total: numOfPay }
+    ? { number: curPay, total: numOfPay }
     : undefined;
 
+  // Adjust date for installments: add (curPaymentNum − 1) months to purchase date
+  // (matches israeli-bank-scrapers convention)
+  let date = t.trnPurchaseDate || null;
+  if (installments && date) {
+    const d = new Date(date);
+    d.setMonth(d.getMonth() + (curPay - 1));
+    date = d.toISOString();
+  }
+
+  // type: only regular(5) + standingOrder(9) are 'normal', everything else is 'installments'
+  const isNormal = [TRN_TYPE.regular, TRN_TYPE.standingOrder].includes(typeCode);
+
   return {
-    date:             t.trnPurchaseDate || null,
+    date,
     processedDate:    t.debCrdDate      || null,
     description:      t.merchantName   || '',
-    memo:             String(t.trnType || ''),
-    originalAmount:   rawAmt,
+    memo:             String(t.transTypeCommentDetails ?? t.trnType ?? ''),
+    originalAmount,
     originalCurrency: t.trnCurrencySymbol || 'ILS',
     chargedAmount:    charged,
     status:           'completed',
-    type:             String(t.transactionTypeCode) === '8' ? 'installments' : 'normal',
+    type:             isNormal ? 'normal' : 'installments',
     installments,
     identifier:       t.trnIntId != null ? String(t.trnIntId) : undefined,
+    category:         t.branchCodeDesc || undefined,
   };
 }
 
@@ -271,12 +295,16 @@ function convertPendingTransaction(t) {
   const numOfPay = t.numberOfPayments;
   const installments = numOfPay ? { number: 1, total: numOfPay } : undefined;
 
+  // Pending transactions: trnTypeCode may be absent → default to expense (negative)
+  const typeCode = String(t.trnTypeCode ?? t.transactionTypeCode ?? '');
+  const originalAmount = rawAmt * (typeCode === TRN_TYPE.credit ? 1 : -1);
+
   return {
     date:             t.trnPurchaseDate || null,
     processedDate:    t.trnPurchaseDate || null,
     description:      t.merchantName   || '',
     memo:             String(t.transTypeCommentDetails || ''),
-    originalAmount:   rawAmt,
+    originalAmount,
     originalCurrency: t.trnCurrencySymbol || 'ILS',
     chargedAmount:    rawAmt * -1,
     status:           'pending',
@@ -309,10 +337,9 @@ const extraFields = (txn) => ({
 });
 
 function calTxnToRow(txn, accountNumber) {
-  // convertTransaction() negates chargedAmount (* -1), so:
-  // negative chargedAmount = expense, positive = refund/income
-  // Same convention as israeli-bank-scrapers v6+ for credit cards
-  const charged = txn.chargedAmount || txn.originalAmount || 0;
+  // chargedAmount is already negated: negative = expense, positive = income/refund
+  // Use ?? (not ||) so chargedAmount === 0 doesn't fall through to originalAmount
+  const charged = txn.chargedAmount ?? txn.originalAmount ?? 0;
   return {
     'תאריך עסקה': new Date(txn.date),
     'שם בית העסק': txn.description || txn.memo || 'לא ידוע',
@@ -376,6 +403,27 @@ export const verifyOtpAndImport = async (req, res, next) => {
     );
 
     const transArr = txnData?.result?.transArr || [];
+
+    // DEBUG: log first few raw transactions (installment + regular) for verification
+    const installmentSample = transArr.filter(t => t.numOfPayments > 0).slice(0, 3);
+    const regularSample     = transArr.filter(t => !t.numOfPayments).slice(0, 2);
+    console.log('[cal-import-debug] total raw txns:', transArr.length);
+    for (const s of [...installmentSample, ...regularSample]) {
+      console.log('[cal-import-debug] raw txn:', JSON.stringify({
+        merchantName: s.merchantName,
+        trnAmt: s.trnAmt,
+        amtBeforeConvAndIndex: s.amtBeforeConvAndIndex,
+        numOfPayments: s.numOfPayments,
+        curPaymentNum: s.curPaymentNum,
+        trnTypeCode: s.trnTypeCode,
+        transactionTypeCode: s.transactionTypeCode,
+        trnPurchaseDate: s.trnPurchaseDate,
+        debCrdDate: s.debCrdDate,
+        trnCurrencySymbol: s.trnCurrencySymbol,
+        transTypeCommentDetails: s.transTypeCommentDetails,
+        branchCodeDesc: s.branchCodeDesc,
+      }));
+    }
 
     // קבץ עסקאות לפי כרטיס
     const cardMap = new Map();

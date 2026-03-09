@@ -1,7 +1,9 @@
-import { Briefcase, ShoppingBag, Coffee, Home, Car, Zap, Trash2 } from 'lucide-react';
+import { Briefcase, ShoppingBag, Coffee, Home, Car, Zap, Trash2, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { formatCurrency } from './utils';
+
+const ILS_CODES = ['ILS', '₪', 'ש"ח', 'שח', 'NIS', 'שקל'];
 
 export const CategoryIcon = ({ category }) => {
   const c = category?.toLowerCase() || '';
@@ -26,7 +28,7 @@ export const TransactionCard = ({ transaction, onClick, onDelete }) => {
   const sign = isExpense ? '' : '+';
   const isPending = transaction.status === 'pending';
   const inst = transaction.installments;
-  const isForeign = transaction.originalCurrency && transaction.originalCurrency !== 'ILS';
+  const isForeign = transaction.originalCurrency && !ILS_CODES.includes(transaction.originalCurrency);
 
   const handleDelete = (e) => {
     e.stopPropagation();
@@ -54,6 +56,11 @@ export const TransactionCard = ({ transaction, onClick, onDelete }) => {
           <span className="text-xs font-medium text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
             <span className="bg-slate-100 px-2 py-0.5 rounded-md">{transaction.category}</span>
             <span>{format(new Date(transaction.date), 'd בMMM', { locale: he })}</span>
+            {transaction.cardNumber && (
+              <span className="text-slate-400 flex items-center gap-0.5">
+                <CreditCard className="h-3 w-3" />···{transaction.cardNumber}
+              </span>
+            )}
             {inst?.number && inst?.total && (
               <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md font-medium">
                 תשלום {inst.number} מתוך {inst.total}
