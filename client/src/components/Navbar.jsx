@@ -7,6 +7,8 @@ import {
   CreditCard, Target, Moon, Sun, Lightbulb, Activity,
   Wallet, RefreshCw, Scale, GraduationCap, FileSpreadsheet, Upload,
   Shield, Building2, Bell, Calculator, DownloadCloud, Baby, Globe, FileText, Hammer, Zap,
+  Layers, Banknote, HandCoins, ClipboardList,
+  Coins, PiggyBank, SlidersHorizontal, Lock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -28,10 +30,11 @@ import {
 const NAV_GROUPS = [
   {
     label: "פיננסים",
+    icon: Coins,
     items: [
       { to: "/finance-dashboard", label: "לוח בקרה", icon: LayoutDashboard, auth: true },
       { to: "/portfolio",         label: "עסקאות",   icon: Receipt,          auth: true },
-      { to: "/categories",        label: "קטגוריות", icon: PieChart,         auth: true },
+      { to: "/categories",        label: "קטגוריות", icon: Layers,           auth: true },
       { to: "/budget",            label: "תקציב",    icon: Wallet,           auth: true },
       { to: "/recurring",         label: "קבועים",   icon: RefreshCw,        auth: true },
       { to: "/smart-analytics",   label: "ניתוח חכם", icon: BarChart3,        auth: true },
@@ -40,37 +43,41 @@ const NAV_GROUPS = [
   },
   {
     label: "השקעות וחיסכון",
+    icon: PiggyBank,
     items: [
       { to: "/investments", label: "מניות",    icon: TrendingUp,    auth: true },
       { to: "/deposits",    label: "פיקדונות", icon: Landmark,      auth: true },
-      { to: "/funds",       label: "קרנות",    icon: PieChart,      auth: true },
+      { to: "/funds",       label: "קרנות",    icon: BarChart3,     auth: true },
       { to: "/pension",     label: "פנסיוני",  icon: GraduationCap, auth: true },
       { to: "/foreign-currency", label: "מט\"ח", icon: Globe,       auth: true },
     ],
   },
   {
     label: "נכסים והתחייבויות",
+    icon: Home,
     items: [
       { to: "/real-estate",   label: "נדל\"ן",      icon: Building2,  auth: true },
-      { to: "/mortgage",      label: "משכנתא",      icon: Building2,  auth: true },
+      { to: "/mortgage",      label: "משכנתא",      icon: Landmark,   auth: true },
       { to: "/my-loans",      label: "הלוואות",     icon: CreditCard, auth: true },
-      { to: "/debts",         label: "ניהול חובות", icon: CreditCard, auth: true },
+      { to: "/debts",         label: "ניהול חובות", icon: HandCoins,  auth: true },
       { to: "/child-savings", label: "חיסכון ילדים", icon: Baby,      auth: true },
     ],
   },
   {
     label: "תכנון",
+    icon: Target,
     items: [
       { to: "/goals",            label: "יעדים",         icon: Target,     auth: true },
       { to: "/insurance",         label: "ביטוח",        icon: Shield,     auth: true },
       { to: "/tax",               label: "מחשבון מס",    icon: Calculator, auth: true },
-      { to: "/projects",          label: "פרויקטים",     icon: Target,     auth: true },
+      { to: "/projects",          label: "פרויקטים",     icon: ClipboardList, auth: true },
       { to: "/pergola-planner",   label: "מתכנן פרגולות", icon: Hammer,     auth: true },
       { to: "/electrical",          label: "שרטוט חשמל",   icon: Zap,        auth: true },
     ],
   },
   {
     label: "ניהול",
+    icon: SlidersHorizontal,
     items: [
       { to: "/alerts",         label: "התראות",                icon: Bell,            auth: true },
       { to: "/reports",        label: "דוחות",                 icon: FileText,        auth: true },
@@ -78,12 +85,13 @@ const NAV_GROUPS = [
       { to: "/import/excel",   label: "ייבוא אקסל",            icon: FileSpreadsheet, auth: true },
       { to: "/import/auto",    label: "ייבוא אוטומטי",         icon: DownloadCloud,   auth: true },
       { to: "/import",         label: "ייבוא נתונים",          icon: Upload,          auth: true },
-      { to: "/discount-import",label: "ייבוא הכנסות (דיסקונט)", icon: DownloadCloud,   auth: true },
+      { to: "/discount-import",label: "ייבוא הכנסות (דיסקונט)", icon: Banknote,        auth: true },
       { to: "/suggestions",    label: "הצעות שיפור",           icon: Lightbulb,       auth: true },
     ],
   },
   {
     label: "אדמין",
+    icon: Lock,
     items: [
       { to: "/admin/logs", label: "דוח מבקרים", icon: Activity, auth: true, adminOnly: true },
     ],
@@ -118,6 +126,18 @@ export default function Navbar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isAuthenticated, user, logout } = useAuthStore();
   const visibleGroups = getVisibleGroups(isAuthenticated, user?.role);
+  const location = useLocation();
+
+  // Close drawer on route change (e.g. browser back button)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  // Lock body scroll when drawer is open
+  useEffect(() => {
+    document.body.style.overflow = sidebarOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [sidebarOpen]);
 
   return (
     <>
@@ -155,6 +175,7 @@ export default function Navbar() {
               transition={{ duration: 0.25 }}
               className="fixed inset-0 z-40 bg-black/50 md:hidden"
               onClick={() => setSidebarOpen(false)}
+              onTouchStart={() => setSidebarOpen(false)}
             />
             <motion.div
               initial={{ x: "100%" }}
@@ -188,16 +209,20 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
   // State to track which accordions are open
   const [expandedGroups, setExpandedGroups] = useState(() => {
     const initial = {};
-    groups.forEach((group, index) => {
-      // Auto-expand the group if the current URL matches one of its items
+    let hasActive = false;
+    groups.forEach((group) => {
       const isActiveGroup = group.items.some(
         (item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)
       );
-      // Open the active group, or the first group by default
-      if (isActiveGroup || index === 0) {
+      if (isActiveGroup) {
         initial[group.label] = true;
+        hasActive = true;
       }
     });
+    // Only fall back to first group if no active route found
+    if (!hasActive && groups.length > 0) {
+      initial[groups[0].label] = true;
+    }
     return initial;
   });
 
@@ -213,7 +238,7 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
   return (
     <div className="flex flex-col h-full border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
       {/* Brand header */}
-      <div className="flex items-center justify-between h-16 px-5 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
+      <div className="flex items-center justify-between h-16 px-5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex-shrink-0">
         <Link
           to="/"
           onClick={onClose}
@@ -241,18 +266,25 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
       </div>
 
       {/* Navigation - With Accordions */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-2">
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
         {groups.map((group, gi) => {
           const isExpanded = expandedGroups[group.label];
 
           return (
-            <div key={gi} className="mb-1">
+            <div key={gi}>
               {group.label && (
                 <button
                   onClick={() => toggleGroup(group.label)}
-                  className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 rounded-lg transition-colors cursor-pointer"
+                  className={`w-full flex items-center justify-between px-3 py-2.5 mt-1 rounded-lg transition-all cursor-pointer
+                    ${isExpanded
+                      ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30"
+                      : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-emerald-600 dark:hover:text-emerald-400"
+                    }`}
                 >
-                  <span>{group.label}</span>
+                  <div className="flex items-center gap-2">
+                    {group.icon && <group.icon className="h-4 w-4 flex-shrink-0" />}
+                    <span className="text-sm font-bold">{group.label}</span>
+                  </div>
                   <motion.div
                     animate={{ rotate: isExpanded ? 180 : 0 }}
                     transition={{ duration: 0.2 }}
@@ -268,7 +300,7 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
                     animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.2, ease: "easeInOut" }}
-                    className="space-y-0.5 overflow-hidden mt-1"
+                    className="space-y-0.5 overflow-hidden mt-0.5"
                   >
                     {group.items.map((item) => (
                       <li key={item.to}>
@@ -321,11 +353,11 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
 // ---------------------------------------------------------------------------
 function NavItem({ item, onClick }) {
   const base =
-    "group flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150";
+    "group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-150";
   const active =
-    "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400";
+    "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-r-2 border-blue-500 dark:border-blue-400";
   const inactive =
-    "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100";
+    "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 border-r-2 border-transparent";
 
   return (
     <NavLink
@@ -364,7 +396,7 @@ function UserNav({ user, logout, onClose }) {
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent className="w-56" side="top" align="start" sideOffset={4}>
+      <DropdownMenuContent className="w-56 z-[60]" side="top" align="start" sideOffset={4}>
         <DropdownMenuLabel className="font-normal">
           <p className="font-semibold text-slate-900 dark:text-slate-100">{user?.name}</p>
           <p className="text-xs text-slate-500 truncate">{user?.email}</p>
