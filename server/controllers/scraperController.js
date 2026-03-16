@@ -1,6 +1,32 @@
 import { createScraper, CompanyTypes } from 'israeli-bank-scrapers';
+import puppeteer from 'puppeteer';
 import { parseTransactions } from '../utils/excelParser.js';
 import AppError from '../utils/AppError.js';
+
+const RENDER_CHROME_ARGS = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-gpu',
+];
+
+const resolveExecutablePath = () => {
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
+  if (process.env.CHROME_BIN) return process.env.CHROME_BIN;
+
+  try {
+    return puppeteer.executablePath();
+  } catch {
+    return undefined;
+  }
+};
+
+const resolveBrowserArgs = () => {
+  if (process.env.PUPPETEER_ARGS) {
+    return process.env.PUPPETEER_ARGS.split(/\s+/).filter(Boolean);
+  }
+  return process.env.RENDER ? RENDER_CHROME_ARGS : undefined;
+};
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -252,11 +278,16 @@ export const scrapeCompany = async (req, res, next) => {
     : (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d; })();
 
   try {
+    const executablePath = resolveExecutablePath();
+    const args = resolveBrowserArgs();
+
     const scraper = createScraper({
       companyId: config.companyId,
       startDate: start,
       combineInstallments: false,
       showBrowser: false,
+      executablePath,
+      args,
     });
 
     const result = await scraper.scrape(credentials);
