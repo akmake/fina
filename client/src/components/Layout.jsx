@@ -25,7 +25,7 @@ export default function Layout() {
       <Navbar />
 
       {/* Main content — pt-14 top bar + pb-16 bottom tab bar on mobile */}
-      <main className="flex-1 overflow-y-auto pt-14 pb-16 md:pt-0 md:pb-0 overscroll-contain">
+      <main className="flex-1 overflow-y-auto pt-14 pb-14 md:pt-0 md:pb-0 overscroll-contain">
         <Outlet />
       </main>
 
