@@ -24,8 +24,8 @@ export default function Layout() {
       {/* Fixed sidebar rendered by Navbar */}
       <Navbar />
 
-      {/* Main content — pt-16 on mobile accounts for the sticky top bar */}
-      <main className="flex-1 overflow-y-auto pt-16 md:pt-0 overscroll-contain">
+      {/* Main content — pt-14 top bar + pb-16 bottom tab bar on mobile */}
+      <main className="flex-1 overflow-y-auto pt-14 pb-16 md:pt-0 md:pb-0 overscroll-contain">
         <Outlet />
       </main>
 

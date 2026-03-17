@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { collectDeviceInfo } from './deviceInfo.js';
 
 // משתנה להחזקת הפונקציות מה-Store כדי למנוע תלות מעגלית
 let authStoreApi = {
@@ -78,32 +77,23 @@ const getCsrfToken = (forceRefresh = false) => {
   return csrfTokenPromise;
 };
 
-// Interceptor לבקשות - וידוא שיש CSRF + שליחת נתוני אנליטיקס
+// Interceptor לבקשות - וידוא שיש CSRF
 api.interceptors.request.use(async (config) => {
   // הוספת headers אנליטיקס לכל בקשה
   const analyticsHeaders = getAnalyticsHeaders();
   Object.assign(config.headers, analyticsHeaders);
 
-  // ── Device info — sent as header on EVERY request (GET, POST, etc.) ──
-  try {
-    const deviceInfo = collectDeviceInfo();
-    config.headers['X-Device-Info'] = btoa(unescape(encodeURIComponent(JSON.stringify(deviceInfo))));
-  } catch (e) {
-    // Silently fail — don't break the actual request
-  }
-
   // דילוג אם הבקשה היא לקבלת הטוקן עצמו
   if (config.url === '/csrf-token') {
     return config;
   }
-  
+
   // אם אין טוקן בהדרים, ננסה להשיג אותו
   if (!api.defaults.headers.common['X-CSRF-Token']) {
     try {
       await getCsrfToken();
     } catch (err) {
-      // אם נכשלנו להשיג טוקן, ייתכן שהשרת למטה או בעיית רשת.
-      // נמשיך בכל זאת כדי שהשרת יחזיר שגיאה מתאימה.
+      // אם נכשלנו להשיג טוקן, נמשיך — השרת יחזיר שגיאה מתאימה
     }
   }
   return config;
@@ -185,5 +175,11 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+/**
+ * קריאה מוקדמת ל-CSRF token — לקרוא בהפעלת האפליקציה
+ * כדי שה-token יהיה מוכן לפני שהקומפוננטים מתחילים לשלוח בקשות
+ */
+export const warmCsrf = () => getCsrfToken();
 
 export default api;

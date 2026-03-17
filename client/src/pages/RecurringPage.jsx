@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   RefreshCw, Plus, Trash2, Pause, Play, Calendar, ArrowUpDown,
   CreditCard, Building, Wifi, Shield, Home, Car, Zap, TrendingDown, TrendingUp,
-  Search, Check, X, Loader2, Lightbulb, ExternalLink
+  Search, Check, X, Loader2, Lightbulb, ExternalLink, Pencil
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -43,6 +43,7 @@ export default function RecurringPage() {
   const [loading, setLoading] = useState(true);
   const [insights, setInsights] = useState([]);
   const [showDialog, setShowDialog] = useState(false);
+  const [editingItem, setEditingItem] = useState(null); // null = add mode, object = edit mode
   const [showDetectDialog, setShowDetectDialog] = useState(false);
   const [detectLoading, setDetectLoading] = useState(false);
   const [candidates, setCandidates] = useState([]);
@@ -80,27 +81,61 @@ export default function RecurringPage() {
     setLoading(false);
   };
 
-  const addTransaction = async () => {
+  const EMPTY_FORM = {
+    description: '', amount: '', type: 'הוצאה', category: 'כללי', account: 'checking',
+    frequency: 'monthly', dayOfMonth: '', startDate: new Date().toISOString().split('T')[0],
+    endDate: '', subcategory: 'other', provider: '', notes: '',
+  };
+
+  const openAddDialog = () => {
+    setEditingItem(null);
+    setForm(EMPTY_FORM);
+    setShowDialog(true);
+  };
+
+  const openEditDialog = (item) => {
+    setEditingItem(item);
+    setForm({
+      description: item.description || '',
+      amount: item.amount ?? '',
+      type: item.type || 'הוצאה',
+      category: item.category || 'כללי',
+      account: item.account || 'checking',
+      frequency: item.frequency || 'monthly',
+      dayOfMonth: item.dayOfMonth ?? '',
+      startDate: item.startDate ? item.startDate.split('T')[0] : new Date().toISOString().split('T')[0],
+      endDate: item.endDate ? item.endDate.split('T')[0] : '',
+      subcategory: item.subcategory || 'other',
+      provider: item.provider || '',
+      notes: item.notes || '',
+    });
+    setShowDialog(true);
+  };
+
+  const saveTransaction = async () => {
     if (!form.description || !form.amount || !form.startDate) {
       toast.error('נא למלא תיאור, סכום ותאריך התחלה');
       return;
     }
+    const payload = {
+      ...form,
+      amount: Number(form.amount),
+      dayOfMonth: form.dayOfMonth ? Number(form.dayOfMonth) : undefined,
+    };
     try {
-      await api.post('/recurring', {
-        ...form,
-        amount: Number(form.amount),
-        dayOfMonth: form.dayOfMonth ? Number(form.dayOfMonth) : undefined,
-      });
-      toast.success('נוסף בהצלחה');
+      if (editingItem) {
+        await api.put(`/recurring/${editingItem._id}`, payload);
+        toast.success('עודכן בהצלחה');
+      } else {
+        await api.post('/recurring', payload);
+        toast.success('נוסף בהצלחה');
+      }
       setShowDialog(false);
-      setForm({
-        description: '', amount: '', type: 'הוצאה', category: 'כללי', account: 'checking',
-        frequency: 'monthly', dayOfMonth: '', startDate: new Date().toISOString().split('T')[0],
-        endDate: '', subcategory: 'other', provider: '', notes: '',
-      });
+      setEditingItem(null);
+      setForm(EMPTY_FORM);
       fetchAll();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'שגיאה בהוספה');
+      toast.error(err.response?.data?.message || 'שגיאה');
     }
   };
 
@@ -198,7 +233,7 @@ export default function RecurringPage() {
           <Button variant="outline" onClick={openDetect}>
             <Search className="h-4 w-4 me-2" /> זיהוי אוטומטי
           </Button>
-          <Button onClick={() => setShowDialog(true)}>
+          <Button onClick={openAddDialog}>
             <Plus className="h-4 w-4 me-2" /> הוסף חדש
           </Button>
         </div>
@@ -325,6 +360,9 @@ export default function RecurringPage() {
                           <p className="text-xs text-slate-400">{formatCurrency(t.annualCost || t.amount * 12)} / שנה</p>
                         </div>
                         <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500" onClick={() => openEditDialog(t)} title="ערוך">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleTransaction(t._id)}
                             title={t.isPaused ? 'הפעל' : 'השהה'}>
                             {t.isPaused ? <Play className="h-4 w-4 text-green-600" /> : <Pause className="h-4 w-4 text-amber-600" />}
@@ -409,11 +447,11 @@ export default function RecurringPage() {
         </DialogContent>
       </Dialog>
 
-      {/* דיאלוג הוספה */}
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+      {/* דיאלוג הוספה / עריכה */}
+      <Dialog open={showDialog} onOpenChange={(v) => { setShowDialog(v); if (!v) setEditingItem(null); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
           <DialogHeader>
-            <DialogTitle>הוספת עסקה קבועה</DialogTitle>
+            <DialogTitle>{editingItem ? 'עריכת עסקה קבועה' : 'הוספת עסקה קבועה'}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -501,8 +539,8 @@ export default function RecurringPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>ביטול</Button>
-            <Button onClick={addTransaction}>הוסף</Button>
+            <Button variant="outline" onClick={() => { setShowDialog(false); setEditingItem(null); }}>ביטול</Button>
+            <Button onClick={saveTransaction}>{editingItem ? 'שמור שינויים' : 'הוסף'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

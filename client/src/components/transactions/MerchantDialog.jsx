@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { Edit3, X, Check, Tag, Save, Loader2, CreditCard } from 'lucide-react';
+import { Edit3, X, Check, Tag, Save, Loader2, CreditCard, Pencil } from 'lucide-react';
 import api from '@/utils/api';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/Button';
@@ -23,6 +23,8 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cat
   const [newMerchantName, setNewMerchantName]   = useState('');
   const [merchantHistory, setMerchantHistory]   = useState([]);
   const [loadingHistory, setLoadingHistory]      = useState(false);
+  const [editingTrx, setEditingTrx]             = useState(null); // { _id, date, amount, type, category }
+  const [savingTrx, setSavingTrx]               = useState(false);
 
   // Fetch ALL transactions for this merchant from server
   useEffect(() => {
@@ -102,11 +104,32 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cat
     finally { setUpdatingCategory(false); }
   };
 
+  const handleSaveTrx = async () => {
+    if (!editingTrx) return;
+    setSavingTrx(true);
+    try {
+      await api.put(`/transactions/${editingTrx._id}`, {
+        date: editingTrx.date,
+        amount: Number(editingTrx.amount),
+        type: editingTrx.type,
+        category: editingTrx.category,
+        description: merchantName,
+      });
+      // refresh merchant history in place
+      const { data } = await api.get(`/transactions/merchant/${encodeURIComponent(merchantName)}`);
+      setMerchantHistory(data || []);
+      setEditingTrx(null);
+      await onRefresh();
+    } catch { alert('שגיאה בשמירת העסקה'); }
+    finally { setSavingTrx(false); }
+  };
+
   const handleClose = () => {
     setEditCategoryMode(false);
     setEditNameMode(false);
     setSelectedNewCategory('');
     setCustomCategory('');
+    setEditingTrx(null);
     onOpenChange(false);
   };
 
@@ -245,27 +268,105 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cat
                 const d = new Date(trx.date);
                 const isIncome = trx.type === 'הכנסה';
                 const inst = trx.installments;
+                const isEditing = editingTrx?._id === trx._id;
                 return (
-                  <div key={i} className="flex items-center gap-3.5 px-5 py-3 hover:bg-slate-50/70 transition-colors">
-                    <div className={`h-10 w-10 rounded-2xl flex flex-col items-center justify-center shrink-0 ${isIncome ? 'bg-emerald-50' : 'bg-slate-100'}`}>
-                      <span className={`text-sm font-bold leading-none ${isIncome ? 'text-emerald-600' : 'text-slate-700'}`}>{format(d, 'dd')}</span>
-                      <span className={`text-[9px] font-medium uppercase leading-none mt-0.5 ${isIncome ? 'text-emerald-400' : 'text-slate-400'}`}>{format(d, 'MMM', { locale: he })}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 leading-tight">{format(d, 'EEEE', { locale: he })}</p>
-                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                        <span className="text-xs text-slate-400">{format(d, 'yyyy')}</span>
-                        {trx.cardNumber && (
-                          <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">···{trx.cardNumber}</span>
-                        )}
-                        {inst?.number && inst?.total && (
-                          <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{inst.number}/{inst.total}</span>
-                        )}
+                  <div key={i} className="px-5 py-3 hover:bg-slate-50/70 transition-colors">
+                    {isEditing ? (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] font-medium text-slate-400 block mb-0.5">תאריך</label>
+                            <input
+                              type="date"
+                              value={editingTrx.date}
+                              onChange={e => setEditingTrx(p => ({ ...p, date: e.target.value }))}
+                              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-blue-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-medium text-slate-400 block mb-0.5">סכום (₪)</label>
+                            <input
+                              type="number"
+                              value={editingTrx.amount}
+                              onChange={e => setEditingTrx(p => ({ ...p, amount: e.target.value }))}
+                              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-blue-400"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] font-medium text-slate-400 block mb-0.5">סוג</label>
+                            <select
+                              value={editingTrx.type}
+                              onChange={e => setEditingTrx(p => ({ ...p, type: e.target.value }))}
+                              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-blue-400 bg-white"
+                            >
+                              <option value="הוצאה">הוצאה</option>
+                              <option value="הכנסה">הכנסה</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-medium text-slate-400 block mb-0.5">קטגוריה</label>
+                            <input
+                              value={editingTrx.category}
+                              onChange={e => setEditingTrx(p => ({ ...p, category: e.target.value }))}
+                              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-blue-400"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2 justify-end pt-1">
+                          <button
+                            onClick={() => setEditingTrx(null)}
+                            className="text-xs text-slate-400 hover:text-slate-600 px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            ביטול
+                          </button>
+                          <button
+                            onClick={handleSaveTrx}
+                            disabled={savingTrx}
+                            className="text-xs bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-700 transition-colors flex items-center gap-1 disabled:opacity-50"
+                          >
+                            {savingTrx ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                            שמור
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <span className={`text-base font-bold tabular-nums shrink-0 ${isIncome ? 'text-emerald-600' : 'text-slate-900'}`}>
-                      {isIncome ? '+' : '−'}{formatCurrency(trx.amount)}
-                    </span>
+                    ) : (
+                      <div className="flex items-center gap-3.5 group/row">
+                        <div className={`h-10 w-10 rounded-2xl flex flex-col items-center justify-center shrink-0 ${isIncome ? 'bg-emerald-50' : 'bg-slate-100'}`}>
+                          <span className={`text-sm font-bold leading-none ${isIncome ? 'text-emerald-600' : 'text-slate-700'}`}>{format(d, 'dd')}</span>
+                          <span className={`text-[9px] font-medium uppercase leading-none mt-0.5 ${isIncome ? 'text-emerald-400' : 'text-slate-400'}`}>{format(d, 'MMM', { locale: he })}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-800 leading-tight">{format(d, 'EEEE', { locale: he })}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <span className="text-xs text-slate-400">{format(d, 'yyyy')}</span>
+                            {trx.cardNumber && (
+                              <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">···{trx.cardNumber}</span>
+                            )}
+                            {inst?.number && inst?.total && (
+                              <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{inst.number}/{inst.total}</span>
+                            )}
+                          </div>
+                        </div>
+                        <span className={`text-base font-bold tabular-nums shrink-0 ${isIncome ? 'text-emerald-600' : 'text-slate-900'}`}>
+                          {isIncome ? '+' : '−'}{formatCurrency(trx.amount)}
+                        </span>
+                        <button
+                          onClick={() => setEditingTrx({
+                            _id: trx._id,
+                            date: format(d, 'yyyy-MM-dd'),
+                            amount: trx.amount,
+                            type: trx.type,
+                            category: trx.category || 'כללי',
+                          })}
+                          className="opacity-0 group-hover/row:opacity-100 transition-opacity p-1.5 rounded-full hover:bg-blue-50 text-slate-300 hover:text-blue-500 shrink-0"
+                          title="ערוך עסקה"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}

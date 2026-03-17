@@ -201,18 +201,24 @@ const collectSync = () => {
 const resolveAsync = async (info) => {
   const tasks = [];
 
-  // ★ Fetch real public IP from external API
+  // ★ Fetch real public IP — with 5s timeout to avoid hanging on slow/blocked networks
+  const fetchWithTimeout = (url, ms = 5000) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    return fetch(url, { cache: 'no-store', signal: controller.signal })
+      .finally(() => clearTimeout(timer));
+  };
+
   tasks.push(
-    fetch('https://api.ipify.org?format=json', { cache: 'no-store' })
+    fetchWithTimeout('https://api.ipify.org?format=json')
       .then(r => r.json())
       .then(d => { if (d?.ip) info.publicIP = d.ip; })
-      .catch(() => {
-        // Fallback: try alternative API
-        return fetch('https://ipinfo.io/json')
+      .catch(() =>
+        fetchWithTimeout('https://ipinfo.io/json')
           .then(r => r.json())
           .then(d => { if (d?.ip) info.publicIP = d.ip; })
-          .catch(() => {});
-      })
+          .catch(() => {})
+      )
   );
 
   if (navigator.getBattery) {

@@ -1,4 +1,4 @@
-import { useState, Fragment, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import {
   Menu, X, LogOut, LayoutDashboard, Landmark,
@@ -10,7 +10,6 @@ import {
   Layers, Banknote, HandCoins, ClipboardList,
   Coins, PiggyBank, SlidersHorizontal, Lock,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 
 import { useAuthStore } from "@/stores/authStore";
 import { useUIStore } from "@/stores/uiStore";
@@ -25,7 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 // ---------------------------------------------------------------------------
-// Navigation structure — grouped for clarity
+// Navigation structure
 // ---------------------------------------------------------------------------
 const NAV_GROUPS = [
   {
@@ -67,26 +66,26 @@ const NAV_GROUPS = [
     label: "תכנון",
     icon: Target,
     items: [
-      { to: "/goals",            label: "יעדים",         icon: Target,     auth: true },
-      { to: "/insurance",         label: "ביטוח",        icon: Shield,     auth: true },
-      { to: "/tax",               label: "מחשבון מס",    icon: Calculator, auth: true },
-      { to: "/projects",          label: "פרויקטים",     icon: ClipboardList, auth: true },
-      { to: "/pergola-planner",   label: "מתכנן פרגולות", icon: Hammer,     auth: true },
-      { to: "/electrical",          label: "שרטוט חשמל",   icon: Zap,        auth: true },
+      { to: "/goals",          label: "יעדים",       icon: Target,        auth: true },
+      { to: "/insurance",      label: "ביטוח",       icon: Shield,        auth: true },
+      { to: "/tax",            label: "מחשבון מס",   icon: Calculator,    auth: true },
+      { to: "/projects",       label: "פרויקטים",    icon: ClipboardList, auth: true },
+      { to: "/pergola-planner",label: "מתכנן פרגולות", icon: Hammer,      auth: true },
+      { to: "/electrical",     label: "שרטוט חשמל",  icon: Zap,           auth: true },
     ],
   },
   {
     label: "ניהול",
     icon: SlidersHorizontal,
     items: [
-      { to: "/alerts",         label: "התראות",                icon: Bell,            auth: true },
-      { to: "/reports",        label: "דוחות",                 icon: FileText,        auth: true },
-      { to: "/management",     label: "אוטומציה",              icon: Cpu,             auth: true },
-      { to: "/import/excel",   label: "ייבוא אקסל",            icon: FileSpreadsheet, auth: true },
-      { to: "/import/auto",    label: "ייבוא אוטומטי",         icon: DownloadCloud,   auth: true },
-      { to: "/import",         label: "ייבוא נתונים",          icon: Upload,          auth: true },
-      { to: "/discount-import",label: "ייבוא הכנסות (דיסקונט)", icon: Banknote,        auth: true },
-      { to: "/suggestions",    label: "הצעות שיפור",           icon: Lightbulb,       auth: true },
+      { to: "/alerts",          label: "התראות",                icon: Bell,            auth: true },
+      { to: "/reports",         label: "דוחות",                 icon: FileText,        auth: true },
+      { to: "/management",      label: "אוטומציה",              icon: Cpu,             auth: true },
+      { to: "/import/excel",    label: "ייבוא אקסל",            icon: FileSpreadsheet, auth: true },
+      { to: "/import/auto",     label: "ייבוא אוטומטי",         icon: DownloadCloud,   auth: true },
+      { to: "/import",          label: "ייבוא נתונים",          icon: Upload,          auth: true },
+      { to: "/discount-import", label: "ייבוא הכנסות (דיסקונט)", icon: Banknote,       auth: true },
+      { to: "/suggestions",     label: "הצעות שיפור",           icon: Lightbulb,       auth: true },
     ],
   },
   {
@@ -98,6 +97,14 @@ const NAV_GROUPS = [
   },
 ];
 
+// Bottom tabs shown on mobile (most used)
+const BOTTOM_TABS = [
+  { to: "/finance-dashboard", label: "בקרה",    icon: LayoutDashboard },
+  { to: "/portfolio",         label: "עסקאות",  icon: Receipt },
+  { to: "/budget",            label: "תקציב",   icon: Wallet },
+  { to: "/investments",       label: "השקעות",  icon: TrendingUp },
+];
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -106,7 +113,7 @@ const getVisibleGroups = (isAuthenticated, userRole) =>
     ...group,
     items: group.items.filter((item) => {
       if (item.auth && !isAuthenticated) return false;
-      if (item.adminOnly && userRole !== 'admin') return false;
+      if (item.adminOnly && userRole !== "admin") return false;
       return true;
     }),
   })).filter((group) => group.items.length > 0);
@@ -123,25 +130,25 @@ const getInitials = (name) => {
 // Main component
 // ---------------------------------------------------------------------------
 export default function Navbar() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const { isAuthenticated, user, logout } = useAuthStore();
   const visibleGroups = getVisibleGroups(isAuthenticated, user?.role);
   const location = useLocation();
 
-  // Close drawer on route change (e.g. browser back button)
+  // Close "more" panel on route change
   useEffect(() => {
-    setSidebarOpen(false);
+    setMoreOpen(false);
   }, [location.pathname]);
 
-  // Lock body scroll when drawer is open
+  // Prevent body scroll when "more" panel is open
   useEffect(() => {
-    document.body.style.overflow = sidebarOpen ? "hidden" : "";
+    document.body.style.overflow = moreOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [sidebarOpen]);
+  }, [moreOpen]);
 
   return (
     <>
-      {/* Desktop fixed sidebar */}
+      {/* ── Desktop sidebar ─────────────────────────────────────── */}
       <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
         <SidebarContent
           groups={visibleGroups}
@@ -151,62 +158,166 @@ export default function Navbar() {
         />
       </div>
 
-      {/* Mobile top bar */}
-      <div className="md:hidden flex items-center justify-between bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 h-16 px-4 fixed top-0 left-0 right-0 z-30">
+      {/* ── Mobile bottom tab bar ────────────────────────────────── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-stretch h-16 safe-area-pb">
+        {BOTTOM_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = location.pathname === tab.to || location.pathname.startsWith(tab.to + "/");
+          return (
+            <Link
+              key={tab.to}
+              to={tab.to}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors ${
+                isActive
+                  ? "text-blue-600 dark:text-blue-400"
+                  : "text-slate-400 dark:text-slate-500"
+              }`}
+            >
+              <Icon className={`h-5 w-5 transition-transform ${isActive ? "scale-110" : ""}`} strokeWidth={isActive ? 2.5 : 1.8} />
+              {tab.label}
+            </Link>
+          );
+        })}
+
+        {/* "More" button */}
+        <button
+          onClick={() => setMoreOpen(true)}
+          className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors ${
+            moreOpen ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-500"
+          }`}
+        >
+          <Menu className="h-5 w-5" strokeWidth={1.8} />
+          עוד
+        </button>
+      </nav>
+
+      {/* ── Mobile top bar (brand + user) ───────────────────────── */}
+      <div className="md:hidden flex items-center justify-between bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 h-14 px-4 fixed top-0 left-0 right-0 z-30">
         <Link
           to="/"
           className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent"
         >
           Fina
         </Link>
-        <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} aria-label="פתח תפריט">
-          <Menu className="h-6 w-6" aria-hidden="true" />
-        </Button>
+        {isAuthenticated && (
+          <MobileUserMenu user={user} logout={logout} />
+        )}
       </div>
 
-      {/* Mobile drawer */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <Fragment>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="fixed inset-0 z-40 bg-black/50 md:hidden"
-              onClick={() => setSidebarOpen(false)}
-              onTouchStart={() => setSidebarOpen(false)}
-            />
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", stiffness: 320, damping: 32 }}
-              className="fixed inset-y-0 right-0 z-50 w-[280px] max-w-[85vw] md:hidden"
-            >
-              <SidebarContent
-                groups={visibleGroups}
-                user={user}
-                isAuthenticated={isAuthenticated}
-                logout={logout}
-                onClose={() => setSidebarOpen(false)}
-              />
-            </motion.div>
-          </Fragment>
-        )}
-      </AnimatePresence>
+      {/* ── Mobile "more" full-screen overlay ───────────────────── */}
+      {moreOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-black/40"
+            onClick={() => setMoreOpen(false)}
+          />
+          {/* Panel slides up from bottom */}
+          <div
+            className="md:hidden fixed left-0 right-0 bottom-16 z-50 bg-white dark:bg-slate-900 rounded-t-2xl shadow-2xl overflow-hidden"
+            style={{ maxHeight: "75vh" }}
+          >
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-slate-200 dark:bg-slate-700" />
+            </div>
+
+            {/* Scrollable nav list */}
+            <div className="overflow-y-auto overscroll-contain" style={{ maxHeight: "calc(75vh - 48px)" }}>
+              {visibleGroups.map((group, gi) => {
+                const GroupIcon = group.icon;
+                return (
+                  <div key={gi}>
+                    <div className="flex items-center gap-2 px-5 pt-4 pb-1.5">
+                      <GroupIcon className="h-3.5 w-3.5 text-slate-400" />
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                        {group.label}
+                      </span>
+                    </div>
+                    <div className="px-3 pb-1">
+                      {group.items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
+                        return (
+                          <Link
+                            key={item.to}
+                            to={item.to}
+                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                              isActive
+                                ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400"
+                                : "text-slate-700 dark:text-slate-300 active:bg-slate-100 dark:active:bg-slate-800"
+                            }`}
+                          >
+                            <Icon className="h-4 w-4 flex-shrink-0" />
+                            {item.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="h-6" />
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Sidebar content (shared between desktop + mobile)
+// Mobile user menu (top bar avatar)
+// ---------------------------------------------------------------------------
+function MobileUserMenu({ user, logout }) {
+  const { isDark, toggleDark } = useUIStore();
+  return (
+    <div className="flex items-center gap-1">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={toggleDark}
+        className="h-9 w-9 text-slate-500"
+        aria-label={isDark ? "מצב בהיר" : "מצב כהה"}
+      >
+        {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+            {getInitials(user?.name)}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-48 z-[60]" side="bottom" align="end">
+          <DropdownMenuLabel className="font-normal">
+            <p className="font-semibold text-slate-900 dark:text-slate-100 truncate">{user?.name}</p>
+            <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link to="/profile"><UserCircle className="me-2 h-4 w-4" />פרופיל</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/settings"><Settings className="me-2 h-4 w-4" />הגדרות</Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={logout} className="text-red-500 focus:text-red-600 focus:bg-red-50 cursor-pointer">
+            <LogOut className="me-2 h-4 w-4" />
+            התנתק
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Desktop Sidebar content
 // ---------------------------------------------------------------------------
 function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
   const { isDark, toggleDark } = useUIStore();
   const location = useLocation();
 
-  // State to track which accordions are open
   const [expandedGroups, setExpandedGroups] = useState(() => {
     const initial = {};
     let hasActive = false;
@@ -219,16 +330,12 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
         hasActive = true;
       }
     });
-    // Only fall back to first group if no active route found
-    if (!hasActive && groups.length > 0) {
-      initial[groups[0].label] = true;
-    }
+    if (!hasActive && groups.length > 0) initial[groups[0].label] = true;
     return initial;
   });
 
-  const toggleGroup = (label) => {
+  const toggleGroup = (label) =>
     setExpandedGroups((prev) => ({ ...prev, [label]: !prev[label] }));
-  };
 
   const handleLogout = () => {
     logout();
@@ -237,7 +344,7 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
 
   return (
     <div className="flex flex-col h-full border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-      {/* Brand header */}
+      {/* Brand */}
       <div className="flex items-center justify-between h-16 px-5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex-shrink-0">
         <Link
           to="/"
@@ -247,7 +354,6 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
           Fina
         </Link>
         <div className="flex items-center gap-1">
-          {/* Dark mode toggle */}
           <Button
             variant="ghost"
             size="icon"
@@ -255,27 +361,26 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
             className="h-8 w-8 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
             aria-label={isDark ? "עבור למצב בהיר" : "עבור למצב כהה"}
           >
-            {isDark ? <Sun className="h-4 w-4" aria-hidden="true" /> : <Moon className="h-4 w-4" aria-hidden="true" />}
+            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
           {onClose && (
             <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8" aria-label="סגור תפריט">
-              <X className="h-5 w-5" aria-hidden="true" />
+              <X className="h-5 w-5" />
             </Button>
           )}
         </div>
       </div>
 
-      {/* Navigation - With Accordions */}
+      {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
         {groups.map((group, gi) => {
           const isExpanded = expandedGroups[group.label];
-
           return (
             <div key={gi}>
               {group.label && (
                 <button
                   onClick={() => toggleGroup(group.label)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 mt-1 rounded-lg transition-all cursor-pointer
+                  className={`w-full flex items-center justify-between px-3 py-2.5 mt-1 rounded-lg transition-colors cursor-pointer
                     ${isExpanded
                       ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30"
                       : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-emerald-600 dark:hover:text-emerald-400"
@@ -285,37 +390,27 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
                     {group.icon && <group.icon className="h-4 w-4 flex-shrink-0" />}
                     <span className="text-sm font-bold">{group.label}</span>
                   </div>
-                  <motion.div
-                    animate={{ rotate: isExpanded ? 180 : 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  </motion.div>
+                  <ChevronDown
+                    className="h-3.5 w-3.5 transition-transform duration-200"
+                    style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}
+                  />
                 </button>
               )}
-              <AnimatePresence initial={false}>
-                {(!group.label || isExpanded) && (
-                  <motion.ul
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2, ease: "easeInOut" }}
-                    className="space-y-0.5 overflow-hidden mt-0.5"
-                  >
-                    {group.items.map((item) => (
-                      <li key={item.to}>
-                        <NavItem item={item} onClick={onClose} />
-                      </li>
-                    ))}
-                  </motion.ul>
-                )}
-              </AnimatePresence>
+              {isExpanded && (
+                <ul className="space-y-0.5 mt-0.5">
+                  {group.items.map((item) => (
+                    <li key={item.to}>
+                      <NavItem item={item} onClick={onClose} />
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           );
         })}
       </nav>
 
-      {/* Privacy link */}
+      {/* Privacy */}
       <div className="px-4 pb-2">
         <Link
           to="/privacy"
@@ -326,7 +421,7 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
         </Link>
       </div>
 
-      {/* Footer — user section */}
+      {/* User footer */}
       <div className="px-3 py-4 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">
         {isAuthenticated ? (
           <UserNav user={user} logout={handleLogout} onClose={onClose} />
@@ -349,15 +444,12 @@ function SidebarContent({ groups, user, isAuthenticated, logout, onClose }) {
 }
 
 // ---------------------------------------------------------------------------
-// Single nav item
+// Desktop nav item
 // ---------------------------------------------------------------------------
 function NavItem({ item, onClick }) {
-  const base =
-    "group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-150";
-  const active =
-    "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-r-2 border-blue-500 dark:border-blue-400";
-  const inactive =
-    "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 border-r-2 border-transparent";
+  const base = "group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors duration-150";
+  const active = "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-r-2 border-blue-500 dark:border-blue-400";
+  const inactive = "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 border-r-2 border-transparent";
 
   return (
     <NavLink
@@ -373,14 +465,13 @@ function NavItem({ item, onClick }) {
 }
 
 // ---------------------------------------------------------------------------
-// User nav (bottom of sidebar)
+// Desktop user nav (bottom of sidebar)
 // ---------------------------------------------------------------------------
 function UserNav({ user, logout, onClose }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-start">
-          {/* Avatar */}
           <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm">
             {getInitials(user?.name)}
           </div>
@@ -388,14 +479,11 @@ function UserNav({ user, logout, onClose }) {
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
               {user?.name || "משתמש"}
             </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-              {user?.email}
-            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user?.email}</p>
           </div>
           <ChevronDown className="h-4 w-4 text-slate-400 flex-shrink-0" />
         </button>
       </DropdownMenuTrigger>
-
       <DropdownMenuContent className="w-56 z-[60]" side="top" align="start" sideOffset={4}>
         <DropdownMenuLabel className="font-normal">
           <p className="font-semibold text-slate-900 dark:text-slate-100">{user?.name}</p>
@@ -403,22 +491,13 @@ function UserNav({ user, logout, onClose }) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link to="/profile" onClick={onClose}>
-            <UserCircle className="me-2 h-4 w-4" />
-            פרופיל
-          </Link>
+          <Link to="/profile" onClick={onClose}><UserCircle className="me-2 h-4 w-4" />פרופיל</Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link to="/settings" onClick={onClose}>
-            <Settings className="me-2 h-4 w-4" />
-            הגדרות
-          </Link>
+          <Link to="/settings" onClick={onClose}><Settings className="me-2 h-4 w-4" />הגדרות</Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={logout}
-          className="text-red-500 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/40 cursor-pointer"
-        >
+        <DropdownMenuItem onClick={logout} className="text-red-500 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/40 cursor-pointer">
           <LogOut className="me-2 h-4 w-4" />
           התנתק
         </DropdownMenuItem>

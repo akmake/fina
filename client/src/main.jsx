@@ -6,6 +6,11 @@ import { HelmetProvider } from 'react-helmet-async';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import App from './App.jsx';
 import './index.css';
+import { warmCsrf } from './utils/api.js';
+
+// מחמם את ה-CSRF token מיד עם טעינת האפליקציה — לפני שהקומפוננטים
+// מתחילים לשלוח בקשות, כדי לחסוך עיכוב של round-trip שלם בהפעלה הראשונה
+warmCsrf();
 // Toaster is provided by Layout.jsx to keep it co-located with the app shell.  
 
 const queryClient = new QueryClient();
