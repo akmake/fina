@@ -293,10 +293,14 @@ export const scrapeCompany = async (req, res, next) => {
     const result = await scraper.scrape(credentials);
 
     if (!result.success) {
-      const errMsg = result.errorType === 'invalidPassword'
-        ? 'שם משתמש או סיסמא שגויים'
-        : `שגיאת כניסה: ${result.errorType}`;
-      return next(new AppError(errMsg, 401));
+      const ERROR_MAP = {
+        invalidPassword: { status: 401, message: 'שם משתמש או סיסמא שגויים — בדוק את הפרטים ונסה שנית' },
+        changePassword:  { status: 400, message: 'נדרש לשנות סיסמה באתר הבנק/חברת האשראי לפני הייבוא' },
+        timeout:         { status: 504, message: 'אתר הבנק לא הגיב בזמן — האתר עמוס, נסה שנית בעוד מספר דקות' },
+        generic:         { status: 502, message: 'שגיאה בהתחברות לאתר הבנק — ייתכן שהאתר בתחזוקה, נסה שנית מאוחר יותר' },
+      };
+      const err = ERROR_MAP[result.errorType] ?? { status: 502, message: `שגיאת כניסה: ${result.errorType}` };
+      return next(new AppError(err.message, err.status));
     }
 
     // Raw debug info — full scraper output per account

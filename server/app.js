@@ -116,7 +116,6 @@ app.get('/api/health', (req, res) => {
 });
 
 // --- נתיבים ציבוריים (ללא CSRF) ---
-app.use('/api/import', importRoutes); 
 app.use('/api/auth', authRoutes);
 
 // --- Endpoint לקבלת ה-CSRF Token ---
@@ -156,7 +155,8 @@ app.use('/api/child-savings',   requireAuth, familyScope, childSavingsRoutes);
 app.use('/api/foreign-currency',requireAuth, familyScope, foreignCurrencyRoutes);
 app.use('/api/reports',         requireAuth, familyScope, reportRoutes);
 app.use('/api/maaser',          requireAuth, familyScope, maaserRoutes);
-app.use('/api/scrape', scraperRoutes);
+app.use('/api/import',  requireAuth, importRoutes);
+app.use('/api/scrape',  requireAuth, scraperRoutes);
 app.use('/api/cal',   calRoutes);
 app.use('/api/logs', logsRoutes);
 

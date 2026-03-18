@@ -33,6 +33,7 @@ export default function AutoImportPage() {
   const [mappings, setMappings] = useState({});
   const [categories, setCategories] = useState([]);
   const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
   const [balances, setBalances] = useState([]);
   const [futureDebits, setFutureDebits] = useState([]);
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
@@ -121,6 +122,7 @@ export default function AutoImportPage() {
         setCalError('קוד שגוי או פג תוקף');
         setStage('cal-otp');
       } else {
+        setIsError(true);
         setMessage(err.response?.data?.message || err.message || 'שגיאה בייבוא מכאל');
         setStage('result');
       }
@@ -155,6 +157,7 @@ export default function AutoImportPage() {
         await processData([], data.transactions);
       }
     } catch (error) {
+      setIsError(true);
       setMessage(error.response?.data?.message || error.message || `שגיאה בהתחברות ל${companyConfig?.label || ''}.`);
       setStage('result');
     }
@@ -200,9 +203,11 @@ export default function AutoImportPage() {
         transactions: finalTransactions,
         newMappings: mappingsToSave,
       });
+      setIsError(false);
       setMessage(data.message);
       setStage('result');
     } catch (err) {
+      setIsError(true);
       setMessage(err.response?.data?.message || 'שגיאה בעיבוד הנתונים.');
       setStage('result');
     }
@@ -227,6 +232,7 @@ export default function AutoImportPage() {
   const reset = () => {
     setStage('credentials');
     setMessage('');
+    setIsError(false);
     setParsedData([]);
     setUnseenMerchants([]);
     setBalances([]);
@@ -462,12 +468,12 @@ export default function AutoImportPage() {
             <div className="text-center p-8 space-y-4 w-full">
               {stage === 'processing'
                 ? <Loader2 className="mx-auto h-16 w-16 text-blue-500 animate-spin" />
-                : message.includes('שגיאה')
+                : isError
                   ? <AlertTriangle className="mx-auto h-16 w-16 text-red-400" />
                   : <CheckCircle className="mx-auto h-16 w-16 text-green-400" />
               }
               <h2 className="text-2xl font-bold">{stage === 'processing' ? 'בתהליך...' : 'הסתיים'}</h2>
-              <p className={message.includes('שגיאה') ? 'text-red-600' : 'text-green-600'}>{message}</p>
+              <p className={isError ? 'text-red-600' : 'text-green-600'}>{message}</p>
 
               {stage === 'result' && balances.length > 0 && (
                 <div className="mt-4 text-right border rounded-md p-4 bg-slate-50 space-y-1">

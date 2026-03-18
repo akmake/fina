@@ -148,8 +148,14 @@ export const loginUser = async (req, res) => {
 };
 
 export const logout = async (req, res) => {
-  res.clearCookie('jwt', { httpOnly: true, sameSite: 'lax', path: '/' });
-  res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'lax', path: '/' });
+  const cookieOpts = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    path: '/',
+  };
+  res.clearCookie('jwt', cookieOpts);
+  res.clearCookie('refreshToken', cookieOpts);
   return res.sendStatus(204);
 };
 

@@ -107,7 +107,7 @@ export const processTransactions = async (req, res, next) => {
             $unset: { category: 1 },
           },
           { upsert: true }
-        ).catch(() => {});
+        ).catch(err => console.error('[MerchantMap] upsert failed:', err.message));
       }
     }
 
