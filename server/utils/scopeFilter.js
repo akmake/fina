@@ -10,5 +10,6 @@ export const scopeFilter = (req) => {
   if (users && users.length > 1) {
     return { user: { $in: users } };
   }
-  return { user: req.user._id };
+  // Always use the ObjectId from scopeUsers (already cast), not the raw JWT string
+  return { user: users?.[0] ?? req.user._id };
 };

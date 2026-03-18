@@ -35,20 +35,29 @@ const createAndSendTokens = (user, res) => {
 
 const oauth2Client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// POST /auth/google — receives Google ID token from @react-oauth/google
+// POST /auth/google — receives either ID token (credential) or access_token
 export const googleAuth = async (req, res) => {
   try {
-    const { credential } = req.body;
-    if (!credential) {
+    const { credential, access_token } = req.body;
+    if (!credential && !access_token) {
       return res.status(400).json({ message: 'חסר טוקן גוגל' });
     }
 
-    const ticket = await oauth2Client.verifyIdToken({
-      idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
+    let googleId, email, name, avatar;
 
-    const { sub: googleId, email, name, picture: avatar } = ticket.getPayload();
+    if (credential) {
+      // ID token path (GoogleLogin component)
+      const ticket = await oauth2Client.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      ({ sub: googleId, email, name, picture: avatar } = ticket.getPayload());
+    } else {
+      // Access token path (useGoogleLogin hook)
+      const resp = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${access_token}`);
+      if (!resp.ok) return res.status(401).json({ message: 'טוקן גוגל לא תקין' });
+      ({ sub: googleId, email, name, picture: avatar } = await resp.json());
+    }
 
     let user = await User.findOne({ googleId });
 
