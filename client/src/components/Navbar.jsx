@@ -7,7 +7,7 @@ import {
   Shield, Building2, Bell, Calculator, DownloadCloud, Baby, Globe,
   FileText, Layers, Banknote, HandCoins, ClipboardList,
   Coins, PiggyBank, SlidersHorizontal, Lock, LogOut, Activity,
-  Lightbulb, X, Search,
+  Lightbulb, X, Search, Users,
 } from "lucide-react";
 
 import { useAuthStore } from "@/stores/authStore";
@@ -57,6 +57,8 @@ const NAV_GROUPS = [
     label: "תכנון", icon: Target,
     items: [
       { to: "/goals",     label: "יעדים",      icon: Target        },
+      { to: "/maaser",    label: "מעשרות",     icon: HandCoins     },
+      { to: "/family",    label: "אזור משפחתי", icon: Users         },
       { to: "/insurance", label: "ביטוח",      icon: Shield        },
       { to: "/tax",       label: "מחשבון מס",  icon: Calculator    },
       { to: "/projects",  label: "פרויקטים",   icon: ClipboardList },

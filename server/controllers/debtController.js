@@ -5,6 +5,7 @@ import FinanceProfile from '../models/FinanceProfile.js';
 import RecurringTransaction from '../models/RecurringTransaction.js';
 import Transaction from '../models/Transaction.js';
 import { subMonths } from 'date-fns';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 // GET /api/debts — תמונת חובות מלאה
 export const getDebtOverview = async (req, res) => {
@@ -12,10 +13,10 @@ export const getDebtOverview = async (req, res) => {
     const userId = req.user._id;
 
     const [loans, mortgages, profile, recurring] = await Promise.all([
-      Loan.find({ user: userId }),
-      Mortgage.find({ user: userId, status: 'active' }),
-      FinanceProfile.findOne({ user: userId }),
-      RecurringTransaction.find({ user: userId, isActive: true, subcategory: 'loan_payment' }),
+      Loan.find(scopeFilter(req)),
+      Mortgage.find({ ...scopeFilter(req), status: 'active' }),
+      FinanceProfile.findOne(scopeFilter(req)),
+      RecurringTransaction.find({ ...scopeFilter(req), isActive: true, subcategory: 'loan_payment' }),
     ]);
 
     // ── חובות ────────────────────────────

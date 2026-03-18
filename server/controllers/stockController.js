@@ -4,6 +4,7 @@ import yahooFinance from 'yahoo-finance2';
 import Stock from '../models/Stock.js';
 import Account from '../models/Account.js'; // Assuming you have this model from finance part
 import AppError from '../utils/AppError.js';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 const USD_TO_SHEKEL = 3.7; // Consider making this a dynamic value
 
@@ -21,7 +22,7 @@ const fetchPrice = async (ticker) => {
 /** GET /api/stocks - Get all stocks for a user */
 export const getAllStocks = async (req, res, next) => {
   try {
-    const stocks = await Stock.find({ user: req.user.id }).sort({ createdAt: -1 });
+    const stocks = await Stock.find(scopeFilter(req)).sort({ createdAt: -1 });
     res.json(stocks);
   } catch (err) {
     next(new AppError('Failed to fetch stocks.', 500));
@@ -108,7 +109,7 @@ export const sellStock = async (req, res, next) => {
 /** POST /api/stocks/refresh-prices - Refresh all stock prices */
 export const refreshPrices = async (req, res, next) => {
     try {
-        const stocks = await Stock.find({ user: req.user.id });
+        const stocks = await Stock.find(scopeFilter(req));
         let updatedCount = 0;
 
         const promises = stocks.map(async (stock) => {
@@ -123,7 +124,7 @@ export const refreshPrices = async (req, res, next) => {
 
         await Promise.all(promises);
 
-        const updatedStocks = await Stock.find({ user: req.user.id }).sort({ createdAt: -1 });
+        const updatedStocks = await Stock.find(scopeFilter(req)).sort({ createdAt: -1 });
 
         res.json({
             message: `${updatedCount} stock prices updated.`,

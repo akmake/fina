@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Transaction from '../models/Transaction.js';
 import FinanceProfile from '../models/FinanceProfile.js';
 import MerchantMap from '../models/MerchantMap.js';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 // --- פונקציית עזר לתרגום סוגים ---
 const normalizeType = (type) => {
@@ -19,7 +20,7 @@ const normalizeAccount = (account) => {
 // Query params: ?from=DATE&to=DATE (month range) | ?before=DATE&limit=N (cursor) | ?limit=N (latest N)
 export const getTransactions = async (req, res) => {
   try {
-    const filter = { user: req.user._id };
+    const filter = { ...scopeFilter(req) };
 
     if (req.query.from || req.query.to) {
       filter.date = {};
@@ -48,7 +49,7 @@ export const searchTransactions = async (req, res) => {
     if (!q || !q.trim()) return res.json([]);
 
     const filter = {
-      user: req.user._id,
+      ...scopeFilter(req),
       $or: [
         { description: { $regex: q.trim(), $options: 'i' } },
         { category:    { $regex: q.trim(), $options: 'i' } },
@@ -70,7 +71,7 @@ export const searchTransactions = async (req, res) => {
 export const getMerchantTransactions = async (req, res) => {
   try {
     const transactions = await Transaction.find({
-      user: req.user._id,
+      ...scopeFilter(req),
       description: req.params.name,
     }).sort({ date: -1 });
     res.json(transactions);
@@ -363,7 +364,7 @@ export const bulkUpdateMerchant = async (req, res) => {
   try {
     // 1. קודם כל משלים את ה-rawDescriptions לפני שהעדכון משנה את ה-description
     const existingTxns = await Transaction.find(
-      { user: userId, description: originalName },
+      { ...scopeFilter(req), description: originalName },
       { rawDescription: 1, description: 1 }
     ).lean();
     const uniqueRawDescriptions = [...new Set(

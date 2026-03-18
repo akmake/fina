@@ -13,6 +13,7 @@ import FinanceProfile from '../models/FinanceProfile.js';
 import smartCategoryEngine from '../utils/smartCategoryEngine.js';
 import { getPaginationOptions, formatPaginatedResponse } from '../utils/pagination.js';
 import logger from '../utils/logger.js';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 /**
  * Get comprehensive financial analytics
@@ -27,7 +28,7 @@ export const getFinancialAnalytics = async (req, res) => {
 
     // Get all transactions in range
     const transactions = await Transaction.find({
-      user: userId,
+      ...scopeFilter(req),
       date: { $gte: start, $lte: end },
     }).lean();
 
@@ -80,7 +81,7 @@ export const autoCategorizeBatch = async (req, res) => {
 
     // Get uncategorized or low-confidence transactions
     const transactions = await Transaction.find({
-      user: userId,
+      ...scopeFilter(req),
       category: category,
     })
       .limit(parseInt(limit))
@@ -151,7 +152,7 @@ export const getTransactionInsights = async (req, res) => {
 
     const startDate = new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000);
 
-    let query = { user: userId, date: { $gte: startDate } };
+    let query = { ...scopeFilter(req), date: { $gte: startDate } };
 
     if (category) query.category = category;
     if (merchant) query.rawDescription = new RegExp(merchant, 'i');
@@ -191,7 +192,7 @@ export const getTransactionInsights = async (req, res) => {
 export const getSpendingRecommendations = async (req, res) => {
   try {
     const userId = req.user._id;
-    const transactions = await Transaction.find({ user: userId })
+    const transactions = await Transaction.find(scopeFilter(req))
       .sort({ date: -1 })
       .limit(200)
       .lean();
@@ -255,9 +256,9 @@ export const getSpendingRecommendations = async (req, res) => {
     // ── המלצות חוצות-מודולים ──────────────────────────────────────────
     const now = new Date();
     const [recurringCount, currentBudget, offTrackGoals] = await Promise.all([
-      RecurringTransaction.countDocuments({ user: userId, isActive: true }),
-      Budget.findOne({ user: userId, month: now.getMonth() + 1, year: now.getFullYear() }).lean(),
-      Goal.find({ user: userId, status: 'active' }).lean(),
+      RecurringTransaction.countDocuments({ ...scopeFilter(req), isActive: true }),
+      Budget.findOne({ ...scopeFilter(req), month: now.getMonth() + 1, year: now.getFullYear() }).lean(),
+      Goal.find({ ...scopeFilter(req), status: 'active' }).lean(),
     ]);
 
     // Recommendation 4: אין קבועות בכלל
@@ -336,7 +337,7 @@ export const predictSpending = async (req, res) => {
     const userId = req.user._id;
     const { months = 3 } = req.query;
 
-    const transactions = await Transaction.find({ user: userId })
+    const transactions = await Transaction.find(scopeFilter(req))
       .sort({ date: -1 })
       .limit(200)
       .lean();
@@ -625,11 +626,11 @@ export const getWeeklyActionPlan = async (req, res) => {
     const monthEnd   = new Date(year, month, 0, 23, 59, 59);
 
     const [profile, budget, goals, thisMonthTx, recurringTx] = await Promise.all([
-      FinanceProfile.findOne({ user: userId }).lean(),
-      Budget.findOne({ user: userId, month, year }).lean(),
-      Goal.find({ user: userId, status: 'active' }).lean(),
-      Transaction.find({ user: userId, date: { $gte: monthStart, $lte: monthEnd } }).lean(),
-      RecurringTransaction.find({ user: userId, isActive: true }).lean(),
+      FinanceProfile.findOne(scopeFilter(req)).lean(),
+      Budget.findOne({ ...scopeFilter(req), month, year }).lean(),
+      Goal.find({ ...scopeFilter(req), status: 'active' }).lean(),
+      Transaction.find({ ...scopeFilter(req), date: { $gte: monthStart, $lte: monthEnd } }).lean(),
+      RecurringTransaction.find({ ...scopeFilter(req), isActive: true }).lean(),
     ]);
 
     const actions = [];
@@ -780,7 +781,7 @@ export const getSeasonalAnalysis = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const transactions = await Transaction.find({ user: userId, type: 'הוצאה' }).lean();
+    const transactions = await Transaction.find({ ...scopeFilter(req), type: 'הוצאה' }).lean();
 
     if (transactions.length === 0) {
       return res.json({ status: 'success', data: { monthly: [], quarterly: [], insights: [], peakMonth: null, cheapestMonth: null } });

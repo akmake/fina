@@ -50,8 +50,10 @@ const DebtPage             = lazy(() => import("@/pages/DebtPage"));
 const ChildSavingsPage     = lazy(() => import("@/pages/ChildSavingsPage"));
 const ForeignCurrencyPage  = lazy(() => import("@/pages/ForeignCurrencyPage"));
 const ReportsPage          = lazy(() => import("@/pages/ReportsPage"));
+const MaaserPage           = lazy(() => import("@/pages/MaaserPage"));
 const AutoImportPage       = lazy(() => import("@/pages/AutoImportPage"));
 const CalDirectImportPage  = lazy(() => import("@/pages/CalDirectImportPage"));
+const FamilyPage           = lazy(() => import("@/pages/FamilyPage"));
 
 function PageLoader() {
   return (
@@ -110,6 +112,9 @@ export default function App() {
             <Route path="projects/new"  element={<NewProjectPage />} />
             <Route path="projects/:id"  element={<ProjectPage />}    />
 
+            {/* Family */}
+            <Route path="family" element={<FamilyPage />} />
+
             {/* Account */}
             <Route path="profile"     element={<ProfilePage />}     />
             <Route path="settings"    element={<SettingsPage />}    />
@@ -126,6 +131,7 @@ export default function App() {
             <Route path="child-savings"    element={<ChildSavingsPage />}    />
             <Route path="foreign-currency" element={<ForeignCurrencyPage />} />
             <Route path="reports"          element={<ReportsPage />}         />
+            <Route path="maaser"           element={<MaaserPage />}          />
 
 
             {/* Admin */}

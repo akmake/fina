@@ -8,12 +8,13 @@ import Mortgage from '../models/Mortgage.js';
 import Transaction from '../models/Transaction.js';
 import RecurringTransaction from '../models/RecurringTransaction.js';
 import { subDays, startOfMonth, endOfMonth, addDays } from 'date-fns';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 // GET /api/alerts
 export const getAlerts = async (req, res) => {
   try {
     const alerts = await Alert.find({
-      user: req.user._id,
+      ...scopeFilter(req),
       isDismissed: false,
       $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
     }).sort({ createdAt: -1 }).limit(50);
@@ -66,7 +67,7 @@ export const generateAlerts = async (req, res) => {
 
     // ── 1. חידוש ביטוח קרוב (30 יום) ────
     const insurances = await Insurance.find({
-      user: userId, status: 'active',
+      ...scopeFilter(req), status: 'active',
       renewalDate: { $gte: now, $lte: addDays(now, 30) },
     });
     for (const ins of insurances) {
@@ -94,7 +95,7 @@ export const generateAlerts = async (req, res) => {
     // ── 2. חריגה מתקציב ────────────────
     const thisMonth = now.getMonth() + 1;
     const thisYear = now.getFullYear();
-    const budget = await Budget.findOne({ user: userId, month: thisMonth, year: thisYear });
+    const budget = await Budget.findOne({ ...scopeFilter(req), month: thisMonth, year: thisYear });
     if (budget) {
       for (const item of budget.items) {
         const spent = item.spent || 0;
@@ -145,7 +146,7 @@ export const generateAlerts = async (req, res) => {
 
     // ── 3. פיקדון מגיע לפדיון (14 יום) ──
     const deposits = await Deposit.find({
-      user: userId, status: 'active',
+      ...scopeFilter(req), status: 'active',
       endDate: { $gte: now, $lte: addDays(now, 14) },
     });
     for (const dep of deposits) {
@@ -170,7 +171,7 @@ export const generateAlerts = async (req, res) => {
     }
 
     // ── 4. יעדים שפיגרו ────────────────
-    const goals = await Goal.find({ user: userId, status: 'active' });
+    const goals = await Goal.find({ ...scopeFilter(req), status: 'active' });
     for (const goal of goals) {
       if (!goal.isOnTrack && goal.targetDate) {
         const exists = await Alert.findOne({
@@ -195,7 +196,7 @@ export const generateAlerts = async (req, res) => {
     }
 
     // ── 5. שינוי ריבית משכנתא קרוב ────
-    const mortgages = await Mortgage.find({ user: userId, status: 'active' });
+    const mortgages = await Mortgage.find({ ...scopeFilter(req), status: 'active' });
     for (const m of mortgages) {
       for (const track of m.tracks) {
         if (track.nextRateChange) {
@@ -226,7 +227,7 @@ export const generateAlerts = async (req, res) => {
 
     // ── 6. עסקה חריגה (כפולה / גדולה) ──
     const recent = await Transaction.find({
-      user: userId,
+      ...scopeFilter(req),
       date: { $gte: subDays(now, 3) },
       type: 'הוצאה',
     }).sort({ amount: -1 });

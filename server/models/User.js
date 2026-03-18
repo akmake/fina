@@ -40,9 +40,14 @@ const userSchema = new mongoose.Schema(
       type: Number, 
       default: 0 
     },
-    lockUntil: { 
-      type: Date 
-    }
+    lockUntil: {
+      type: Date
+    },
+    familyGroup: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'FamilyGroup',
+      default: null,
+    },
   },
   { timestamps: true }
 );

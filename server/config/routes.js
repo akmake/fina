@@ -1,6 +1,7 @@
 import authRoutes         from '../routes/auth.js';
 
 import projectRoutes      from '../routes/projectRoutes.js';
+import maaserRoutes       from '../routes/maaserRoutes.js';
 
 import { requireAuth }    from '../middlewares/authMiddleware.js';
 import { csrfTokenHandler, csrfProtection } from '../middlewares/csrf.js';
@@ -19,5 +20,5 @@ export const configureRoutes = (app) => {
   /* ---------- מסלולים מוגנים ---------- */
   /* ---------- מסלול מוגן חדש: פרויקטים כספיים ---------- */
   app.use('/api/projects', requireAuth, projectRoutes);
-
+  app.use('/api/maaser',  requireAuth, maaserRoutes);
 };

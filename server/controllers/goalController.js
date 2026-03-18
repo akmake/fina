@@ -1,5 +1,6 @@
 // server/controllers/goalController.js
 import Goal from '../models/Goal.js';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 const CATEGORY_LABELS = {
   home_purchase: 'קניית דירה',
@@ -34,7 +35,7 @@ const CATEGORY_ICONS = {
 // GET /api/goals
 export const getGoals = async (req, res) => {
   try {
-    const goals = await Goal.find({ user: req.user._id }).sort({ priority: 1, createdAt: -1 });
+    const goals = await Goal.find(scopeFilter(req)).sort({ priority: 1, createdAt: -1 });
 
     const activeGoals = goals.filter(g => g.status === 'active');
     const summary = {

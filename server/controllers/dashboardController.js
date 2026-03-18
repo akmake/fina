@@ -4,6 +4,7 @@ import Transaction from '../models/Transaction.js';
 import Project from '../models/Project.js';
 import FinanceProfile from '../models/FinanceProfile.js';
 import { startOfMonth, endOfMonth, subMonths, subDays } from 'date-fns';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 export const getDashboardData = async (req, res, next) => {
     try {
@@ -11,12 +12,12 @@ export const getDashboardData = async (req, res, next) => {
         const today = new Date();
 
         // Find most recent transaction to determine effective month
-        const mostRecentTx = await Transaction.findOne({ user: userObjectId }).sort({ date: -1 }).lean();
+        const mostRecentTx = await Transaction.findOne(scopeFilter(req)).sort({ date: -1 }).lean();
 
         let effectiveMonthStart = startOfMonth(today);
         if (mostRecentTx) {
             const currentMonthCount = await Transaction.countDocuments({
-                user: userObjectId,
+                ...scopeFilter(req),
                 date: { $gte: startOfMonth(today) }
             });
             if (currentMonthCount === 0) {
@@ -41,11 +42,11 @@ export const getDashboardData = async (req, res, next) => {
             recentTransactions,
             topCategories,
         ] = await Promise.all([
-            FinanceProfile.findOne({ user: req.user._id }).lean(),
+            FinanceProfile.findOne(scopeFilter(req)).lean(),
 
             // Monthly income/expense for effective month + previous
             Transaction.aggregate([
-                { $match: { user: userObjectId, date: { $gte: effectivePrevMonthStart, $lte: effectiveMonthEnd } } },
+                { $match: { ...scopeFilter(req), date: { $gte: effectivePrevMonthStart, $lte: effectiveMonthEnd } } },
                 { $group: {
                     _id: {
                         monthStart: { $dateToString: { format: "%Y-%m-01", date: "$date" } },
@@ -65,7 +66,7 @@ export const getDashboardData = async (req, res, next) => {
 
             // Balance trend for chart
             Transaction.aggregate([
-                { $match: { user: userObjectId, date: { $gte: chartStart, $lte: effectiveMonthEnd } } },
+                { $match: { ...scopeFilter(req), date: { $gte: chartStart, $lte: effectiveMonthEnd } } },
                 { $sort: { date: 1 } },
                 { $group: {
                     _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
@@ -75,14 +76,14 @@ export const getDashboardData = async (req, res, next) => {
             ]),
 
             // Recent transactions (last 10)
-            Transaction.find({ user: userObjectId })
+            Transaction.find(scopeFilter(req))
                 .sort({ date: -1 })
                 .limit(10)
                 .lean(),
 
             // Top 5 expense categories in effective month
             Transaction.aggregate([
-                { $match: { user: userObjectId, type: 'הוצאה', date: { $gte: effectiveMonthStart, $lte: effectiveMonthEnd } } },
+                { $match: { ...scopeFilter(req), type: 'הוצאה', date: { $gte: effectiveMonthStart, $lte: effectiveMonthEnd } } },
                 { $group: { _id: "$category", total: { $sum: "$amount" } } },
                 { $sort: { total: -1 } },
                 { $limit: 5 }

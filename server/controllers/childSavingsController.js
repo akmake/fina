@@ -1,5 +1,6 @@
 // server/controllers/childSavingsController.js
 import ChildSavings from '../models/ChildSavings.js';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 const TYPE_LABELS = {
   government: 'חיסכון לכל ילד',
@@ -13,7 +14,7 @@ const TYPE_LABELS = {
 // GET /api/child-savings
 export const getChildSavings = async (req, res) => {
   try {
-    const savings = await ChildSavings.find({ user: req.user._id }).sort({ childName: 1 });
+    const savings = await ChildSavings.find(scopeFilter(req)).sort({ childName: 1 });
 
     // קיבוץ לפי ילד
     const byChild = {};

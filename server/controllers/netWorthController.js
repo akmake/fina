@@ -16,6 +16,7 @@ import Insurance from '../models/Insurance.js';
 import Goal from '../models/Goal.js';
 import NetWorthSnapshot from '../models/NetWorthSnapshot.js';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 // ──────────────────────────────────────────────────
 // @desc   חישוב שווי נקי מפורט — כולל כל המודולים
@@ -26,16 +27,16 @@ export const getNetWorth = async (req, res) => {
     const userId = req.user._id;
 
     const [profile, deposits, stocks, funds, loans, pensions, properties, mortgages, foreignCurrency, childSavings] = await Promise.all([
-      FinanceProfile.findOne({ user: userId }),
-      Deposit.find({ user: userId, status: 'active' }),
-      Stock.find({ user: userId }),
-      Fund.find({ user: userId }),
-      Loan.find({ user: userId }),
-      Pension.find({ user: userId, status: 'active' }),
-      RealEstate.find({ user: userId, status: 'owned' }),
-      Mortgage.find({ user: userId, status: 'active' }),
-      ForeignCurrency.find({ user: userId, status: 'active' }),
-      ChildSavings.find({ user: userId, status: 'active' }),
+      FinanceProfile.findOne(scopeFilter(req)),
+      Deposit.find({ ...scopeFilter(req), status: 'active' }),
+      Stock.find(scopeFilter(req)),
+      Fund.find(scopeFilter(req)),
+      Loan.find(scopeFilter(req)),
+      Pension.find({ ...scopeFilter(req), status: 'active' }),
+      RealEstate.find({ ...scopeFilter(req), status: 'owned' }),
+      Mortgage.find({ ...scopeFilter(req), status: 'active' }),
+      ForeignCurrency.find({ ...scopeFilter(req), status: 'active' }),
+      ChildSavings.find({ ...scopeFilter(req), status: 'active' }),
     ]);
 
     // ── נכסים (Assets) ──────────────────
@@ -137,18 +138,18 @@ export const getFinancialHealthScore = async (req, res) => {
     const thisYear = today.getFullYear();
 
     const [profile, deposits, stocks, funds, loans, pensions, budget, recurring, recentTransactions, insurances, goals, mortgages] = await Promise.all([
-      FinanceProfile.findOne({ user: userId }),
-      Deposit.find({ user: userId, status: 'active' }),
-      Stock.find({ user: userId }),
-      Fund.find({ user: userId }),
-      Loan.find({ user: userId }),
-      Pension.find({ user: userId, status: 'active' }),
-      Budget.findOne({ user: userId, month: thisMonth, year: thisYear }),
-      RecurringTransaction.find({ user: userId, isActive: true }),
-      Transaction.find({ user: userId, date: { $gte: subMonths(today, 3) } }),
-      Insurance.find({ user: userId, status: 'active' }),
-      Goal.find({ user: userId, status: 'active' }),
-      Mortgage.find({ user: userId, status: 'active' }),
+      FinanceProfile.findOne(scopeFilter(req)),
+      Deposit.find({ ...scopeFilter(req), status: 'active' }),
+      Stock.find(scopeFilter(req)),
+      Fund.find(scopeFilter(req)),
+      Loan.find(scopeFilter(req)),
+      Pension.find({ ...scopeFilter(req), status: 'active' }),
+      Budget.findOne({ ...scopeFilter(req), month: thisMonth, year: thisYear }),
+      RecurringTransaction.find({ ...scopeFilter(req), isActive: true }),
+      Transaction.find({ ...scopeFilter(req), date: { $gte: subMonths(today, 3) } }),
+      Insurance.find({ ...scopeFilter(req), status: 'active' }),
+      Goal.find({ ...scopeFilter(req), status: 'active' }),
+      Mortgage.find({ ...scopeFilter(req), status: 'active' }),
     ]);
 
     const scores = [];
@@ -323,16 +324,16 @@ export const saveNetWorthSnapshot = async (req, res) => {
     const month = now.getMonth() + 1;
 
     const [profile, deposits, stocks, funds, loans, pensions, properties, mortgages, foreignCurrency, childSavings] = await Promise.all([
-      FinanceProfile.findOne({ user: userId }),
-      Deposit.find({ user: userId, status: 'active' }),
-      Stock.find({ user: userId }),
-      Fund.find({ user: userId }),
-      Loan.find({ user: userId }),
-      Pension.find({ user: userId, status: 'active' }),
-      RealEstate.find({ user: userId, status: 'owned' }),
-      Mortgage.find({ user: userId, status: 'active' }),
-      ForeignCurrency.find({ user: userId, status: 'active' }),
-      ChildSavings.find({ user: userId, status: 'active' }),
+      FinanceProfile.findOne(scopeFilter(req)),
+      Deposit.find({ ...scopeFilter(req), status: 'active' }),
+      Stock.find(scopeFilter(req)),
+      Fund.find(scopeFilter(req)),
+      Loan.find(scopeFilter(req)),
+      Pension.find({ ...scopeFilter(req), status: 'active' }),
+      RealEstate.find({ ...scopeFilter(req), status: 'owned' }),
+      Mortgage.find({ ...scopeFilter(req), status: 'active' }),
+      ForeignCurrency.find({ ...scopeFilter(req), status: 'active' }),
+      ChildSavings.find({ ...scopeFilter(req), status: 'active' }),
     ]);
 
     const checking        = profile?.checking || 0;
@@ -389,7 +390,7 @@ export const getNetWorthHistory = async (req, res) => {
     const userId = req.user._id;
     const months = parseInt(req.query.months) || 12;
 
-    const snapshots = await NetWorthSnapshot.find({ user: userId })
+    const snapshots = await NetWorthSnapshot.find(scopeFilter(req))
       .sort({ year: -1, month: -1 })
       .limit(months)
       .lean();

@@ -1,4 +1,5 @@
 import FinanceProfile from '../models/FinanceProfile.js';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 // @desc   קבלת הפרופיל הפיננסי של המשתמש המחובר
 // @route  GET /api/finances
@@ -6,7 +7,7 @@ import FinanceProfile from '../models/FinanceProfile.js';
 export const getFinanceProfile = async (req, res) => {
   try {
     // השתמשנו ב-req.user._id כדי למצוא את הפרופיל הנכון
-    let profile = await FinanceProfile.findOne({ user: req.user._id });
+    let profile = await FinanceProfile.findOne(scopeFilter(req));
 
     // אם למשתמש עדיין אין פרופיל, ניצור אובייקט זמני עם ערכי ברירת מחדל
     if (!profile) {

@@ -1,6 +1,7 @@
 import Loan from '../models/Loan.js';
 import RateHistory from '../models/RateHistory.js'; // ייבוא מודל הריביות
 import { calculateDynamicSchedule } from '../utils/loanCalculator.js';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 export const createLoan = async (req, res, next) => {
   try {
@@ -25,7 +26,7 @@ export const createLoan = async (req, res, next) => {
 
 export const getLoans = async (req, res, next) => {
   try {
-    const loans = await Loan.find({ user: req.user.id }).sort({ createdAt: -1 });
+    const loans = await Loan.find(scopeFilter(req)).sort({ createdAt: -1 });
     res.status(200).json(loans);
   } catch (error) {
     next(error);
@@ -34,7 +35,7 @@ export const getLoans = async (req, res, next) => {
 
 export const getLoanById = async (req, res, next) => {
   try {
-    const loan = await Loan.findOne({ _id: req.params.id, user: req.user.id }).lean(); // lean() for performance
+    const loan = await Loan.findOne({ _id: req.params.id, ...scopeFilter(req) }).lean(); // lean() for performance
     if (!loan) {
       return res.status(404).json({ message: 'הלוואה לא נמצאה' });
     }

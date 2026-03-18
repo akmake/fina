@@ -1,5 +1,6 @@
 // server/controllers/pensionController.js
 import Pension from '../models/Pension.js';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 // ──────────────────────────────────────────────────
 // תוויות בעברית לסוגי מוצרים
@@ -19,7 +20,7 @@ const PRODUCT_LABELS = {
 export const getPensionProducts = async (req, res) => {
   try {
     const { type, status } = req.query;
-    const filter = { user: req.user._id };
+    const filter = { ...scopeFilter(req) };
     if (type) filter.productType = type;
     if (status) filter.status = status || 'active';
 
@@ -160,8 +161,8 @@ export const getRetirementSimulation = async (req, res) => {
     const retirementAge = parseInt(req.query.retirementAge) || 67;
     const expectedReturn = parseFloat(req.query.expectedReturn) || 4; // %
 
-    const products = await Pension.find({ 
-      user: req.user._id, 
+    const products = await Pension.find({
+      ...scopeFilter(req),
       status: 'active',
       productType: { $in: ['pension', 'managers_insurance', 'provident_fund'] }
     });

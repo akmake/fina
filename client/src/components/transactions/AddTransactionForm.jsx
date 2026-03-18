@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, HandCoins, X } from 'lucide-react';
 import api from '@/utils/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { CREATE_NEW_CATEGORY_VALUE } from './utils';
 
 export default function AddTransactionForm({ categories, onAdd, onCategoryCreated }) {
+  const [maaserPrompt, setMaaserPrompt] = useState(null); // { amount, transactionId }
+
   const [form, setForm] = useState({
     description: '',
     amount: '',
@@ -42,10 +44,32 @@ export default function AddTransactionForm({ categories, onAdd, onCategoryCreate
     if (!form.category) { alert('נא לבחור קטגוריה.'); return; }
     try {
       const categoryName = categories.find(c => c._id === form.category)?.name || 'כללי';
-      await api.post('/transactions', { ...form, category: categoryName });
+      const { data: saved } = await api.post('/transactions', { ...form, category: categoryName });
+
+      // בדוק אם הקטגוריה מוגדרת כתרומה — אם כן, שאל אם לקזז במעשרות
+      try {
+        const { data: settings } = await api.get('/maaser/settings');
+        const donCats = settings.donationCategories || [];
+        if (donCats.some(c => c.toLowerCase() === categoryName.toLowerCase())) {
+          setMaaserPrompt({ amount: Number(form.amount), transactionId: saved._id, category: categoryName });
+        }
+      } catch { /* maaser feature unavailable, ignore */ }
+
       onAdd();
       setForm({ description: '', amount: '', date: new Date().toISOString().slice(0, 10), type: 'הוצאה', category: '', account: 'checking' });
     } catch { alert('שגיאה בהוספת העסקה'); }
+  };
+
+  const handleMaaserConfirm = async () => {
+    try {
+      await api.post('/maaser/donations', {
+        amount:        maaserPrompt.amount,
+        date:          new Date().toISOString().split('T')[0],
+        recipient:     maaserPrompt.category,
+        transactionId: maaserPrompt.transactionId,
+      });
+    } catch { /* silent */ }
+    setMaaserPrompt(null);
   };
 
   return (
@@ -134,6 +158,44 @@ export default function AddTransactionForm({ categories, onAdd, onCategoryCreate
           </Button>
         </form>
       </div>
+
+      {/* Maaser prompt */}
+      {maaserPrompt && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMaaserPrompt(null)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-11 w-11 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                <HandCoins className="h-6 w-6 text-emerald-500" />
+              </div>
+              <div>
+                <p className="font-bold text-slate-900 text-[15px]">זיהינו תרומה / צדקה</p>
+                <p className="text-xs text-slate-400">הקטגוריה "{maaserPrompt.category}" מוגדרת כתרומה</p>
+              </div>
+              <button onClick={() => setMaaserPrompt(null)} className="mr-auto text-slate-300 hover:text-slate-500">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-600 mb-5 bg-slate-50 rounded-2xl px-4 py-3">
+              האם לקזז <span className="font-bold text-emerald-600">₪{maaserPrompt.amount.toLocaleString()}</span> מחשבון המעשרות שלך?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setMaaserPrompt(null)}
+                className="flex-1 h-11 rounded-2xl bg-slate-100 text-slate-600 text-sm font-semibold hover:bg-slate-200 transition-colors"
+              >
+                לא כרגע
+              </button>
+              <button
+                onClick={handleMaaserConfirm}
+                className="flex-1 h-11 rounded-2xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-600 transition-colors"
+              >
+                כן, קזז מהמעשרות
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New category dialog */}
       <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>

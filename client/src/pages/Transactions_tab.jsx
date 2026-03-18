@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { format, isSameMonth, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { Upload, Search, ChevronDown, Loader2, X, Save } from 'lucide-react';
+import { Upload, Search, ChevronDown, Loader2, X, Save, Zap } from 'lucide-react';
 
+import { useNavigate } from 'react-router-dom';
 import api from '@/utils/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -17,6 +18,8 @@ import ImportWizard from '@/components/transactions/ImportWizard';
 import AddTransactionForm from '@/components/transactions/AddTransactionForm';
 
 export default function TransactionsPage() {
+  const navigate = useNavigate();
+
   // ─── Data ───────────────────────────────────────────────────
   const [transactions, setTransactions] = useState([]);
   const [categories,   setCategories]   = useState([]);
@@ -301,6 +304,12 @@ export default function TransactionsPage() {
       <header className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-white/50 px-4 sm:px-8 py-4 sm:py-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-sm">
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">הארנק שלי</h1>
         <div className="flex gap-2 w-full sm:w-auto">
+          <Button
+            onClick={() => navigate('/import/auto')}
+            className="rounded-full h-9 sm:h-10 px-4 sm:px-5 bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all flex-1 sm:flex-none text-sm font-semibold flex items-center gap-2"
+          >
+            <Zap className="h-4 w-4" /> ייבוא אוטומטי
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="rounded-full h-9 sm:h-10 px-4 sm:px-6 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:shadow-md transition-all flex-1 sm:flex-none text-sm font-semibold">

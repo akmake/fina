@@ -1,6 +1,7 @@
 // server/controllers/realEstateController.js
 import RealEstate from '../models/RealEstate.js';
 import Mortgage from '../models/Mortgage.js';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 const TYPE_LABELS = {
   apartment: 'דירה',
@@ -16,10 +17,10 @@ const TYPE_LABELS = {
 // GET /api/real-estate
 export const getProperties = async (req, res) => {
   try {
-    const properties = await RealEstate.find({ user: req.user._id }).sort({ createdAt: -1 });
+    const properties = await RealEstate.find(scopeFilter(req)).sort({ createdAt: -1 });
 
     // חיבור משכנתאות
-    const mortgages = await Mortgage.find({ user: req.user._id, status: 'active' });
+    const mortgages = await Mortgage.find({ ...scopeFilter(req), status: 'active' });
     const propertiesWithMortgage = properties.map(p => {
       const obj = p.toObject();
       if (p.linkedMortgageId) {

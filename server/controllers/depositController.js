@@ -2,11 +2,12 @@
 import Deposit from '../models/Deposit.js';
 import Account from '../models/Account.js';
 import { add_months } from '../utils/dateHelpers.js';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 // קבלת כל הפיקדונות של המשתמש
 export const getDeposits = async (req, res) => {
   // אין שינוי כאן, השדה החדש יישלף אוטומטית
-  const deposits = await Deposit.find({ user: req.user.id, status: 'active' }).sort({ endDate: 1 });
+  const deposits = await Deposit.find({ ...scopeFilter(req), status: 'active' }).sort({ endDate: 1 });
   res.json(deposits);
 };
 

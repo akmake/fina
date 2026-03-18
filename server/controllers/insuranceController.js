@@ -1,5 +1,6 @@
 // server/controllers/insuranceController.js
 import Insurance from '../models/Insurance.js';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 const TYPE_LABELS = {
   health: 'ביטוח בריאות',
@@ -19,7 +20,7 @@ const TYPE_LABELS = {
 // GET /api/insurance
 export const getInsurancePolicies = async (req, res) => {
   try {
-    const policies = await Insurance.find({ user: req.user._id }).sort({ type: 1 });
+    const policies = await Insurance.find(scopeFilter(req)).sort({ type: 1 });
 
     // קיבוץ לפי סוג
     const grouped = {};

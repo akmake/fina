@@ -2,6 +2,7 @@
 import RecurringTransaction from '../models/RecurringTransaction.js';
 import Transaction from '../models/Transaction.js';
 import { addDays, addWeeks, addMonths, addYears, isBefore, isAfter, startOfDay } from 'date-fns';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 // ──────────────────────────────────────────────────
 // חישוב התאריך הבא לביצוע
@@ -34,10 +35,10 @@ export const detectRecurringPatterns = async (req, res) => {
 
     // שלוף כל עסקאות המשתמש מ-6 חודשים אחרונים
     const [allTxns, existingRecurring] = await Promise.all([
-      Transaction.find({ user: userId, date: { $gte: sixMonthsAgo } })
+      Transaction.find({ ...scopeFilter(req), date: { $gte: sixMonthsAgo } })
         .select('description rawDescription amount type category date')
         .lean(),
-      RecurringTransaction.find({ user: userId }).select('description amount').lean(),
+      RecurringTransaction.find(scopeFilter(req)).select('description amount').lean(),
     ]);
 
     // בנה Set של תיאורים שכבר מוגדרים כקבועות
@@ -113,7 +114,7 @@ export const detectRecurringPatterns = async (req, res) => {
 export const getRecurringTransactions = async (req, res) => {
   try {
     const { active, type, subcategory } = req.query;
-    const filter = { user: req.user._id };
+    const filter = { ...scopeFilter(req) };
 
     if (active !== undefined) filter.isActive = active === 'true';
     if (type) filter.type = type;
@@ -270,10 +271,10 @@ export const toggleRecurringTransaction = async (req, res) => {
 export const getCashflowForecast = async (req, res) => {
   try {
     const months = parseInt(req.query.months) || 3;
-    const active = await RecurringTransaction.find({ 
-      user: req.user._id, 
+    const active = await RecurringTransaction.find({
+      ...scopeFilter(req),
       isActive: true,
-      isPaused: false 
+      isPaused: false
     });
 
     const forecast = [];

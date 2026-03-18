@@ -1,5 +1,6 @@
 // server/controllers/foreignCurrencyController.js
 import ForeignCurrency from '../models/ForeignCurrency.js';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 // ── Cache שערי חליפין ──────────────────────────────
 const ratesCache = new Map(); // currency → { rate, fetchedAt }
@@ -104,7 +105,7 @@ export const getExchangeRates = async (req, res) => {
 // GET /api/foreign-currency
 export const getForeignCurrencies = async (req, res) => {
   try {
-    const holdings = await ForeignCurrency.find({ user: req.user._id, status: 'active' }).sort({ currency: 1 });
+    const holdings = await ForeignCurrency.find({ ...scopeFilter(req), status: 'active' }).sort({ currency: 1 });
 
     // סיכום לפי מטבע
     const byCurrency = {};

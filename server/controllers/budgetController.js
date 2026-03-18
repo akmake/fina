@@ -2,16 +2,17 @@
 import Budget from '../models/Budget.js';
 import Transaction from '../models/Transaction.js';
 import { startOfMonth, endOfMonth } from 'date-fns';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 // ──────────────────────────────────────────────────
 // חישוב הוצאות בפועל מתוך עסקאות
 // ──────────────────────────────────────────────────
-const calculateActualSpending = async (userId, month, year) => {
+const calculateActualSpending = async (userFilter, month, year) => {
   const start = new Date(year, month - 1, 1);
   const end = endOfMonth(start);
 
   const spending = await Transaction.aggregate([
-    { $match: { user: userId, type: 'הוצאה', date: { $gte: start, $lte: end } } },
+    { $match: { ...userFilter, type: 'הוצאה', date: { $gte: start, $lte: end } } },
     { $group: { _id: '$category', total: { $sum: '$amount' } } }
   ]);
 
@@ -31,14 +32,14 @@ export const getBudget = async (req, res) => {
     const m = parseInt(month) || new Date().getMonth() + 1;
     const y = parseInt(year) || new Date().getFullYear();
 
-    let budget = await Budget.findOne({ user: req.user._id, month: m, year: y });
+    let budget = await Budget.findOne({ ...scopeFilter(req), month: m, year: y });
 
     if (!budget) {
       return res.json({ budget: null, spending: {}, exists: false });
     }
 
     // חישוב הוצאות בפועל
-    const spending = await calculateActualSpending(req.user._id, m, y);
+    const spending = await calculateActualSpending(scopeFilter(req), m, y);
 
     // עדכון הוצאות בפריטי התקציב
     let totalSpent = 0;
@@ -140,10 +141,10 @@ export const copyBudget = async (req, res) => {
   try {
     const { fromMonth, fromYear, toMonth, toYear } = req.body;
 
-    const source = await Budget.findOne({ 
-      user: req.user._id, 
-      month: parseInt(fromMonth), 
-      year: parseInt(fromYear) 
+    const source = await Budget.findOne({
+      ...scopeFilter(req),
+      month: parseInt(fromMonth),
+      year: parseInt(fromYear)
     });
 
     if (!source) {
@@ -151,10 +152,10 @@ export const copyBudget = async (req, res) => {
     }
 
     // בדוק שלא קיים תקציב ביעד
-    const existing = await Budget.findOne({ 
-      user: req.user._id, 
-      month: parseInt(toMonth), 
-      year: parseInt(toYear) 
+    const existing = await Budget.findOne({
+      ...scopeFilter(req),
+      month: parseInt(toMonth),
+      year: parseInt(toYear)
     });
 
     if (existing) {
@@ -189,12 +190,12 @@ export const getBudgetSummary = async (req, res) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
 
-    const budgets = await Budget.find({ user: req.user._id, year }).sort({ month: 1 });
+    const budgets = await Budget.find({ ...scopeFilter(req), year }).sort({ month: 1 });
 
     // חישוב הוצאות לכל חודש
     const monthlySummary = [];
     for (const budget of budgets) {
-      const spending = await calculateActualSpending(req.user._id, budget.month, year);
+      const spending = await calculateActualSpending(scopeFilter(req), budget.month, year);
       const totalSpent = Object.values(spending).reduce((sum, v) => sum + v, 0);
 
       monthlySummary.push({

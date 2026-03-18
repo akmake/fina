@@ -1,10 +1,11 @@
 // server/controllers/mortgageController.js
 import Mortgage from '../models/Mortgage.js';
+import { scopeFilter } from '../utils/scopeFilter.js';
 
 // GET /api/mortgages
 export const getMortgages = async (req, res) => {
   try {
-    const mortgages = await Mortgage.find({ user: req.user._id }).sort({ startDate: -1 });
+    const mortgages = await Mortgage.find(scopeFilter(req)).sort({ startDate: -1 });
 
     const summary = {
       totalBalance: mortgages.reduce((s, m) => s + (m.totalCurrentBalance || 0), 0),
@@ -68,7 +69,7 @@ export const deleteMortgage = async (req, res) => {
 // POST /api/mortgages/:id/simulate-refinance
 export const simulateRefinance = async (req, res) => {
   try {
-    const mortgage = await Mortgage.findOne({ _id: req.params.id, user: req.user._id });
+    const mortgage = await Mortgage.findOne({ _id: req.params.id, ...scopeFilter(req) });
     if (!mortgage) return res.status(404).json({ message: 'משכנתא לא נמצאה' });
 
     // --- תוספת/תיקון: קבלת סוג ההחזר המבוקש מהלקוח לסימולציה ---
@@ -123,7 +124,7 @@ export const simulateRefinance = async (req, res) => {
 // GET /api/mortgages/:id/prime-scenario
 export const primeScenario = async (req, res) => {
   try {
-    const mortgage = await Mortgage.findOne({ _id: req.params.id, user: req.user._id });
+    const mortgage = await Mortgage.findOne({ _id: req.params.id, ...scopeFilter(req) });
     if (!mortgage) return res.status(404).json({ message: 'משכנתא לא נמצאה' });
 
     const scenarios = [
