@@ -1,4 +1,4 @@
-import { Briefcase, ShoppingBag, Coffee, Home, Car, Zap, Trash2, CreditCard } from 'lucide-react';
+import { Briefcase, ShoppingBag, Coffee, Home, Car, Zap, Trash2, CreditCard, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { formatCurrency } from './utils';
@@ -23,7 +23,7 @@ export const CategoryIcon = ({ category }) => {
   );
 };
 
-export const TransactionCard = ({ transaction, onClick, onDelete }) => {
+export const TransactionCard = ({ transaction, onClick, onDelete, onEdit }) => {
   const isExpense = transaction.type === 'הוצאה';
   const sign = isExpense ? '' : '+';
   const isPending = transaction.status === 'pending';
@@ -33,6 +33,11 @@ export const TransactionCard = ({ transaction, onClick, onDelete }) => {
   const handleDelete = (e) => {
     e.stopPropagation();
     if (confirm('למחוק את העסקה?')) onDelete(transaction._id);
+  };
+
+  const handleEdit = (e) => {
+    e.stopPropagation();
+    onEdit(transaction);
   };
 
   return (
@@ -80,10 +85,17 @@ export const TransactionCard = ({ transaction, onClick, onDelete }) => {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <span className={`text-[16px] font-bold tracking-tight ${isExpense ? 'text-slate-900' : 'text-emerald-600'}`}>
           {sign}{formatCurrency(transaction.amount)}
         </span>
+        <button
+          onClick={handleEdit}
+          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full hover:bg-blue-50 text-slate-300 hover:text-blue-500"
+          title="ערוך עסקה"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
         <button
           onClick={handleDelete}
           className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full hover:bg-red-50 text-slate-300 hover:text-red-500"

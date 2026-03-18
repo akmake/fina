@@ -50,8 +50,6 @@ const DebtPage             = lazy(() => import("@/pages/DebtPage"));
 const ChildSavingsPage     = lazy(() => import("@/pages/ChildSavingsPage"));
 const ForeignCurrencyPage  = lazy(() => import("@/pages/ForeignCurrencyPage"));
 const ReportsPage          = lazy(() => import("@/pages/ReportsPage"));
-const PergolaPlannerPage   = lazy(() => import("@/pages/PergolaPlannerPage"));
-const ElectricalCADPage    = lazy(() => import("@/pages/ElectricalCADPage"));
 const AutoImportPage       = lazy(() => import("@/pages/AutoImportPage"));
 const CalDirectImportPage  = lazy(() => import("@/pages/CalDirectImportPage"));
 
@@ -129,10 +127,6 @@ export default function App() {
             <Route path="foreign-currency" element={<ForeignCurrencyPage />} />
             <Route path="reports"          element={<ReportsPage />}         />
 
-            {/* Tools */}
-            <Route path="pergola-planner"  element={<PergolaPlannerPage />}  />
-            <Route path="electrical"       element={<ElectricalCADPage />}   />
-            <Route path="electrical/:projectId" element={<ElectricalCADPage />} />
 
             {/* Admin */}
             <Route path="admin/logs"          element={<AdminLogsPage />}     />

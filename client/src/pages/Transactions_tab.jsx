@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { format, isSameMonth, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { Upload, Search, ChevronDown, Loader2 } from 'lucide-react';
+import { Upload, Search, ChevronDown, Loader2, X, Save } from 'lucide-react';
 
 import api from '@/utils/api';
 import { Button } from '@/components/ui/Button';
@@ -36,6 +36,11 @@ export default function TransactionsPage() {
   // ─── Merchant dialog ─────────────────────────────────────────
   const [selectedMerchant,     setSelectedMerchant]     = useState(null);
   const [isMerchantDialogOpen, setIsMerchantDialogOpen] = useState(false);
+
+  // ─── Edit dialog ──────────────────────────────────────────────
+  const [editingTrx,  setEditingTrx]  = useState(null);
+  const [editForm,    setEditForm]    = useState({});
+  const [editSaving,  setEditSaving]  = useState(false);
 
   // ─── Import wizard ────────────────────────────────────────────
   const [importState,     setImportState]     = useState('idle');
@@ -191,6 +196,31 @@ export default function TransactionsPage() {
       await api.delete(`/transactions/${id}`);
       setTransactions(prev => prev.filter(t => t._id !== id));
     } catch { alert('שגיאה במחיקת העסקה'); }
+  };
+
+  // ─── Edit ────────────────────────────────────────────────────
+  const openEdit = (trx) => {
+    setEditingTrx(trx);
+    setEditForm({
+      description: trx.description || '',
+      amount:      trx.amount ?? '',
+      type:        trx.type || 'הוצאה',
+      category:    trx.category || 'כללי',
+      date:        trx.date ? trx.date.split('T')[0] : '',
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    setEditSaving(true);
+    try {
+      const { data } = await api.put(`/transactions/${editingTrx._id}`, {
+        ...editForm,
+        amount: Number(editForm.amount),
+      });
+      setTransactions(prev => prev.map(t => t._id === editingTrx._id ? { ...t, ...editForm, amount: Number(editForm.amount) } : t));
+      setEditingTrx(null);
+    } catch { alert('שגיאה בשמירה'); }
+    finally { setEditSaving(false); }
   };
 
   // ─── Import ──────────────────────────────────────────────────
@@ -357,6 +387,7 @@ export default function TransactionsPage() {
                           transaction={t}
                           onClick={() => { setSelectedMerchant(t.description); setIsMerchantDialogOpen(true); }}
                           onDelete={handleDelete}
+                          onEdit={openEdit}
                         />
                       ))}
                     </div>
@@ -389,6 +420,90 @@ export default function TransactionsPage() {
           </aside>
         </div>
       </div>
+
+      {/* Edit dialog */}
+      {editingTrx && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditingTrx(null)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 z-10">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-[17px] font-bold text-slate-900">עריכת עסקה</h3>
+              <button onClick={() => setEditingTrx(null)} className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">תיאור</label>
+                <input
+                  value={editForm.description}
+                  onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">סכום (₪)</label>
+                  <input
+                    type="number"
+                    value={editForm.amount}
+                    onChange={e => setEditForm(p => ({ ...p, amount: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">סוג</label>
+                  <select
+                    value={editForm.type}
+                    onChange={e => setEditForm(p => ({ ...p, type: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400 bg-white"
+                  >
+                    <option value="הוצאה">הוצאה</option>
+                    <option value="הכנסה">הכנסה</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">קטגוריה</label>
+                  <input
+                    value={editForm.category}
+                    onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">תאריך</label>
+                  <input
+                    type="date"
+                    value={editForm.date}
+                    onChange={e => setEditForm(p => ({ ...p, date: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => setEditingTrx(null)}
+                className="flex-1 h-11 rounded-2xl bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200 transition-colors"
+              >
+                ביטול
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={editSaving}
+                className="flex-1 h-11 rounded-2xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {editSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                שמור
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Merchant dialog */}
       <MerchantDialog

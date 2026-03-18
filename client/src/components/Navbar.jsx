@@ -5,7 +5,7 @@ import {
   ChevronDown, Cpu, BarChart3, Receipt, CreditCard, Target, Moon, Sun,
   Wallet, RefreshCw, Scale, GraduationCap, FileSpreadsheet, Upload,
   Shield, Building2, Bell, Calculator, DownloadCloud, Baby, Globe,
-  FileText, Hammer, Zap, Layers, Banknote, HandCoins, ClipboardList,
+  FileText, Layers, Banknote, HandCoins, ClipboardList,
   Coins, PiggyBank, SlidersHorizontal, Lock, LogOut, Activity,
   Lightbulb, X, Search,
 } from "lucide-react";
@@ -56,12 +56,10 @@ const NAV_GROUPS = [
   {
     label: "תכנון", icon: Target,
     items: [
-      { to: "/goals",           label: "יעדים",          icon: Target        },
-      { to: "/insurance",       label: "ביטוח",          icon: Shield        },
-      { to: "/tax",             label: "מחשבון מס",      icon: Calculator    },
-      { to: "/projects",        label: "פרויקטים",       icon: ClipboardList },
-      { to: "/pergola-planner", label: "מתכנן פרגולות",  icon: Hammer        },
-      { to: "/electrical",      label: "שרטוט חשמל",     icon: Zap           },
+      { to: "/goals",     label: "יעדים",      icon: Target        },
+      { to: "/insurance", label: "ביטוח",      icon: Shield        },
+      { to: "/tax",       label: "מחשבון מס",  icon: Calculator    },
+      { to: "/projects",  label: "פרויקטים",   icon: ClipboardList },
     ],
   },
   {
