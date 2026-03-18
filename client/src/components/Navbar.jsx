@@ -7,7 +7,7 @@ import {
   Shield, Building2, Bell, Calculator, DownloadCloud, Baby, Globe,
   FileText, Layers, Banknote, HandCoins, ClipboardList,
   Coins, PiggyBank, SlidersHorizontal, Lock, LogOut, Activity,
-  Lightbulb, X, Search, Users,
+  Lightbulb, X, Search, Users, HelpCircle,
 } from "lucide-react";
 
 import { useAuthStore } from "@/stores/authStore";
@@ -25,12 +25,10 @@ const NAV_GROUPS = [
     label: "פיננסים", icon: Coins,
     items: [
       { to: "/finance-dashboard", label: "לוח בקרה",  icon: LayoutDashboard },
-      { to: "/portfolio",         label: "עסקאות",    icon: Receipt         },
-      { to: "/categories",        label: "קטגוריות",  icon: Layers          },
-      { to: "/budget",            label: "תקציב",     icon: Wallet          },
-      { to: "/recurring",         label: "קבועים",    icon: RefreshCw       },
-      { to: "/smart-analytics",   label: "ניתוח חכם", icon: BarChart3       },
-      { to: "/net-worth",         label: "שווי נקי",  icon: Scale           },
+      { to: "/portfolio",  label: "עסקאות",   icon: Receipt   },
+      { to: "/categories", label: "קטגוריות", icon: Layers    },
+      { to: "/budget",     label: "תקציב",    icon: Wallet    },
+      { to: "/recurring",  label: "קבועים",   icon: RefreshCw },
     ],
   },
   {
@@ -67,8 +65,7 @@ const NAV_GROUPS = [
   {
     label: "ניהול", icon: SlidersHorizontal,
     items: [
-      { to: "/alerts",          label: "התראות",         icon: Bell            },
-      { to: "/reports",         label: "דוחות",          icon: FileText        },
+      { to: "/help",            label: "מדריך שימוש",    icon: HelpCircle      },
       { to: "/management",      label: "אוטומציה",       icon: Cpu             },
       { to: "/import/excel",    label: "ייבוא אקסל",     icon: FileSpreadsheet },
       { to: "/import/auto",     label: "ייבוא אוטומטי",  icon: DownloadCloud   },

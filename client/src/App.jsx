@@ -54,6 +54,7 @@ const MaaserPage           = lazy(() => import("@/pages/MaaserPage"));
 const AutoImportPage       = lazy(() => import("@/pages/AutoImportPage"));
 const CalDirectImportPage  = lazy(() => import("@/pages/CalDirectImportPage"));
 const FamilyPage           = lazy(() => import("@/pages/FamilyPage"));
+const HelpPage             = lazy(() => import("@/pages/HelpPage"));
 
 function PageLoader() {
   return (
@@ -114,6 +115,7 @@ export default function App() {
 
             {/* Family */}
             <Route path="family" element={<FamilyPage />} />
+            <Route path="help"   element={<HelpPage />} />
 
             {/* Account */}
             <Route path="profile"     element={<ProfilePage />}     />

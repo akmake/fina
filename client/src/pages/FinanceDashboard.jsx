@@ -1,633 +1,779 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import {
-  ArrowUp, ArrowDown, Wallet, TrendingUp, Activity, CreditCard,
-  Loader2, AlertCircle, Plus, Scale, Heart, ChevronLeft, Bell,
-  Clock, PiggyBank, Shield, Lightbulb, X, CheckCircle2, Target,
-} from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { format, startOfMonth, endOfMonth, subMonths, isWithinInterval } from 'date-fns';
+import {
+  TrendingUp, TrendingDown, AlertCircle, CheckCircle2, Loader2,
+  Wallet, PiggyBank, BarChart2, Home, ChevronLeft, Zap, Target,
+  ArrowUpRight, ArrowDownRight, Info, Plus, Upload,
+} from 'lucide-react';
+import {
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
+import { format, subMonths } from 'date-fns';
 import { he } from 'date-fns/locale';
-
 import api from '@/utils/api';
 import { formatCurrency } from '@/utils/formatters';
-import { Button } from '@/components/ui/Button';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
 
-// ── Health Score Ring ──────────────────────────────────────────────────────────
-const HealthRing = ({ score, max = 100 }) => {
-  const pct = Math.min(1, score / max);
-  const r = 32;
-  const circ = 2 * Math.PI * r;
+const COLORS = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899','#84cc16'];
+const fmt = formatCurrency;
+
+// ─── Plain-language story ──────────────────────────────────────────────────────
+function buildStory(summary, netWorth, healthScore) {
+  if (!summary) return [];
+  const { thisMonth, prevMonth } = summary.monthlySummary ?? {};
+  const income  = thisMonth?.income  ?? 0;
+  const expense = thisMonth?.expense ?? 0;
+  const net     = income - expense;
+  const prevNet = (prevMonth?.income ?? 0) - (prevMonth?.expense ?? 0);
+  const savingsRate = income > 0 ? Math.round((net / income) * 100) : 0;
+  const nwTotal = netWorth?.totalNetWorth ?? 0;
+  const grade   = healthScore?.grade ?? '';
+  const lines   = [];
+
+  if (income === 0 && expense === 0) {
+    lines.push({ icon: '📭', text: 'עדיין אין עסקאות לחודש הנוכחי — ייבא נתונים כדי לראות את המצב שלך.', tone: 'neutral' });
+  } else if (net >= 0) {
+    const vsLast = net > prevNet + 100 ? '— יותר מהחודש שעבר 📈' : net < prevNet - 100 ? '— פחות מהחודש שעבר 📉' : '— דומה לחודש שעבר';
+    const quality = savingsRate >= 20 ? 'מעולה, מעל הממוצע!' : savingsRate >= 10 ? 'סביר, אפשר לשפר.' : 'נמוך — כדאי לבדוק לאן הולך הכסף.';
+    lines.push({ icon: '💰', text: `החודש הכנסת ${fmt(income)} והוצאת ${fmt(expense)}. חיסכת ${fmt(net)} (${savingsRate}%) — ${quality} ${vsLast}`, tone: 'positive' });
+  } else {
+    lines.push({ icon: '⚠️', text: `החודש הוצאת ${fmt(Math.abs(net))} יותר ממה שהכנסת. כדאי להבין מאיפה ולתקן בחודש הבא.`, tone: 'warning' });
+  }
+
+  if (nwTotal !== 0) {
+    lines.push({
+      icon: '🏦',
+      text: nwTotal > 0
+        ? `השווי הנקי שלך עומד על ${fmt(nwTotal)}. הנכסים גדולים מהחובות — מצב טוב.`
+        : `השווי הנקי שלך הוא ${fmt(nwTotal)}. יש יותר חובות מנכסים — שים לב לזה.`,
+      tone: nwTotal > 0 ? 'positive' : 'warning',
+    });
+  }
+
+  const top = summary.topCategories?.[0];
+  if (top) {
+    lines.push({ icon: '🔍', text: `ההוצאה הגדולה ביותר החודש: ${top.category} — ${fmt(top.total)}. שווה לבדוק אם זה בגדר הצפוי.`, tone: 'neutral' });
+  }
+
+  const gradeMap = { 'A+': 'מצוין! הציון הפיננסי שלך גבוה מאוד.', A: 'טוב מאוד. אתה בדרך הנכונה.', B: 'סביר. עם כמה שיפורים קטנים תגיע לרמה גבוהה יותר.', C: 'יש מקום לשיפור — עיין בהמלצות.', D: 'המצב מצריך תשומת לב.', F: 'יש נקודות קריטיות לטפל בהן.' };
+  if (grade && gradeMap[grade]) {
+    lines.push({ icon: '📊', text: `${gradeMap[grade]} ציון: ${grade}${healthScore?.label ? ` — ${healthScore.label}` : ''}`, tone: ['A+','A'].includes(grade) ? 'positive' : ['D','F'].includes(grade) ? 'warning' : 'neutral' });
+  }
+  return lines;
+}
+
+// ─── Shared UI helpers ─────────────────────────────────────────────────────────
+const TABS = [
+  { id: 'month',  label: 'החודש',  icon: Wallet    },
+  { id: 'trends', label: 'מגמות',  icon: BarChart2 },
+  { id: 'assets', label: 'נכסים',  icon: Home      },
+  { id: 'annual', label: 'שנתי',   icon: Target    },
+];
+
+function KpiCard({ label, value, sub, positive, loading }) {
   return (
-    <svg viewBox="0 0 80 80" className="w-20 h-20 flex-shrink-0">
-      <circle cx="40" cy="40" r={r} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="7" />
-      <circle
-        cx="40" cy="40" r={r} fill="none" stroke="white" strokeWidth="7"
-        strokeDasharray={circ} strokeDashoffset={circ * (1 - pct)}
-        strokeLinecap="round" transform="rotate(-90 40 40)"
-        style={{ transition: 'stroke-dashoffset 1.2s ease' }}
-      />
-      <text x="40" y="40" textAnchor="middle" dy="0.35em" fill="white" fontSize="17" fontWeight="bold">{score}</text>
-    </svg>
-  );
-};
-
-// ── Gradient Stat Card ─────────────────────────────────────────────────────────
-const GradientStatCard = ({ title, value, change, changeType, icon: Icon, gradient, subText }) => (
-  <div className={`relative overflow-hidden rounded-2xl p-5 shadow-lg ${gradient}`}>
-    <div className="absolute -top-5 -right-5 w-24 h-24 rounded-full bg-white opacity-10 pointer-events-none" />
-    <div className="absolute -bottom-8 -left-4 w-28 h-28 rounded-full bg-white opacity-5 pointer-events-none" />
-    <div className="relative z-10">
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-white/75 text-[11px] font-semibold uppercase tracking-widest">{title}</span>
-        <div className="h-8 w-8 rounded-xl bg-white/20 flex items-center justify-center">
-          <Icon className="h-4 w-4 text-white" />
-        </div>
-      </div>
-      <div className="text-xl sm:text-2xl font-extrabold text-white tracking-tight mb-2">{formatCurrency(value)}</div>
-      {change !== undefined && (
-        <div className="flex items-center gap-1 text-[11px] text-white/65">
-          {changeType === 'increase' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-          <span>{Math.abs(change).toFixed(1)}% {subText || 'לעומת חודש קודם'}</span>
-        </div>
-      )}
-      {change === undefined && subText && (
-        <div className="text-[11px] text-white/65">{subText}</div>
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-4 flex flex-col gap-1">
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
+      {loading
+        ? <div className="h-7 w-24 bg-slate-100 rounded animate-pulse" />
+        : <p className="text-2xl font-black text-slate-900">{value}</p>}
+      {sub && !loading && (
+        <p className={`text-xs font-medium flex items-center gap-0.5 ${positive === true ? 'text-emerald-600' : positive === false ? 'text-red-500' : 'text-slate-400'}`}>
+          {positive === true ? <ArrowUpRight className="h-3 w-3" /> : positive === false ? <ArrowDownRight className="h-3 w-3" /> : null}
+          {sub}
+        </p>
       )}
     </div>
-  </div>
-);
+  );
+}
 
-// ── Custom Chart Tooltip ───────────────────────────────────────────────────────
-const ChartTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null;
+function SectionTitle({ icon, title, link, linkLabel }) {
   return (
-    <div className="bg-white/95 backdrop-blur-sm border border-slate-100 shadow-2xl rounded-2xl px-4 py-3">
-      <p className="text-[11px] font-semibold text-slate-400 mb-0.5">{label}</p>
-      <p className="text-base font-bold text-slate-900">{formatCurrency(payload[0].value)}</p>
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2">{icon}<h3 className="text-sm font-bold text-slate-700">{title}</h3></div>
+      {link && <Link to={link} className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-0.5 font-medium">{linkLabel}<ChevronLeft className="h-3.5 w-3.5" /></Link>}
     </div>
   );
-};
+}
 
-// ── Main Component ─────────────────────────────────────────────────────────────
+function EmptyState({ icon, title, desc, action, actionLabel }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-10 text-center gap-2">
+      <div className="text-3xl mb-1">{icon}</div>
+      <p className="text-sm font-semibold text-slate-700">{title}</p>
+      <p className="text-xs text-slate-400 max-w-xs">{desc}</p>
+      {action && (
+        <Link to={action} className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
+          <Plus className="h-3 w-3" />{actionLabel}
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function TabSpinner() {
+  return <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-blue-400" /></div>;
+}
+
+// ─── Main ──────────────────────────────────────────────────────────────────────
 export default function FinanceDashboard() {
-  const [transactions, setTransactions] = useState([]);
-  const [projects,     setProjects]     = useState([]);
-  const [accounts,     setAccounts]     = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [error,        setError]        = useState(null);
-  const [netWorth,        setNetWorth]        = useState(null);
-  const [healthScore,     setHealthScore]     = useState(null);
-  const [alerts,          setAlerts]          = useState([]);
-  const [recommendations, setRecommendations] = useState([]);
-  const [actionPlan,      setActionPlan]      = useState([]);
-  const [planDismissed,   setPlanDismissed]   = useState(false);
+  const [core,        setCore]        = useState(null);
+  const [coreLoading, setCoreLoading] = useState(true);
+  const [activeTab,   setActiveTab]   = useState('month');
+  const [tabData,     setTabData]     = useState({});
+  const [tabLoading,  setTabLoading]  = useState(false);
 
   useEffect(() => {
-    const fetchAll = async () => {
+    (async () => {
       try {
-        setLoading(true);
-        const [txRes, dashRes, nwRes, hsRes, alertsRes] = await Promise.all([
-          api.get('/transactions'),
+        const [sumRes, nwRes, hsRes, apRes] = await Promise.all([
           api.get('/dashboard/summary'),
           api.get('/net-worth').catch(() => ({ data: null })),
           api.get('/net-worth/health-score').catch(() => ({ data: null })),
-          api.get('/alerts').catch(() => ({ data: [] })),
+          api.get('/analytics/action-plan').catch(() => ({ data: null })),
         ]);
-        setTransactions(txRes.data || []);
-        setProjects(dashRes.data?.projects || []);
-        setAccounts(dashRes.data?.accounts || []);
-        setNetWorth(nwRes.data);
-        setHealthScore(hsRes.data);
-        const al = Array.isArray(alertsRes.data) ? alertsRes.data : (alertsRes.data?.alerts || []);
-        setAlerts(al.filter(a => !a.isRead).slice(0, 5));
-        api.post('/net-worth/snapshot').catch(() => {});
-        api.get('/analytics/recommendations').then(r => {
-          const recs = r.data?.data?.recommendations || [];
-          setRecommendations(recs.filter(rec => rec.priority === 'high').slice(0, 3));
-        }).catch(() => {});
-        api.get('/analytics/action-plan').then(r => {
-          setActionPlan(r.data?.data?.actions || []);
-        }).catch(() => {});
-      } catch (err) {
-        const msg = err.response?.data?.message || 'שגיאה בטעינת הנתונים';
-        setError(msg);
-        toast.error(msg);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAll();
+        setCore({ summary: sumRes.data, netWorth: nwRes.data, healthScore: hsRes.data, actionPlan: apRes.data });
+      } catch { /* silent */ } finally { setCoreLoading(false); }
+    })();
   }, []);
 
-  const effectiveMonth = useMemo(() => {
-    if (!transactions.length) return new Date();
-    const now = new Date();
-    const hasNow = transactions.some(t =>
-      isWithinInterval(new Date(t.date), { start: startOfMonth(now), end: endOfMonth(now) })
-    );
-    if (hasNow) return now;
-    const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
-    return new Date(sorted[0].date);
-  }, [transactions]);
+  const loadTab = useCallback(async (tab) => {
+    if (tabData[tab]) return;
+    setTabLoading(true);
+    try {
+      if (tab === 'month') {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const [budgetRes, alertsRes, recRes, catRes] = await Promise.all([
+          api.get(`/budgets?month=${now.getMonth()+1}&year=${now.getFullYear()}`).catch(() => ({ data: null })),
+          api.get('/alerts').catch(() => ({ data: { alerts: [] } })),
+          api.get('/analytics/recommendations').catch(() => ({ data: { recommendations: [] } })),
+          api.get(`/analytics/smart-analytics?startDate=${startOfMonth.toISOString()}&endDate=${now.toISOString()}`).catch(() => ({ data: null })),
+        ]);
+        setTabData(p => ({
+          ...p,
+          month: {
+            budget: budgetRes.data,
+            alerts: alertsRes.data?.alerts ?? [],
+            recommendations: recRes.data?.data?.recommendations ?? recRes.data?.recommendations ?? [],
+            categories: catRes.data?.data?.topCategories ?? catRes.data?.topCategories ?? [],
+          },
+        }));
+      } else if (tab === 'trends') {
+        const end = new Date(), start = subMonths(end, 5);
+        const res = await api.get(`/analytics/smart-analytics?startDate=${start.toISOString()}&endDate=${end.toISOString()}`).catch(() => ({ data: null }));
+        // API wraps response: { status, data: { trends, topCategories, ... } }
+        setTabData(p => ({ ...p, trends: res.data?.data ?? res.data }));
+      } else if (tab === 'assets') {
+        const res = await api.get('/net-worth/history').catch(() => ({ data: [] }));
+        setTabData(p => ({ ...p, assets: Array.isArray(res.data) ? res.data : res.data?.history ?? [] }));
+      } else if (tab === 'annual') {
+        const [yrRes, fsRes] = await Promise.all([
+          api.get('/reports/yearly-comparison').catch(() => ({ data: null })),
+          api.get('/reports/financial-summary').catch(() => ({ data: null })),
+        ]);
+        setTabData(p => ({ ...p, annual: { yearly: yrRes.data, summary: fsRes.data } }));
+      }
+    } finally { setTabLoading(false); }
+  }, [tabData]);
 
-  const stats = useMemo(() => {
-    const thisStart = startOfMonth(effectiveMonth);
-    const thisEnd   = endOfMonth(effectiveMonth);
-    const prevStart = startOfMonth(subMonths(effectiveMonth, 1));
-    const prevEnd   = endOfMonth(subMonths(effectiveMonth, 1));
+  useEffect(() => { loadTab(activeTab); }, [activeTab, loadTab]);
 
-    const thisTxns = transactions.filter(t => isWithinInterval(new Date(t.date), { start: thisStart, end: thisEnd }));
-    const prevTxns = transactions.filter(t => isWithinInterval(new Date(t.date), { start: prevStart, end: prevEnd }));
-    const sum = (txns, type) => txns.filter(t => t.type === type).reduce((s, t) => s + t.amount, 0);
+  const story   = buildStory(core?.summary, core?.netWorth, core?.healthScore);
+  const monthly = core?.summary?.monthlySummary;
+  const income  = monthly?.thisMonth?.income  ?? 0;
+  const expense = monthly?.thisMonth?.expense ?? 0;
+  const net     = income - expense;
+  const savingsRate = income > 0 ? Math.round((net / income) * 100) : 0;
+  const nwTotal = core?.netWorth?.totalNetWorth ?? 0;
 
-    const thisIncome  = sum(thisTxns, 'הכנסה');
-    const thisExpense = sum(thisTxns, 'הוצאה');
-    const prevIncome  = sum(prevTxns, 'הכנסה');
-    const prevExpense = sum(prevTxns, 'הוצאה');
-
-    const catSums = {};
-    thisTxns.filter(t => t.type === 'הוצאה').forEach(t => {
-      const c = t.category || 'כללי';
-      catSums[c] = (catSums[c] || 0) + t.amount;
-    });
-    const topCategories = Object.entries(catSums)
-      .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([cat, total]) => ({ cat, total }));
-
-    const chartStart = new Date(thisEnd);
-    chartStart.setDate(chartStart.getDate() - 29);
-    const dailyMap = {};
-    transactions
-      .filter(t => { const d = new Date(t.date); return d >= chartStart && d <= thisEnd; })
-      .forEach(t => {
-        const key = format(new Date(t.date), 'MM/dd');
-        dailyMap[key] = (dailyMap[key] || 0) + (t.type === 'הכנסה' ? t.amount : -t.amount);
-      });
-
-    let cumulative = 0;
-    const balanceChartData = Object.entries(dailyMap)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([date, delta]) => { cumulative += delta; return { date, balance: cumulative }; });
-
-    return { thisIncome, thisExpense, prevIncome, prevExpense, topCategories, balanceChartData };
-  }, [transactions, effectiveMonth]);
-
-  const calcChange = (cur, prev) => prev === 0 ? (cur > 0 ? 100 : 0) : ((cur - prev) / Math.abs(prev)) * 100;
-  const isCurrentMonth = isWithinInterval(effectiveMonth, { start: startOfMonth(new Date()), end: endOfMonth(new Date()) });
-  const totalBalance  = accounts.reduce((s, a) => s + (a.balance || 0), 0);
-  const thisNet       = stats.thisIncome - stats.thisExpense;
-  const prevNet       = stats.prevIncome - stats.prevExpense;
-  const incomeChange  = calcChange(stats.thisIncome,  stats.prevIncome);
-  const expenseChange = calcChange(stats.thisExpense, stats.prevExpense);
-  const netChange     = calcChange(thisNet, prevNet);
-  const topCatTotal   = stats.topCategories.reduce((s, c) => s + c.total, 0);
-
-  const savingsRate = stats.thisIncome > 0 ? ((stats.thisIncome - stats.thisExpense) / stats.thisIncome) * 100 : 0;
-  const liquidBalance     = netWorth?.assets?.totalLiquid ?? totalBalance;
-  const avgMonthlyExpense = stats.thisExpense > 0 ? stats.thisExpense : (stats.prevExpense || 1);
-  const emergencyMonths   = avgMonthlyExpense > 0 ? liquidBalance / avgMonthlyExpense : 0;
-
-  const recentTxns = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
-
-  const CAT_COLORS = [
-    { bar: 'from-blue-500 to-indigo-600',   dot: '#3b82f6' },
-    { bar: 'from-violet-500 to-purple-600', dot: '#8b5cf6' },
-    { bar: 'from-amber-400 to-orange-500',  dot: '#f59e0b' },
-    { bar: 'from-emerald-500 to-teal-500',  dot: '#10b981' },
-    { bar: 'from-rose-500 to-red-500',      dot: '#ef4444' },
-  ];
-
-  if (loading) return (
-    <div className="flex flex-col justify-center items-center h-[60vh] gap-4">
-      <Loader2 className="h-10 w-10 animate-spin text-indigo-500" />
-      <p className="text-slate-400 text-sm">טוען נתונים...</p>
-    </div>
-  );
-
-  if (error) return (
-    <div className="flex flex-col items-center justify-center h-[50vh] text-red-500 gap-3">
-      <AlertCircle className="h-10 w-10" />
-      <p className="text-lg font-medium">{error}</p>
-      <Button variant="outline" onClick={() => window.location.reload()}>נסה שוב</Button>
-    </div>
-  );
+  // Balance chart from dashboard: [{date, balance}]
+  const balanceChart = (core?.summary?.balanceChartData ?? []).map(p => ({
+    name: p.date ? format(new Date(p.date), 'd/M', { locale: he }) : '',
+    יתרה: p.balance ?? 0,
+  }));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/20 to-indigo-50/30 p-3 sm:p-6 md:p-8 font-sans" dir="rtl">
-      <div className="max-w-7xl mx-auto space-y-5 sm:space-y-6">
+    <div className="min-h-screen bg-[#F2F4F8]" dir="rtl">
+      <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
 
-        {/* ── Header ─────────────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between pt-1">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">לוח בקרה</h1>
-            <p className="text-slate-400 text-sm mt-0.5">
-              {format(effectiveMonth, 'MMMM yyyy', { locale: he })}
-              {!isCurrentMonth && <span className="mr-2 text-amber-500 text-xs">· אין נתונים לחודש הנוכחי</span>}
-            </p>
-          </div>
-          <Button
-            asChild
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-0 text-white rounded-xl shadow-md shadow-blue-200/60 transition-all duration-200 hover:shadow-lg hover:shadow-blue-300/50"
-          >
-            <Link to="/portfolio"><Plus className="me-2 h-4 w-4" />הוסף תנועה</Link>
-          </Button>
-        </div>
-
-        {/* ── Hero Card ──────────────────────────────────────────────────────── */}
-        <div className="relative rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 p-6 sm:p-8 shadow-2xl shadow-indigo-200/60 overflow-hidden">
-          {/* decorative blobs */}
-          <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div className="absolute top-8 right-16 w-48 h-48 rounded-full bg-white/10 blur-2xl" />
-            <div className="absolute -bottom-8 left-12 w-64 h-40 rounded-full bg-violet-400/20 blur-3xl" />
-            <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.07),transparent_60%)]" />
+        {/* ── Story card ───────────────────────────────────────────────── */}
+        <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-6 text-white">
+          <div className="flex items-center gap-2 mb-4">
+            <Zap className="h-5 w-5 text-amber-400" />
+            <h2 className="text-base font-bold text-white/90">המצב שלך — בקצרה</h2>
           </div>
 
-          <div className="relative grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
-            {/* Health score */}
-            <div className="flex items-center gap-4">
-              {healthScore
-                ? <HealthRing score={healthScore.totalScore} max={healthScore.maxPossible} />
-                : <div className="h-20 w-20 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0"><Heart className="h-7 w-7 text-white/40" /></div>
-              }
-              <div>
-                <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest mb-1">בריאות פיננסית</p>
-                {healthScore
-                  ? <>
-                      <p className="text-white font-bold text-base leading-tight">{healthScore.grade} — {healthScore.gradeLabel}</p>
-                      {healthScore.tips?.[0] && <p className="text-white/55 text-xs mt-1 leading-relaxed max-w-[160px]">{healthScore.tips[0].tip}</p>}
-                    </>
-                  : <p className="text-white/40 text-sm">אין נתונים</p>
-                }
-              </div>
-            </div>
-
-            {/* Net flow */}
-            <div className="flex flex-col justify-center sm:items-center">
-              <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest mb-2">תזרים חודשי נטו</p>
-              <p className={`text-3xl sm:text-4xl font-extrabold tracking-tight ${thisNet >= 0 ? 'text-white' : 'text-red-300'}`}>
-                {thisNet >= 0 ? '+' : ''}{formatCurrency(thisNet)}
-              </p>
-              <div className="flex items-center gap-4 mt-2">
-                <span className="flex items-center gap-1 text-emerald-300 text-sm font-semibold">
-                  <ArrowUp className="h-3.5 w-3.5" />{formatCurrency(stats.thisIncome)}
-                </span>
-                <span className="flex items-center gap-1 text-red-300 text-sm font-semibold">
-                  <ArrowDown className="h-3.5 w-3.5" />{formatCurrency(stats.thisExpense)}
-                </span>
-              </div>
-            </div>
-
-            {/* Savings + Emergency + Net Worth */}
-            <div className="flex flex-col justify-center space-y-3">
-              {/* Savings Rate */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-white/60 text-xs flex items-center gap-1.5"><PiggyBank className="h-3 w-3" />שיעור חיסכון</span>
-                  <span className={`text-sm font-bold ${savingsRate >= 20 ? 'text-emerald-300' : savingsRate >= 10 ? 'text-amber-300' : 'text-red-300'}`}>
-                    {savingsRate.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="h-1.5 bg-white/15 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-700 ${savingsRate >= 20 ? 'bg-emerald-400' : savingsRate >= 10 ? 'bg-amber-400' : 'bg-red-400'}`}
-                    style={{ width: `${Math.min(100, Math.max(0, savingsRate))}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Emergency Fund */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-white/60 text-xs flex items-center gap-1.5"><Shield className="h-3 w-3" />קרן חירום</span>
-                  <span className={`text-sm font-bold ${emergencyMonths >= 6 ? 'text-emerald-300' : emergencyMonths >= 3 ? 'text-amber-300' : 'text-red-300'}`}>
-                    {emergencyMonths.toFixed(1)} חודשים
-                  </span>
-                </div>
-                <div className="h-1.5 bg-white/15 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-700 ${emergencyMonths >= 6 ? 'bg-emerald-400' : emergencyMonths >= 3 ? 'bg-amber-400' : 'bg-red-400'}`}
-                    style={{ width: `${Math.min(100, (emergencyMonths / 6) * 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Net Worth */}
-              {netWorth && (
-                <Link to="/net-worth" className="flex items-center justify-between bg-white/10 hover:bg-white/15 transition-colors rounded-xl px-3 py-2 mt-1">
-                  <span className="text-white/60 text-xs flex items-center gap-1.5"><Scale className="h-3 w-3" />שווי נקי</span>
-                  <span className={`text-sm font-bold ${netWorth.netWorth >= 0 ? 'text-white' : 'text-red-300'}`}>
-                    {formatCurrency(netWorth.netWorth)}
-                  </span>
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Action Plan ────────────────────────────────────────────────────── */}
-        {actionPlan.length > 0 && !planDismissed && (
-          <div className="bg-gradient-to-br from-indigo-50/80 to-white/80 backdrop-blur-sm border border-indigo-100 rounded-3xl p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-xl bg-indigo-600 flex items-center justify-center">
-                  <CheckCircle2 className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <p className="font-bold text-indigo-800 text-sm">תוכנית פעולה לחודש זה</p>
-                  <p className="text-xs text-indigo-400">צעדים ספציפיים עם סכומים</p>
-                </div>
-              </div>
-              <button onClick={() => setPlanDismissed(true)} className="text-slate-300 hover:text-slate-500 transition-colors p-1">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="space-y-2.5">
-              {actionPlan.map((action, i) => (
-                <div key={i} className={`flex items-start gap-3 p-3 rounded-2xl border ${
-                  action.priority === 'high'   ? 'bg-red-50/70 border-red-100'    :
-                  action.priority === 'medium' ? 'bg-amber-50/70 border-amber-100' :
-                                                 'bg-blue-50/70 border-blue-100'
-                }`}>
-                  <span className="text-xl flex-shrink-0">{action.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <p className="font-semibold text-sm text-slate-800">{action.title}</p>
-                      {action.amount != null && (
-                        <span className={`text-sm font-bold flex-shrink-0 ${
-                          action.priority === 'high' ? 'text-red-600' : action.priority === 'medium' ? 'text-amber-600' : 'text-blue-600'
-                        }`}>₪{action.amount.toLocaleString()}</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{action.description}</p>
-                    {action.actionUrl && (
-                      <Link to={action.actionUrl} className="inline-block mt-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700">
-                        {action.actionLabel} ←
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Stat Cards ─────────────────────────────────────────────────────── */}
-        <section className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-          <GradientStatCard title="יתרה כוללת"   value={totalBalance}       icon={Wallet}      gradient="bg-gradient-to-br from-blue-500 to-blue-700"       subText="בכל החשבונות" />
-          <GradientStatCard title="הכנסות החודש" value={stats.thisIncome}   icon={TrendingUp}  gradient="bg-gradient-to-br from-emerald-500 to-teal-600"    change={incomeChange}  changeType={incomeChange  >= 0 ? 'increase' : 'decrease'} />
-          <GradientStatCard title="הוצאות החודש" value={stats.thisExpense}  icon={CreditCard}  gradient="bg-gradient-to-br from-orange-500 to-red-500"      change={expenseChange} changeType={expenseChange <= 0 ? 'increase' : 'decrease'} />
-          <GradientStatCard title="תזרים נקי"    value={thisNet}            icon={Activity}    gradient="bg-gradient-to-br from-violet-600 to-purple-700"   change={netChange}     changeType={thisNet >= prevNet ? 'increase' : 'decrease'} subText="הכנסות פחות הוצאות" />
-        </section>
-
-        {/* ── Alerts ─────────────────────────────────────────────────────────── */}
-        {alerts.length > 0 && (
-          <div className="bg-white/80 backdrop-blur-sm rounded-3xl border border-amber-100 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-xl bg-amber-100 flex items-center justify-center">
-                  <Bell className="h-4 w-4 text-amber-600" />
-                </div>
-                <span className="font-bold text-slate-800">התראות ({alerts.length})</span>
-              </div>
-              <Button variant="ghost" size="sm" asChild className="text-xs text-blue-600">
-                <Link to="/alerts">הצג הכל <ChevronLeft className="h-3 w-3 ms-1" /></Link>
-              </Button>
-            </div>
+          {coreLoading ? (
             <div className="space-y-2">
-              {alerts.map(a => (
-                <div key={a._id} className={`flex items-start gap-2.5 text-sm px-3 py-2.5 rounded-2xl ${
-                  a.severity === 'danger'  ? 'bg-red-50 text-red-700'    :
-                  a.severity === 'warning' ? 'bg-amber-50 text-amber-700' :
-                                             'bg-blue-50 text-blue-700'
-                }`}>
-                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <span className="text-xs leading-relaxed">{a.message}</span>
-                </div>
-              ))}
+              {[80,65,75].map((w,i) => <div key={i} className="h-4 bg-white/10 rounded animate-pulse" style={{ width: `${w}%` }} />)}
             </div>
-          </div>
-        )}
-
-        {/* ── Recommendations ────────────────────────────────────────────────── */}
-        {recommendations.length > 0 && (
-          <div className="bg-white/80 backdrop-blur-sm rounded-3xl border border-indigo-100 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-xl bg-indigo-100 flex items-center justify-center">
-                  <Lightbulb className="h-4 w-4 text-indigo-600" />
-                </div>
-                <span className="font-bold text-slate-800">המלצות דחופות</span>
-              </div>
-              <Button variant="ghost" size="sm" asChild className="text-xs text-blue-600">
-                <Link to="/smart-analytics">הצג הכל <ChevronLeft className="h-3 w-3 ms-1" /></Link>
-              </Button>
-            </div>
+          ) : (
             <div className="space-y-2">
-              {recommendations.map((rec, i) => (
-                <div key={i} className="flex items-start gap-2.5 px-3 py-2.5 rounded-2xl bg-red-50 text-red-700">
-                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-red-400" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs leading-relaxed">{rec.suggestion}</p>
-                    {rec.actionUrl && (
-                      <Link to={rec.actionUrl} className="text-xs font-semibold text-indigo-600 hover:underline mt-0.5 block">{rec.actionLabel}</Link>
-                    )}
-                  </div>
+              {story.map((line, i) => (
+                <div key={i} className={`flex items-start gap-3 rounded-2xl px-4 py-3 ${
+                  line.tone === 'positive' ? 'bg-emerald-500/15 border border-emerald-500/20'
+                  : line.tone === 'warning'  ? 'bg-amber-500/15 border border-amber-500/20'
+                  : 'bg-white/5 border border-white/10'
+                }`}>
+                  <span className="text-base leading-none mt-0.5 shrink-0">{line.icon}</span>
+                  <p className="text-sm text-white/90 leading-relaxed">{line.text}</p>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ── Chart + Accounts/Goals ─────────────────────────────────────────── */}
-        <section className="grid gap-4 lg:grid-cols-3">
-          {/* Area Chart */}
-          <div className="lg:col-span-2 bg-white/80 backdrop-blur-sm rounded-3xl border border-white/60 shadow-lg p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="font-bold text-slate-900 text-lg tracking-tight">מגמת תזרים</h2>
-                <p className="text-slate-400 text-sm">{format(effectiveMonth, 'MMMM yyyy', { locale: he })}</p>
-              </div>
-            </div>
-            {stats.balanceChartData.length > 0 ? (
-              <div className="h-[240px] sm:h-[270px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={stats.balanceChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="balGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%"   stopColor="#6366f1" stopOpacity={0.25} />
-                        <stop offset="100%" stopColor="#6366f1" stopOpacity={0}    />
-                      </linearGradient>
-                    </defs>
-                    <XAxis
-                      dataKey="date"
-                      tick={{ fontSize: 10, fill: '#94a3b8' }}
-                      axisLine={false} tickLine={false} dy={8}
-                    />
-                    <YAxis
-                      tickFormatter={v => `₪${(v / 1000).toFixed(0)}k`}
-                      tick={{ fontSize: 10, fill: '#94a3b8' }}
-                      axisLine={false} tickLine={false} width={44}
-                    />
-                    <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#6366f1', strokeWidth: 1, strokeDasharray: '4 4' }} />
-                    <Area
-                      type="monotone" dataKey="balance"
-                      stroke="#6366f1" strokeWidth={2.5}
-                      fillOpacity={1} fill="url(#balGrad)"
-                      dot={false}
-                      activeDot={{ r: 5, fill: '#6366f1', stroke: 'white', strokeWidth: 2.5 }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-[240px] flex items-center justify-center text-slate-300 text-sm">
-                אין נתונים לגרף
-              </div>
-            )}
-          </div>
-
-          {/* Accounts + Goals */}
-          <div className="flex flex-col gap-4">
-            <div className="bg-white/80 backdrop-blur-sm rounded-3xl border border-white/60 shadow-lg p-5 flex-1">
-              <h2 className="font-bold text-slate-900 mb-4">חשבונות</h2>
-              <div className="space-y-3">
-                {accounts.length === 0 && <p className="text-slate-300 text-sm text-center py-3">אין חשבונות</p>}
-                {accounts.map((acc, i) => (
-                  <div key={acc._id || i} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-xl bg-blue-50 flex items-center justify-center">
-                        <Wallet className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <span className="text-sm font-medium text-slate-700">{acc.name}</span>
-                    </div>
-                    <span className="font-bold text-slate-900 tabular-nums text-sm">{formatCurrency(acc.balance)}</span>
+          {!coreLoading && core?.actionPlan?.data?.actions?.length > 0 && (
+            <div className="mt-5 pt-4 border-t border-white/10">
+              <p className="text-[11px] font-semibold text-white/40 uppercase tracking-widest mb-3">3 דברים לעשות עכשיו</p>
+              <div className="space-y-2">
+                {core.actionPlan.data.actions.slice(0, 3).map((a, i) => (
+                  <div key={i} className="flex items-center gap-3 text-sm text-white/80">
+                    <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold shrink-0">{i+1}</div>
+                    <span className="flex-1">{a.title}</span>
+                    {a.amount > 0 && <span className="text-amber-300 font-semibold text-xs">{fmt(a.amount)}</span>}
                   </div>
                 ))}
               </div>
             </div>
+          )}
+        </div>
 
-            <div className="bg-white/80 backdrop-blur-sm rounded-3xl border border-white/60 shadow-lg p-5 flex-1">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold text-slate-900">יעדים</h2>
-                <Link to="/projects" className="text-xs text-blue-600 hover:underline font-medium">הכל</Link>
-              </div>
-              {projects.length === 0 ? (
-                <div className="text-center py-4">
-                  <Target className="h-8 w-8 text-slate-200 mx-auto mb-2" />
-                  <p className="text-slate-400 text-xs mb-2">אין יעדים פעילים</p>
-                  <Button variant="outline" size="sm" asChild className="rounded-xl text-xs">
-                    <Link to="/projects/new">צור יעד חדש</Link>
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {projects.slice(0, 3).map(proj => {
-                    const pct = Math.min(100, Math.max(0, (proj.currentAmount / proj.targetAmount) * 100));
-                    return (
-                      <div key={proj._id}>
-                        <div className="flex justify-between text-xs mb-1.5">
-                          <span className="font-semibold text-slate-700 truncate">{proj.projectName}</span>
-                          <span className="text-slate-400 flex-shrink-0 mr-2">{pct.toFixed(0)}%</span>
-                        </div>
-                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-700" style={{ width: `${pct}%` }} />
-                        </div>
-                        <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-                          <span>{formatCurrency(proj.currentAmount)}</span>
-                          <span>יעד: {formatCurrency(proj.targetAmount)}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+        {/* ── KPI row ──────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <KpiCard label="הכנסות" value={fmt(income)}
+            sub={monthly?.prevMonth ? `לעומת ${fmt(monthly.prevMonth.income)}` : null}
+            positive={income >= (monthly?.prevMonth?.income ?? 0)} loading={coreLoading} />
+          <KpiCard label="הוצאות" value={fmt(expense)}
+            sub={monthly?.prevMonth ? `לעומת ${fmt(monthly.prevMonth.expense)}` : null}
+            positive={expense <= (monthly?.prevMonth?.expense ?? 0)} loading={coreLoading} />
+          <KpiCard label="חיסכון נטו" value={fmt(net)}
+            sub={income > 0 ? `${savingsRate}% מההכנסה` : null}
+            positive={net >= 0} loading={coreLoading} />
+          <KpiCard label="שווי נקי" value={fmt(nwTotal)}
+            sub={core?.healthScore ? `ציון ${core.healthScore.grade}` : null}
+            positive={nwTotal >= 0} loading={coreLoading} />
+        </div>
+
+        {/* ── Persistent balance chart ─────────────────────────────────── */}
+        {!coreLoading && balanceChart.length > 1 && (
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
+            <SectionTitle icon={<TrendingUp className="h-4 w-4 text-blue-500" />} title="יתרת חשבון — חודש נוכחי" />
+            <ResponsiveContainer width="100%" height={160}>
+              <AreaChart data={balanceChart}>
+                <defs>
+                  <linearGradient id="gBal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} width={36} />
+                <Tooltip formatter={v => fmt(v)} />
+                <Area type="monotone" dataKey="יתרה" stroke="#3b82f6" fill="url(#gBal)" strokeWidth={2.5} dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
-        </section>
+        )}
 
-        {/* ── Categories + Recent Transactions ───────────────────────────────── */}
-        <section className="grid gap-4 lg:grid-cols-2">
-
-          {/* Categories */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-3xl border border-white/60 shadow-lg p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-bold text-slate-900 text-lg tracking-tight">הוצאות לפי קטגוריה</h2>
-              <Link to="/categories" className="text-xs text-blue-600 hover:underline font-medium">פירוט</Link>
-            </div>
-            {stats.topCategories.length === 0 ? (
-              <p className="text-slate-300 text-sm text-center py-8">אין נתונים לחודש זה</p>
-            ) : (
-              <div className="space-y-4">
-                {stats.topCategories.map(({ cat, total }, i) => {
-                  const pct = topCatTotal > 0 ? (total / topCatTotal) * 100 : 0;
-                  const c = CAT_COLORS[i % CAT_COLORS.length];
-                  return (
-                    <div key={cat}>
-                      <div className="flex items-center justify-between mb-1.5 text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.dot }} />
-                          <span className="font-semibold text-slate-700">{cat}</span>
-                        </div>
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-xs text-slate-400 tabular-nums">{pct.toFixed(0)}%</span>
-                          <span className="font-bold text-slate-900 tabular-nums">{formatCurrency(total)}</span>
-                        </div>
-                      </div>
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full bg-gradient-to-r ${c.bar} transition-all duration-700`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+        {/* ── Tabs ─────────────────────────────────────────────────────── */}
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="flex border-b border-slate-100 overflow-x-auto">
+            {TABS.map(t => {
+              const Icon = t.icon;
+              const active = t.id === activeTab;
+              return (
+                <button key={t.id} onClick={() => setActiveTab(t.id)}
+                  className={`flex items-center gap-2 px-5 py-3.5 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 ${active ? 'border-blue-500 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}>
+                  <Icon className="h-4 w-4" />{t.label}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Recent Transactions */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-3xl border border-white/60 shadow-lg p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-bold text-slate-900 text-lg tracking-tight">עסקאות אחרונות</h2>
-              <Link to="/portfolio" className="text-xs text-blue-600 hover:underline font-medium">הכל</Link>
-            </div>
-            {recentTxns.length === 0 ? (
-              <p className="text-slate-300 text-sm text-center py-8">אין עסקאות</p>
-            ) : (
-              <div className="space-y-1">
-                {recentTxns.map((t, i) => (
-                  <div key={t._id || i} className="flex items-center gap-3 px-1 py-2.5 rounded-2xl hover:bg-slate-50/80 transition-colors group">
-                    <div className={`h-9 w-9 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-                      t.type === 'הכנסה' ? 'bg-emerald-50' : 'bg-red-50'
-                    }`}>
-                      {t.type === 'הכנסה'
-                        ? <ArrowUp className="h-4 w-4 text-emerald-500" />
-                        : <ArrowDown className="h-4 w-4 text-red-400" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate leading-tight">{t.description}</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        {t.category && <span>{t.category} · </span>}
-                        {format(new Date(t.date), 'd MMM', { locale: he })}
-                      </p>
-                    </div>
-                    <span className={`font-bold text-sm tabular-nums flex-shrink-0 ${
-                      t.type === 'הכנסה' ? 'text-emerald-600' : 'text-slate-700'
-                    }`}>
-                      {t.type === 'הכנסה' ? '+' : ''}{formatCurrency(t.amount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="p-5">
+            {tabLoading && !tabData[activeTab]
+              ? <TabSpinner />
+              : (
+                <>
+                  {activeTab === 'month'  && <MonthTab  data={tabData.month}  core={core} />}
+                  {activeTab === 'trends' && <TrendsTab data={tabData.trends} />}
+                  {activeTab === 'assets' && <AssetsTab history={tabData.assets} core={core} />}
+                  {activeTab === 'annual' && <AnnualTab data={tabData.annual} />}
+                </>
+              )
+            }
           </div>
+        </div>
 
-        </section>
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TAB: החודש
+// ─────────────────────────────────────────────────────────────────────────────
+function MonthTab({ data, core }) {
+  const topCats = data?.categories?.length > 0
+    ? data.categories
+    : (core?.summary?.topCategories ?? []);
+  const alerts  = (data?.alerts ?? []).filter(a => !a.read).slice(0, 4);
+  const recs    = (data?.recommendations ?? []).slice(0, 3);
+  const budget  = data?.budget;
+
+  if (!data && !core?.summary) return <TabSpinner />;
+
+  return (
+    <div className="space-y-7">
+
+      {/* Alerts */}
+      {alerts.length > 0 && (
+        <div>
+          <SectionTitle icon={<AlertCircle className="h-4 w-4 text-amber-500" />} title="התראות פעילות" link="/alerts" linkLabel="כל ההתראות" />
+          <div className="space-y-2">
+            {alerts.map((a, i) => (
+              <div key={i} className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
+                <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800">{a.message ?? a.title}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recommendations */}
+      {recs.length > 0 && (
+        <div>
+          <SectionTitle icon={<Zap className="h-4 w-4 text-blue-500" />} title="המלצות לחודש זה" link="/smart-analytics" linkLabel="ניתוח מלא" />
+          <div className="space-y-2">
+            {recs.map((r, i) => (
+              <div key={i} className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
+                <div className={`h-2 w-2 rounded-full mt-1.5 shrink-0 ${r.priority === 'high' ? 'bg-red-500' : r.priority === 'medium' ? 'bg-amber-500' : 'bg-blue-400'}`} />
+                <p className="text-sm text-blue-900">{r.suggestion ?? r.text ?? r.title}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Top categories — horizontal bar chart */}
+      {topCats.length > 0 ? (
+        <div>
+          <SectionTitle icon={<BarChart2 className="h-4 w-4 text-violet-500" />} title="הוצאות לפי קטגוריה" link="/categories" linkLabel="ניתוח מעמיק" />
+          <div className="space-y-3">
+            {(() => {
+              const max = Math.max(...topCats.slice(0, 6).map(c => c.total));
+              return topCats.slice(0, 6).map((c, i) => (
+                <div key={i}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="font-medium text-slate-700">{c.category}</span>
+                    <span className="font-bold text-slate-900">{fmt(c.total)}</span>
+                  </div>
+                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${Math.round((c.total / max) * 100)}%`, background: COLORS[i % COLORS.length] }}
+                    />
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+      ) : (
+        <EmptyState icon="📊" title="אין עסקאות החודש" desc="ייבא עסקאות כדי לראות ניתוח לפי קטגוריות" action="/import/auto" actionLabel="ייבוא אוטומטי" />
+      )}
+
+      {/* Budget vs actual */}
+      {budget?.categories?.length > 0 && (
+        <div>
+          <SectionTitle icon={<Wallet className="h-4 w-4 text-emerald-500" />} title="תקציב מול פועל" link="/budget" linkLabel="לתקציב המלא" />
+          <div className="space-y-3">
+            {budget.categories.slice(0, 6).map((cat, i) => {
+              const pct = cat.limit > 0 ? Math.round((cat.actual / cat.limit) * 100) : 0;
+              const over = pct > 100;
+              return (
+                <div key={i}>
+                  <div className="flex justify-between text-xs text-slate-600 mb-1 font-medium">
+                    <span>{cat.category}</span>
+                    <span className={over ? 'text-red-500 font-bold' : ''}>{fmt(cat.actual)} / {fmt(cat.limit)} ({pct}%)</span>
+                  </div>
+                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${over ? 'bg-red-400' : pct > 80 ? 'bg-amber-400' : 'bg-emerald-400'}`}
+                      style={{ width: `${Math.min(pct, 100)}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TAB: מגמות
+// ─────────────────────────────────────────────────────────────────────────────
+function TrendsTab({ data }) {
+  if (!data) return <TabSpinner />;
+
+  const trends    = data?.trends ?? [];
+  const catData   = data?.topCategories ?? [];
+  const anomalies = data?.anomalies ?? [];
+  const efficiency = data?.efficiency ?? null;
+  const summary   = data?.summary;
+
+  // trends: [{date, income, expense, net}] → chart format
+  const trendChart = trends.map(t => ({
+    name:    t.month ?? (t.date ? format(new Date(t.date), 'MMM yy', { locale: he }) : ''),
+    הכנסות: t.income  ?? 0,
+    הוצאות: t.expense ?? 0,
+  })).filter(t => t.name);
+
+  const pieData = catData.slice(0, 7).map(c => ({ name: c.category, value: c.total ?? c.amount ?? 0 })).filter(d => d.value > 0);
+
+  const hasData = trendChart.length > 0 || pieData.length > 0;
+
+  if (!hasData) {
+    return (
+      <EmptyState icon="📈" title="אין מספיק נתונים לניתוח מגמות"
+        desc="ייבא נתונים מכמה חודשים כדי לראות מגמות"
+        action="/smart-analytics" actionLabel="מעבר לניתוח חכם" />
+    );
+  }
+
+  return (
+    <div className="space-y-7">
+
+      {/* Summary KPIs */}
+      {summary && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: 'סה"כ הכנסות', value: fmt(summary.totalIncome ?? 0) },
+            { label: 'סה"כ הוצאות', value: fmt(summary.totalExpense ?? 0) },
+            { label: 'תזרים נקי',   value: fmt(summary.netFlow ?? 0), colored: true, positive: (summary.netFlow ?? 0) >= 0 },
+            { label: 'יעילות',      value: efficiency != null ? `${Math.round(efficiency)}%` : '—' },
+          ].map((k, i) => (
+            <div key={i} className="bg-slate-50 rounded-2xl p-3 text-center">
+              <p className="text-[11px] text-slate-400 mb-1">{k.label}</p>
+              <p className={`text-base font-black ${k.colored ? (k.positive ? 'text-emerald-600' : 'text-red-500') : 'text-slate-900'}`}>{k.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 6-month trend chart */}
+      {trendChart.length > 0 && (
+        <div>
+          <SectionTitle icon={<TrendingUp className="h-4 w-4 text-blue-500" />} title="הכנסות מול הוצאות — לאורך זמן" link="/smart-analytics" linkLabel="ניתוח מלא" />
+          <ResponsiveContainer width="100%" height={240}>
+            <AreaChart data={trendChart}>
+              <defs>
+                <linearGradient id="gI" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
+                <linearGradient id="gE" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.2}/><stop offset="95%" stopColor="#ef4444" stopOpacity={0}/></linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} width={36} />
+              <Tooltip formatter={v => fmt(v)} />
+              <Legend />
+              <Area type="monotone" dataKey="הכנסות" stroke="#10b981" fill="url(#gI)" strokeWidth={2.5} dot={false} />
+              <Area type="monotone" dataKey="הוצאות" stroke="#ef4444" fill="url(#gE)" strokeWidth={2.5} dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Category pie + legend */}
+      {pieData.length > 0 && (
+        <div>
+          <SectionTitle icon={<BarChart2 className="h-4 w-4 text-violet-500" />} title="פילוח הוצאות לפי קטגוריה" link="/categories" linkLabel="ניתוח קטגוריות" />
+          <div className="flex flex-col sm:flex-row items-center gap-5">
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={75} dataKey="value" paddingAngle={2}>
+                  {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Pie>
+                <Tooltip formatter={v => fmt(v)} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="w-full space-y-2">
+              {pieData.map((d, i) => {
+                const total = pieData.reduce((s, x) => s + x.value, 0);
+                const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
+                return (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
+                    <span className="flex-1 text-sm text-slate-600 truncate">{d.name}</span>
+                    <span className="text-xs text-slate-400">{pct}%</span>
+                    <span className="font-semibold text-sm text-slate-800 min-w-[64px] text-left">{fmt(d.value)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Anomalies */}
+      {anomalies.length > 0 && (
+        <div>
+          <SectionTitle icon={<AlertCircle className="h-4 w-4 text-amber-500" />} title={`חריגות שזוהו (${anomalies.length})`} />
+          <div className="space-y-2">
+            {anomalies.slice(0, 4).map((a, i) => (
+              <div key={i} className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 text-sm text-amber-800">
+                {a.description ?? a.text ?? a.category ?? ''}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TAB: נכסים
+// ─────────────────────────────────────────────────────────────────────────────
+function AssetsTab({ history, core }) {
+  const nw  = core?.netWorth;
+  const hs  = core?.healthScore;
+
+  const histData = (history ?? []).map(h => ({
+    name: h.date ? format(new Date(h.date), 'MMM yy', { locale: he }) : '',
+    שווי: h.netWorth ?? h.value ?? 0,
+  })).filter(h => h.name);
+
+  const assetRows = [
+    { label: 'פיקדונות',     value: nw?.deposits       ?? 0 },
+    { label: 'מניות',        value: nw?.stocks          ?? 0 },
+    { label: 'קרנות',        value: nw?.funds           ?? 0 },
+    { label: 'פנסיה',        value: nw?.pension         ?? 0 },
+    { label: 'נדל"ן',        value: nw?.realEstate      ?? 0 },
+    { label: 'חיסכון ילדים', value: nw?.childSavings    ?? 0 },
+    { label: 'מט"ח',         value: nw?.foreignCurrency ?? 0 },
+  ].filter(r => r.value > 0);
+
+  const liabilityRows = [
+    { label: 'הלוואות',  value: nw?.loans      ?? 0 },
+    { label: 'משכנתא',   value: nw?.mortgage   ?? 0 },
+    { label: 'חובות',    value: nw?.debts      ?? 0 },
+  ].filter(r => r.value > 0);
+
+  const pieData = assetRows.map(r => ({ name: r.label, value: r.value }));
+
+  const hasAny = (nw?.totalAssets ?? 0) + (nw?.totalLiabilities ?? 0) > 0;
+
+  return (
+    <div className="space-y-7">
+
+      {/* 3-metric hero */}
+      <div className="grid grid-cols-3 gap-3 text-center">
+        {[
+          { label: 'שווי נקי',      value: nw?.totalNetWorth    ?? 0, cls: 'text-slate-900'   },
+          { label: 'נכסים',         value: nw?.totalAssets      ?? 0, cls: 'text-emerald-600' },
+          { label: 'התחייבויות',    value: nw?.totalLiabilities ?? 0, cls: 'text-red-500'     },
+        ].map((r, i) => (
+          <div key={i} className="bg-slate-50 rounded-2xl p-4">
+            <p className="text-[11px] text-slate-400 mb-1.5">{r.label}</p>
+            <p className={`text-lg font-black ${r.cls}`}>{fmt(r.value)}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Asset pie chart */}
+      {pieData.length > 0 ? (
+        <div>
+          <SectionTitle icon={<PiggyBank className="h-4 w-4 text-emerald-500" />} title="פירוט נכסים" link="/net-worth" linkLabel="תמונה מלאה" />
+          <div className="flex flex-col sm:flex-row items-center gap-5">
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={48} outerRadius={72} dataKey="value" paddingAngle={2}>
+                  {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Pie>
+                <Tooltip formatter={v => fmt(v)} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="w-full space-y-2">
+              {assetRows.map((r, i) => (
+                <div key={i} className="flex items-center gap-2 py-1 border-b border-slate-50 last:border-0">
+                  <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
+                  <span className="flex-1 text-sm text-slate-600">{r.label}</span>
+                  <span className="text-sm font-bold text-slate-900">{fmt(r.value)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <EmptyState icon="🏦" title="אין נכסים מוגדרים" desc="הוסף פיקדונות, מניות, פנסיה ועוד כדי לעקוב אחר השווי הנקי שלך"
+          action="/deposits" actionLabel="הוסף פיקדון" />
+      )}
+
+      {/* Liabilities */}
+      {liabilityRows.length > 0 && (
+        <div>
+          <SectionTitle icon={<TrendingDown className="h-4 w-4 text-red-500" />} title="התחייבויות" />
+          <div className="space-y-1">
+            {liabilityRows.map((r, i) => (
+              <div key={i} className="flex justify-between py-2 border-b border-slate-50 last:border-0 text-sm">
+                <span className="text-slate-600">{r.label}</span>
+                <span className="font-bold text-red-500">{fmt(r.value)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Net worth history */}
+      {histData.length > 1 && (
+        <div>
+          <SectionTitle icon={<TrendingUp className="h-4 w-4 text-blue-500" />} title="שווי נקי — היסטוריה" />
+          <ResponsiveContainer width="100%" height={190}>
+            <AreaChart data={histData}>
+              <defs>
+                <linearGradient id="gNW" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} width={36} />
+              <Tooltip formatter={v => fmt(v)} />
+              <Area type="monotone" dataKey="שווי" stroke="#3b82f6" fill="url(#gNW)" strokeWidth={2.5} dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Health score */}
+      {hs && (
+        <div>
+          <SectionTitle icon={<CheckCircle2 className="h-4 w-4 text-emerald-500" />} title="ציון בריאות פיננסית" link="/net-worth" linkLabel="פרטים נוספים" />
+          <div className="bg-slate-50 rounded-2xl p-4 flex items-center gap-5">
+            <div className="text-6xl font-black text-slate-900 leading-none">{hs.grade}</div>
+            <div className="flex-1">
+              <p className="font-bold text-slate-800 text-base">{hs.label}</p>
+              <p className="text-sm text-slate-400 mt-0.5">ציון {hs.score}/100</p>
+              <div className="mt-2 h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                <div className="h-full rounded-full bg-gradient-to-l from-blue-500 to-indigo-500" style={{ width: `${hs.score}%` }} />
+              </div>
+            </div>
+          </div>
+          {hs.tips?.slice(0, 3).map((t, i) => (
+            <div key={i} className="flex items-start gap-2 mt-2 text-sm text-slate-600">
+              <span className="shrink-0">{t.icon ?? '•'}</span><span>{t.tip ?? t}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TAB: שנתי
+// ─────────────────────────────────────────────────────────────────────────────
+function AnnualTab({ data }) {
+  if (!data) return <TabSpinner />;
+  const yr  = data?.yearly;
+  const fs  = data?.summary;
+  const monthlyData = (yr?.monthlyData ?? []).map(m => ({
+    ...m,
+    month: m.month ?? m.label ?? '',
+    income:  m.income  ?? m.currentIncome  ?? 0,
+    expense: m.expense ?? m.currentExpense ?? 0,
+  }));
+
+  if (!yr && !fs) {
+    return (
+      <EmptyState icon="📅" title="אין נתונים שנתיים" desc="נדרש לפחות שנה של עסקאות לניתוח שנתי" action="/reports" actionLabel="לדוחות" />
+    );
+  }
+
+  return (
+    <div className="space-y-7">
+
+      {/* YoY KPI grid */}
+      {yr && (
+        <div>
+          <SectionTitle icon={<BarChart2 className="h-4 w-4 text-blue-500" />} title={`השוואה שנתית — ${yr.currentYear ?? ''} מול ${yr.previousYear ?? ''}`} link="/reports" linkLabel="דוח מלא" />
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: 'הכנסות',      cur: yr.currentYear?.income,      prev: yr.previousYear?.income,      positive: true  },
+              { label: 'הוצאות',      cur: yr.currentYear?.expense,     prev: yr.previousYear?.expense,     positive: false },
+              { label: 'חיסכון',      cur: yr.currentYear?.savings,     prev: yr.previousYear?.savings,     positive: true  },
+              { label: 'שיעור חיסכון', cur: yr.currentYear?.savingsRate, prev: yr.previousYear?.savingsRate, positive: true, pct: true },
+            ].filter(r => r.cur != null).map((r, i) => {
+              const up = r.positive ? r.cur >= (r.prev ?? 0) : r.cur <= (r.prev ?? 0);
+              return (
+                <div key={i} className="bg-slate-50 rounded-2xl p-4">
+                  <p className="text-xs text-slate-400 mb-1">{r.label}</p>
+                  <p className="text-xl font-black text-slate-900">{r.pct ? `${r.cur?.toFixed(1)}%` : fmt(r.cur)}</p>
+                  {r.prev != null && (
+                    <p className={`text-xs flex items-center gap-0.5 mt-1 ${up ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {up ? <ArrowUpRight className="h-3 w-3"/> : <ArrowDownRight className="h-3 w-3"/>}
+                      {r.pct ? `${r.prev?.toFixed(1)}%` : fmt(r.prev)} שנה קודמת
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Monthly bar chart */}
+      {monthlyData.length > 0 && (
+        <div>
+          <SectionTitle icon={<BarChart2 className="h-4 w-4 text-slate-400" />} title="הכנסות vs הוצאות לפי חודש" />
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={monthlyData} barGap={2}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} width={36} />
+              <Tooltip formatter={v => fmt(v)} />
+              <Legend />
+              <Bar dataKey="income"  name="הכנסות" fill="#10b981" radius={[3,3,0,0]} />
+              <Bar dataKey="expense" name="הוצאות" fill="#ef4444" radius={[3,3,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Financial summary breakdown */}
+      {fs && (
+        <div>
+          <SectionTitle icon={<Home className="h-4 w-4 text-slate-400" />} title="סיכום כולל — נכסים והתחייבויות" link="/net-worth" linkLabel="שווי נקי מלא" />
+          <div className="space-y-1">
+            {Object.entries({
+              'חשבונות':      fs.accounts?.total,
+              'פיקדונות':     fs.deposits?.total,
+              'מניות':        fs.stocks?.total,
+              'פנסיה':        fs.pension?.total,
+              'הלוואות':      fs.loans?.total       != null ? -(fs.loans.total)       : null,
+              'משכנתאות':     fs.mortgages?.total   != null ? -(fs.mortgages.total)   : null,
+              'נדל"ן':        fs.realEstate?.totalValue,
+              'חיסכון ילדים': fs.childSavings?.total,
+              'יעדים':        fs.goals?.totalSaved,
+            }).filter(([, v]) => v != null && v !== 0).map(([label, val], i) => (
+              <div key={i} className="flex justify-between py-2.5 border-b border-slate-50 last:border-0 text-sm">
+                <span className="text-slate-600">{label}</span>
+                <span className={`font-semibold ${val >= 0 ? 'text-slate-900' : 'text-red-500'}`}>{fmt(val)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
