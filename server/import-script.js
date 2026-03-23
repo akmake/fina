@@ -3,7 +3,7 @@ import sqlite3 from 'sqlite3';
 import dotenv from 'dotenv';
 
 // טעינת המודלים ממסד הנתונים החדש
-import User from './models/userModel.js';
+import User from './models/User.js';
 import Transaction from './models/Transaction.js';
 import FinanceProfile from './models/FinanceProfile.js';
 

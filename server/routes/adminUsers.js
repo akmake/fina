@@ -1,5 +1,5 @@
 import express from 'express';
-import requireAdmin from '../middlewares/requireAdmin.js';
+import { requireAuth, requireAdmin } from '../middlewares/authMiddleware.js';
 import {
   getAllUsers,
   updateUserRole,
@@ -7,7 +7,7 @@ import {
 } from '../controllers/admin/userAdminController.js';
 
 const router = express.Router();
-router.use(requireAdmin);
+router.use(requireAuth, requireAdmin);
 
 router.get('/',    getAllUsers);
 router.put('/:id', updateUserRole);

@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(find c:UsersyosefDocumentsGitHubfinaservernode_modulesisraeli-bank-scrapers -name index*)",
+      "Bash(node -e \"const {CompanyTypes} = require\\(''./node_modules/israeli-bank-scrapers/lib/index.js''\\); console.log\\(JSON.stringify\\(CompanyTypes, null, 2\\)\\)\")",
+      "Bash(node --input-type=module -e \"import {CompanyTypes} from ''./node_modules/israeli-bank-scrapers/lib/index.js''; console.log\\(JSON.stringify\\(CompanyTypes, null, 2\\)\\)\")",
+      "Bash(npm show:*)"
     ]
   }
 }

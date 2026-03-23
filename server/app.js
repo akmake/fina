@@ -43,6 +43,7 @@ import scraperRoutes from './routes/scraperRoutes.js';
 import calRoutes from './routes/calRoutes.js';
 import maaserRoutes from './routes/maaserRoutes.js';
 import familyRoutes from './routes/familyRoutes.js';
+import adminUsersRoutes from './routes/adminUsers.js';
 
 // ייבוא מידלוור
 import rateLimiter from './middlewares/rateLimiter.js';
@@ -159,6 +160,7 @@ app.use('/api/import',  requireAuth, importRoutes);
 app.use('/api/scrape',  requireAuth, scraperRoutes);
 app.use('/api/cal',   calRoutes);
 app.use('/api/logs', logsRoutes);
+app.use('/api/admin/users', adminUsersRoutes);
 
 // --- טיפול בשגיאות ---
 

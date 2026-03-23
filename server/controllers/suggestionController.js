@@ -1,5 +1,5 @@
 import Suggestion from '../models/Suggestion.js';
-import User from '../models/userModel.js';
+import User from '../models/User.js';
 
 // פונקציית עזר — שולפת שם משתמש מה-DB
 const getUserName = async (userId) => {

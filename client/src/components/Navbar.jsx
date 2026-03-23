@@ -69,6 +69,7 @@ const NAV_GROUPS = [
       { to: "/management",      label: "אוטומציה",       icon: Cpu             },
       { to: "/import/excel",    label: "ייבוא אקסל",     icon: FileSpreadsheet },
       { to: "/import/auto",     label: "ייבוא אוטומטי",  icon: DownloadCloud   },
+      { to: "/import/max",      label: "ייבוא מקס",      icon: CreditCard      },
       { to: "/import",          label: "ייבוא נתונים",   icon: Upload          },
       { to: "/discount-import", label: "ייבוא דיסקונט",  icon: Banknote        },
       { to: "/suggestions",     label: "הצעות שיפור",    icon: Lightbulb       },
@@ -77,7 +78,8 @@ const NAV_GROUPS = [
   {
     label: "אדמין", icon: Lock, adminOnly: true,
     items: [
-      { to: "/admin/logs", label: "דוח מבקרים", icon: Activity, adminOnly: true },
+      { to: "/admin/logs",  label: "דוח מבקרים", icon: Activity, adminOnly: true },
+      { to: "/admin/users", label: "משתמשים",    icon: Users,    adminOnly: true },
     ],
   },
 ];
