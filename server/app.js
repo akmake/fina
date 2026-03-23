@@ -74,9 +74,20 @@ await connectDB();
 const app = express();
 
 // --- הגדרות אבטחה בסיסיות (Helmet) ---
-app.use(helmet({ 
+app.use(helmet({
   crossOriginResourcePolicy: false,
-  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://accounts.google.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      frameSrc: ["https://accounts.google.com"],
+    },
+  },
 }));
 // --- הגדרות CORS (החלק הקריטי לתקשורת ברנדר) ---
 const allowedOrigins = [
