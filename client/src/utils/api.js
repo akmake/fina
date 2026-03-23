@@ -135,7 +135,8 @@ api.interceptors.response.use(
     }
 
     // --- טיפול ב-401: חידוש access token ---
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // מניעת לולאה: אם בקשת ה-refresh עצמה נכשלת ב-401, לא ננסה לרענן שוב
+    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/refresh')) {
       
       // אם אנחנו כבר באמצע תהליך חידוש, הכנס לתור
       if (isRefreshing) {
