@@ -66,6 +66,77 @@ export const searchTransactions = async (req, res) => {
   }
 };
 
+// @desc   סיכום כל בתי העסק עם נתונים חודשיים
+// @route  GET /api/transactions/merchants/summary
+export const getMerchantsSummary = async (req, res) => {
+  try {
+    const filter = scopeFilter(req);
+    const months = parseInt(req.query.months) || 12;
+
+    const since = new Date();
+    since.setMonth(since.getMonth() - months);
+    since.setDate(1);
+    since.setHours(0, 0, 0, 0);
+
+    const pipeline = [
+      {
+        $match: {
+          ...filter,
+          type: 'הוצאה',
+          date: { $gte: since },
+          description: { $exists: true, $ne: '' },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            name: '$description',
+            month: { $dateToString: { format: '%Y-%m', date: '$date' } },
+          },
+          monthTotal: { $sum: '$amount' },
+          monthCount: { $sum: 1 },
+          category: { $last: '$category' },
+          lastDate: { $max: '$date' },
+        },
+      },
+      {
+        $group: {
+          _id: '$_id.name',
+          total: { $sum: '$monthTotal' },
+          count: { $sum: '$monthCount' },
+          category: { $last: '$category' },
+          lastDate: { $max: '$lastDate' },
+          monthCount: { $sum: 1 },
+          monthly: {
+            $push: { month: '$_id.month', total: '$monthTotal', count: '$monthCount' },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          name: '$_id',
+          total: { $round: ['$total', 2] },
+          count: 1,
+          category: 1,
+          lastDate: 1,
+          monthCount: 1,
+          isRecurring: { $gte: ['$monthCount', 2] },
+          avgPerMonth: { $round: [{ $divide: ['$total', '$monthCount'] }, 2] },
+          monthly: 1,
+        },
+      },
+      { $sort: { total: -1 } },
+    ];
+
+    const merchants = await Transaction.aggregate(pipeline);
+    res.json(merchants);
+  } catch (err) {
+    console.error('getMerchantsSummary error:', err);
+    res.status(500).json({ message: 'שגיאת שרת' });
+  }
+};
+
 // @desc   כל העסקאות של בית עסק מסוים
 // @route  GET /api/transactions/merchant/:name
 export const getMerchantTransactions = async (req, res) => {

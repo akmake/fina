@@ -354,9 +354,9 @@ const RulesManager = ({ onRulesApplied }) => {
 
       {/* ── Categories collapsible section ── */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-        <button
+        <div
           onClick={() => setShowCategories(v => !v)}
-          className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+          className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer select-none"
         >
           <div className="flex items-center gap-2">
             <Tag className="w-4 h-4 text-slate-500 dark:text-slate-400" />
@@ -386,7 +386,7 @@ const RulesManager = ({ onRulesApplied }) => {
             </button>
             {showCategories ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
           </div>
-        </button>
+        </div>
 
         {showCategories && (
           <div className="px-5 pb-4 flex flex-wrap gap-2 border-t border-slate-100 dark:border-slate-800 pt-4">

@@ -1,15 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   TrendingUp, TrendingDown, AlertCircle, CheckCircle2, Loader2,
-  Wallet, PiggyBank, BarChart2, Home, ChevronLeft, Zap, Target,
-  ArrowUpRight, ArrowDownRight, Info, Plus, Upload,
+  Wallet, BarChart2, Home, ChevronLeft, Target,
+  ArrowUpRight, ArrowDownRight, Building2, CreditCard, Upload, PiggyBank,
+  Activity, PieChart as PieChartIcon
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { format, subMonths } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { he } from 'date-fns/locale';
 import api from '@/utils/api';
 import { formatCurrency } from '@/utils/formatters';
@@ -17,763 +18,546 @@ import { formatCurrency } from '@/utils/formatters';
 const COLORS = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899','#84cc16'];
 const fmt = formatCurrency;
 
-// ─── Plain-language story ──────────────────────────────────────────────────────
-function buildStory(summary, netWorth, healthScore) {
-  if (!summary) return [];
-  const { thisMonth, prevMonth } = summary.monthlySummary ?? {};
-  const income  = thisMonth?.income  ?? 0;
-  const expense = thisMonth?.expense ?? 0;
-  const net     = income - expense;
-  const prevNet = (prevMonth?.income ?? 0) - (prevMonth?.expense ?? 0);
-  const savingsRate = income > 0 ? Math.round((net / income) * 100) : 0;
-  const nwTotal = netWorth?.totalNetWorth ?? 0;
-  const grade   = healthScore?.grade ?? '';
-  const lines   = [];
-
-  if (income === 0 && expense === 0) {
-    lines.push({ icon: '📭', text: 'עדיין אין עסקאות לחודש הנוכחי — ייבא נתונים כדי לראות את המצב שלך.', tone: 'neutral' });
-  } else if (net >= 0) {
-    const vsLast = net > prevNet + 100 ? '— יותר מהחודש שעבר 📈' : net < prevNet - 100 ? '— פחות מהחודש שעבר 📉' : '— דומה לחודש שעבר';
-    const quality = savingsRate >= 20 ? 'מעולה, מעל הממוצע!' : savingsRate >= 10 ? 'סביר, אפשר לשפר.' : 'נמוך — כדאי לבדוק לאן הולך הכסף.';
-    lines.push({ icon: '💰', text: `החודש הכנסת ${fmt(income)} והוצאת ${fmt(expense)}. חיסכת ${fmt(net)} (${savingsRate}%) — ${quality} ${vsLast}`, tone: 'positive' });
-  } else {
-    lines.push({ icon: '⚠️', text: `החודש הוצאת ${fmt(Math.abs(net))} יותר ממה שהכנסת. כדאי להבין מאיפה ולתקן בחודש הבא.`, tone: 'warning' });
-  }
-
-  if (nwTotal !== 0) {
-    lines.push({
-      icon: '🏦',
-      text: nwTotal > 0
-        ? `השווי הנקי שלך עומד על ${fmt(nwTotal)}. הנכסים גדולים מהחובות — מצב טוב.`
-        : `השווי הנקי שלך הוא ${fmt(nwTotal)}. יש יותר חובות מנכסים — שים לב לזה.`,
-      tone: nwTotal > 0 ? 'positive' : 'warning',
-    });
-  }
-
-  const top = summary.topCategories?.[0];
-  if (top) {
-    lines.push({ icon: '🔍', text: `ההוצאה הגדולה ביותר החודש: ${top.category} — ${fmt(top.total)}. שווה לבדוק אם זה בגדר הצפוי.`, tone: 'neutral' });
-  }
-
-  const gradeMap = { 'A+': 'מצוין! הציון הפיננסי שלך גבוה מאוד.', A: 'טוב מאוד. אתה בדרך הנכונה.', B: 'סביר. עם כמה שיפורים קטנים תגיע לרמה גבוהה יותר.', C: 'יש מקום לשיפור — עיין בהמלצות.', D: 'המצב מצריך תשומת לב.', F: 'יש נקודות קריטיות לטפל בהן.' };
-  if (grade && gradeMap[grade]) {
-    lines.push({ icon: '📊', text: `${gradeMap[grade]} ציון: ${grade}${healthScore?.label ? ` — ${healthScore.label}` : ''}`, tone: ['A+','A'].includes(grade) ? 'positive' : ['D','F'].includes(grade) ? 'warning' : 'neutral' });
-  }
-  return lines;
-}
-
-// ─── Shared UI helpers ─────────────────────────────────────────────────────────
-const TABS = [
-  { id: 'month',  label: 'החודש',  icon: Wallet    },
-  { id: 'trends', label: 'מגמות',  icon: BarChart2 },
-  { id: 'assets', label: 'נכסים',  icon: Home      },
-  { id: 'annual', label: 'שנתי',   icon: Target    },
-];
-
-function KpiCard({ label, value, sub, positive, loading }) {
-  return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-4 flex flex-col gap-1">
-      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
-      {loading
-        ? <div className="h-7 w-24 bg-slate-100 rounded animate-pulse" />
-        : <p className="text-2xl font-black text-slate-900">{value}</p>}
-      {sub && !loading && (
-        <p className={`text-xs font-medium flex items-center gap-0.5 ${positive === true ? 'text-emerald-600' : positive === false ? 'text-red-500' : 'text-slate-400'}`}>
-          {positive === true ? <ArrowUpRight className="h-3 w-3" /> : positive === false ? <ArrowDownRight className="h-3 w-3" /> : null}
-          {sub}
-        </p>
-      )}
-    </div>
-  );
-}
-
+// ─── UI Helpers ─────────────────────────────────────────────────────────────
 function SectionTitle({ icon, title, link, linkLabel }) {
   return (
-    <div className="flex items-center justify-between mb-3">
-      <div className="flex items-center gap-2">{icon}<h3 className="text-sm font-bold text-slate-700">{title}</h3></div>
-      {link && <Link to={link} className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-0.5 font-medium">{linkLabel}<ChevronLeft className="h-3.5 w-3.5" /></Link>}
-    </div>
-  );
-}
-
-function EmptyState({ icon, title, desc, action, actionLabel }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-10 text-center gap-2">
-      <div className="text-3xl mb-1">{icon}</div>
-      <p className="text-sm font-semibold text-slate-700">{title}</p>
-      <p className="text-xs text-slate-400 max-w-xs">{desc}</p>
-      {action && (
-        <Link to={action} className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
-          <Plus className="h-3 w-3" />{actionLabel}
+    <div className="flex items-center justify-between mb-5 border-b border-slate-100 pb-3">
+      <div className="flex items-center gap-2">
+        <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+          {icon}
+        </div>
+        <h2 className="text-lg font-bold text-slate-800">{title}</h2>
+      </div>
+      {link && (
+        <Link to={link} className="text-xs font-semibold text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-1 px-3 py-1.5 rounded-full">
+          {linkLabel} <ChevronLeft className="h-3 w-3" />
         </Link>
       )}
     </div>
   );
 }
 
-function TabSpinner() {
-  return <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-blue-400" /></div>;
+function StatCard({ label, value, sub, positive, loading, icon: Icon }) {
+  return (
+    <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 flex flex-col justify-between h-32">
+      <div className="flex justify-between items-start">
+        <span className="text-xs font-bold text-slate-500">{label}</span>
+        {Icon && <div className="bg-slate-50 p-1.5 rounded-md"><Icon className="h-4 w-4 text-slate-400" /></div>}
+      </div>
+      <div className="mt-2">
+        {loading ? (
+          <div className="h-8 w-24 bg-slate-100 rounded animate-pulse" />
+        ) : (
+          <p className="text-2xl lg:text-3xl font-bold text-slate-900 tabular-nums">{value}</p>
+        )}
+        {sub && !loading && (
+          <p className={`text-xs font-semibold flex items-center gap-1 mt-1.5 ${positive === true ? 'text-emerald-600' : positive === false ? 'text-red-500' : 'text-slate-500'}`}>
+            {positive === true && <ArrowUpRight className="h-3 w-3" />}
+            {positive === false && <ArrowDownRight className="h-3 w-3" />}
+            {sub}
+          </p>
+        )}
+      </div>
+    </div>
+  );
 }
 
-// ─── Main ──────────────────────────────────────────────────────────────────────
+function Block({ children, className = '', colSpan = 1, rowSpan = 1 }) {
+  const colClasses = {
+    1: 'lg:col-span-1',
+    2: 'lg:col-span-2',
+    3: 'lg:col-span-3',
+    4: 'lg:col-span-4',
+  };
+  const rowClasses = {
+    1: 'lg:row-span-1',
+    2: 'lg:row-span-2',
+  };
+  return (
+    <div className={`bg-white border border-slate-200 shadow-sm rounded-2xl p-6 flex flex-col ${colClasses[colSpan]} ${rowClasses[rowSpan]} ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+// ─── Main Component ─────────────────────────────────────────────────────────
 export default function FinanceDashboard() {
-  const [core,        setCore]        = useState(null);
-  const [coreLoading, setCoreLoading] = useState(true);
-  const [activeTab,   setActiveTab]   = useState('month');
-  const [tabData,     setTabData]     = useState({});
-  const [tabLoading,  setTabLoading]  = useState(false);
+  const navigate = useNavigate();
+  const [data, setData] = useState({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const [sumRes, nwRes, hsRes, apRes] = await Promise.all([
+        const now = new Date();
+        const curStart = startOfMonth(now);
+        const prevDate = subMonths(now, 1);
+        const prevStart = startOfMonth(prevDate);
+        const prevEnd = endOfMonth(prevDate);
+        const trendStart = subMonths(now, 5);
+
+        // Fetch everything independently so one failure doesn't break the dashboard
+        const endpoints = [
           api.get('/dashboard/summary'),
-          api.get('/net-worth').catch(() => ({ data: null })),
-          api.get('/net-worth/health-score').catch(() => ({ data: null })),
-          api.get('/analytics/action-plan').catch(() => ({ data: null })),
-        ]);
-        setCore({ summary: sumRes.data, netWorth: nwRes.data, healthScore: hsRes.data, actionPlan: apRes.data });
-      } catch { /* silent */ } finally { setCoreLoading(false); }
+          api.get('/net-worth'),
+          api.get('/net-worth/health-score'),
+          api.get('/net-worth/history'),
+          api.get('/mortgages'),
+          api.get('/goals'),
+          api.get('/alerts'),
+          api.get(`/budgets?month=${now.getMonth()+1}&year=${now.getFullYear()}`),
+          api.get('/analytics/recommendations'),
+          api.get(`/analytics/smart-analytics?startDate=${curStart.toISOString()}&endDate=${now.toISOString()}`),
+          api.get(`/analytics/smart-analytics?startDate=${prevStart.toISOString()}&endDate=${prevEnd.toISOString()}`),
+          api.get(`/analytics/smart-analytics?startDate=${trendStart.toISOString()}&endDate=${now.toISOString()}`),
+          api.get('/reports/yearly-comparison'),
+          api.get('/reports/financial-summary'),
+          api.get('/reports/trends?months=6'),
+        ];
+
+        const results = await Promise.allSettled(endpoints);
+        const getRes = (index) => results[index].status === 'fulfilled' ? results[index].value.data : null;
+
+        const sumData = getRes(0);
+        const curAnData = getRes(9);
+        const prvAnData = getRes(10);
+        const recData = getRes(8);
+        const alertsData = getRes(6);
+        const trendData = getRes(11);
+        const catTrendsData = getRes(14);
+
+        setData({
+          summary: sumData,
+          netWorth: getRes(1),
+          healthScore: getRes(2),
+          nwHistory: Array.isArray(getRes(3)) ? getRes(3) : getRes(3)?.history || [],
+          mortgage: getRes(4),
+          goals: getRes(5),
+          alerts: alertsData?.alerts ?? [],
+          budget: getRes(7),
+          recommendations: recData?.data?.recommendations ?? recData?.recommendations ?? [],
+          curCategories: curAnData?.data?.topCategories ?? curAnData?.topCategories ?? sumData?.topCategories ?? [],
+          prevCategories: prvAnData?.data?.topCategories ?? prvAnData?.topCategories ?? [],
+          trends: trendData?.data?.trends ?? trendData?.trends ?? [],
+          yearly: getRes(12),
+          finSummary: getRes(13),
+          catTrends: catTrendsData?.trends ?? [],
+          catTrendCategories: [...new Set((catTrendsData?.trends ?? []).flatMap(m => Object.keys(m.categories || {})))],
+        });
+      } catch (err) {
+        console.error("Failed to load dashboard data", err);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
-  const loadTab = useCallback(async (tab) => {
-    if (tabData[tab]) return;
-    setTabLoading(true);
-    try {
-      if (tab === 'month') {
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const [budgetRes, alertsRes, recRes, catRes] = await Promise.all([
-          api.get(`/budgets?month=${now.getMonth()+1}&year=${now.getFullYear()}`).catch(() => ({ data: null })),
-          api.get('/alerts').catch(() => ({ data: { alerts: [] } })),
-          api.get('/analytics/recommendations').catch(() => ({ data: { recommendations: [] } })),
-          api.get(`/analytics/smart-analytics?startDate=${startOfMonth.toISOString()}&endDate=${now.toISOString()}`).catch(() => ({ data: null })),
-        ]);
-        setTabData(p => ({
-          ...p,
-          month: {
-            budget: budgetRes.data,
-            alerts: alertsRes.data?.alerts ?? [],
-            recommendations: recRes.data?.data?.recommendations ?? recRes.data?.recommendations ?? [],
-            categories: catRes.data?.data?.topCategories ?? catRes.data?.topCategories ?? [],
-          },
-        }));
-      } else if (tab === 'trends') {
-        const end = new Date(), start = subMonths(end, 5);
-        const res = await api.get(`/analytics/smart-analytics?startDate=${start.toISOString()}&endDate=${end.toISOString()}`).catch(() => ({ data: null }));
-        // API wraps response: { status, data: { trends, topCategories, ... } }
-        setTabData(p => ({ ...p, trends: res.data?.data ?? res.data }));
-      } else if (tab === 'assets') {
-        const res = await api.get('/net-worth/history').catch(() => ({ data: [] }));
-        setTabData(p => ({ ...p, assets: Array.isArray(res.data) ? res.data : res.data?.history ?? [] }));
-      } else if (tab === 'annual') {
-        const [yrRes, fsRes] = await Promise.all([
-          api.get('/reports/yearly-comparison').catch(() => ({ data: null })),
-          api.get('/reports/financial-summary').catch(() => ({ data: null })),
-        ]);
-        setTabData(p => ({ ...p, annual: { yearly: yrRes.data, summary: fsRes.data } }));
-      }
-    } finally { setTabLoading(false); }
-  }, [tabData]);
-
-  useEffect(() => { loadTab(activeTab); }, [activeTab, loadTab]);
-
-  const story   = buildStory(core?.summary, core?.netWorth, core?.healthScore);
-  const monthly = core?.summary?.monthlySummary;
-  const income  = monthly?.thisMonth?.income  ?? 0;
-  const expense = monthly?.thisMonth?.expense ?? 0;
-  const net     = income - expense;
-  const savingsRate = income > 0 ? Math.round((net / income) * 100) : 0;
-  const nwTotal = core?.netWorth?.totalNetWorth ?? 0;
-
-  // Balance chart from dashboard: [{date, balance}]
-  const balanceChart = (core?.summary?.balanceChartData ?? []).map(p => ({
-    name: p.date ? format(new Date(p.date), 'd/M', { locale: he }) : '',
-    יתרה: p.balance ?? 0,
-  }));
-
-  return (
-    <div className="min-h-screen bg-[#F2F4F8]" dir="rtl">
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
-
-        {/* ── Story card ───────────────────────────────────────────────── */}
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-6 text-white">
-          <div className="flex items-center gap-2 mb-4">
-            <Zap className="h-5 w-5 text-amber-400" />
-            <h2 className="text-base font-bold text-white/90">המצב שלך — בקצרה</h2>
-          </div>
-
-          {coreLoading ? (
-            <div className="space-y-2">
-              {[80,65,75].map((w,i) => <div key={i} className="h-4 bg-white/10 rounded animate-pulse" style={{ width: `${w}%` }} />)}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {story.map((line, i) => (
-                <div key={i} className={`flex items-start gap-3 rounded-2xl px-4 py-3 ${
-                  line.tone === 'positive' ? 'bg-emerald-500/15 border border-emerald-500/20'
-                  : line.tone === 'warning'  ? 'bg-amber-500/15 border border-amber-500/20'
-                  : 'bg-white/5 border border-white/10'
-                }`}>
-                  <span className="text-base leading-none mt-0.5 shrink-0">{line.icon}</span>
-                  <p className="text-sm text-white/90 leading-relaxed">{line.text}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {!coreLoading && core?.actionPlan?.data?.actions?.length > 0 && (
-            <div className="mt-5 pt-4 border-t border-white/10">
-              <p className="text-[11px] font-semibold text-white/40 uppercase tracking-widest mb-3">3 דברים לעשות עכשיו</p>
-              <div className="space-y-2">
-                {core.actionPlan.data.actions.slice(0, 3).map((a, i) => (
-                  <div key={i} className="flex items-center gap-3 text-sm text-white/80">
-                    <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold shrink-0">{i+1}</div>
-                    <span className="flex-1">{a.title}</span>
-                    {a.amount > 0 && <span className="text-amber-300 font-semibold text-xs">{fmt(a.amount)}</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── KPI row ──────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard label="הכנסות" value={fmt(income)}
-            sub={monthly?.prevMonth ? `לעומת ${fmt(monthly.prevMonth.income)}` : null}
-            positive={income >= (monthly?.prevMonth?.income ?? 0)} loading={coreLoading} />
-          <KpiCard label="הוצאות" value={fmt(expense)}
-            sub={monthly?.prevMonth ? `לעומת ${fmt(monthly.prevMonth.expense)}` : null}
-            positive={expense <= (monthly?.prevMonth?.expense ?? 0)} loading={coreLoading} />
-          <KpiCard label="חיסכון נטו" value={fmt(net)}
-            sub={income > 0 ? `${savingsRate}% מההכנסה` : null}
-            positive={net >= 0} loading={coreLoading} />
-          <KpiCard label="שווי נקי" value={fmt(nwTotal)}
-            sub={core?.healthScore ? `ציון ${core.healthScore.grade}` : null}
-            positive={nwTotal >= 0} loading={coreLoading} />
-        </div>
-
-        {/* ── Persistent balance chart ─────────────────────────────────── */}
-        {!coreLoading && balanceChart.length > 1 && (
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
-            <SectionTitle icon={<TrendingUp className="h-4 w-4 text-blue-500" />} title="יתרת חשבון — חודש נוכחי" />
-            <ResponsiveContainer width="100%" height={160}>
-              <AreaChart data={balanceChart}>
-                <defs>
-                  <linearGradient id="gBal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} width={36} />
-                <Tooltip formatter={v => fmt(v)} />
-                <Area type="monotone" dataKey="יתרה" stroke="#3b82f6" fill="url(#gBal)" strokeWidth={2.5} dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* ── Tabs ─────────────────────────────────────────────────────── */}
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="flex border-b border-slate-100 overflow-x-auto">
-            {TABS.map(t => {
-              const Icon = t.icon;
-              const active = t.id === activeTab;
-              return (
-                <button key={t.id} onClick={() => setActiveTab(t.id)}
-                  className={`flex items-center gap-2 px-5 py-3.5 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 ${active ? 'border-blue-500 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-400 hover:text-slate-700 hover:bg-slate-50'}`}>
-                  <Icon className="h-4 w-4" />{t.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="p-5">
-            {tabLoading && !tabData[activeTab]
-              ? <TabSpinner />
-              : (
-                <>
-                  {activeTab === 'month'  && <MonthTab  data={tabData.month}  core={core} />}
-                  {activeTab === 'trends' && <TrendsTab data={tabData.trends} />}
-                  {activeTab === 'assets' && <AssetsTab history={tabData.assets} core={core} />}
-                  {activeTab === 'annual' && <AnnualTab data={tabData.annual} />}
-                </>
-              )
-            }
-          </div>
-        </div>
-
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TAB: החודש
-// ─────────────────────────────────────────────────────────────────────────────
-function MonthTab({ data, core }) {
-  const topCats = data?.categories?.length > 0
-    ? data.categories
-    : (core?.summary?.topCategories ?? []);
-  const alerts  = (data?.alerts ?? []).filter(a => !a.read).slice(0, 4);
-  const recs    = (data?.recommendations ?? []).slice(0, 3);
-  const budget  = data?.budget;
-
-  if (!data && !core?.summary) return <TabSpinner />;
-
-  return (
-    <div className="space-y-7">
-
-      {/* Alerts */}
-      {alerts.length > 0 && (
-        <div>
-          <SectionTitle icon={<AlertCircle className="h-4 w-4 text-amber-500" />} title="התראות פעילות" link="/alerts" linkLabel="כל ההתראות" />
-          <div className="space-y-2">
-            {alerts.map((a, i) => (
-              <div key={i} className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
-                <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                <p className="text-sm text-amber-800">{a.message ?? a.title}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Recommendations */}
-      {recs.length > 0 && (
-        <div>
-          <SectionTitle icon={<Zap className="h-4 w-4 text-blue-500" />} title="המלצות לחודש זה" link="/smart-analytics" linkLabel="ניתוח מלא" />
-          <div className="space-y-2">
-            {recs.map((r, i) => (
-              <div key={i} className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
-                <div className={`h-2 w-2 rounded-full mt-1.5 shrink-0 ${r.priority === 'high' ? 'bg-red-500' : r.priority === 'medium' ? 'bg-amber-500' : 'bg-blue-400'}`} />
-                <p className="text-sm text-blue-900">{r.suggestion ?? r.text ?? r.title}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Top categories — horizontal bar chart */}
-      {topCats.length > 0 ? (
-        <div>
-          <SectionTitle icon={<BarChart2 className="h-4 w-4 text-violet-500" />} title="הוצאות לפי קטגוריה" link="/categories" linkLabel="ניתוח מעמיק" />
-          <div className="space-y-3">
-            {(() => {
-              const max = Math.max(...topCats.slice(0, 6).map(c => c.total));
-              return topCats.slice(0, 6).map((c, i) => (
-                <div key={i}>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="font-medium text-slate-700">{c.category}</span>
-                    <span className="font-bold text-slate-900">{fmt(c.total)}</span>
-                  </div>
-                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{ width: `${Math.round((c.total / max) * 100)}%`, background: COLORS[i % COLORS.length] }}
-                    />
-                  </div>
-                </div>
-              ));
-            })()}
-          </div>
-        </div>
-      ) : (
-        <EmptyState icon="📊" title="אין עסקאות החודש" desc="ייבא עסקאות כדי לראות ניתוח לפי קטגוריות" action="/import/auto" actionLabel="ייבוא אוטומטי" />
-      )}
-
-      {/* Budget vs actual */}
-      {budget?.categories?.length > 0 && (
-        <div>
-          <SectionTitle icon={<Wallet className="h-4 w-4 text-emerald-500" />} title="תקציב מול פועל" link="/budget" linkLabel="לתקציב המלא" />
-          <div className="space-y-3">
-            {budget.categories.slice(0, 6).map((cat, i) => {
-              const pct = cat.limit > 0 ? Math.round((cat.actual / cat.limit) * 100) : 0;
-              const over = pct > 100;
-              return (
-                <div key={i}>
-                  <div className="flex justify-between text-xs text-slate-600 mb-1 font-medium">
-                    <span>{cat.category}</span>
-                    <span className={over ? 'text-red-500 font-bold' : ''}>{fmt(cat.actual)} / {fmt(cat.limit)} ({pct}%)</span>
-                  </div>
-                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all ${over ? 'bg-red-400' : pct > 80 ? 'bg-amber-400' : 'bg-emerald-400'}`}
-                      style={{ width: `${Math.min(pct, 100)}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TAB: מגמות
-// ─────────────────────────────────────────────────────────────────────────────
-function TrendsTab({ data }) {
-  if (!data) return <TabSpinner />;
-
-  const trends    = data?.trends ?? [];
-  const catData   = data?.topCategories ?? [];
-  const anomalies = data?.anomalies ?? [];
-  const efficiency = data?.efficiency ?? null;
-  const summary   = data?.summary;
-
-  // trends: [{date, income, expense, net}] → chart format
-  const trendChart = trends.map(t => ({
-    name:    t.month ?? (t.date ? format(new Date(t.date), 'MMM yy', { locale: he }) : ''),
-    הכנסות: t.income  ?? 0,
-    הוצאות: t.expense ?? 0,
-  })).filter(t => t.name);
-
-  const pieData = catData.slice(0, 7).map(c => ({ name: c.category, value: c.total ?? c.amount ?? 0 })).filter(d => d.value > 0);
-
-  const hasData = trendChart.length > 0 || pieData.length > 0;
-
-  if (!hasData) {
+  if (loading) {
     return (
-      <EmptyState icon="📈" title="אין מספיק נתונים לניתוח מגמות"
-        desc="ייבא נתונים מכמה חודשים כדי לראות מגמות"
-        action="/smart-analytics" actionLabel="מעבר לניתוח חכם" />
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <p className="text-slate-500 text-sm font-medium">טוען נתונים פיננסיים...</p>
+      </div>
     );
   }
 
-  return (
-    <div className="space-y-7">
+  // ─── Data Extraction ───
+  const {
+    summary, netWorth, nwHistory, healthScore, budget, alerts,
+    recommendations, curCategories, prevCategories, trends, yearly, finSummary,
+    catTrends, catTrendCategories,
+  } = data;
 
-      {/* Summary KPIs */}
-      {summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: 'סה"כ הכנסות', value: fmt(summary.totalIncome ?? 0) },
-            { label: 'סה"כ הוצאות', value: fmt(summary.totalExpense ?? 0) },
-            { label: 'תזרים נקי',   value: fmt(summary.netFlow ?? 0), colored: true, positive: (summary.netFlow ?? 0) >= 0 },
-            { label: 'יעילות',      value: efficiency != null ? `${Math.round(efficiency)}%` : '—' },
-          ].map((k, i) => (
-            <div key={i} className="bg-slate-50 rounded-2xl p-3 text-center">
-              <p className="text-[11px] text-slate-400 mb-1">{k.label}</p>
-              <p className={`text-base font-black ${k.colored ? (k.positive ? 'text-emerald-600' : 'text-red-500') : 'text-slate-900'}`}>{k.value}</p>
-            </div>
-          ))}
-        </div>
-      )}
+  const monthly = summary?.monthlySummary;
+  const income = monthly?.thisMonth?.income ?? 0;
+  const expense = monthly?.thisMonth?.expense ?? 0;
+  const netFlow = income - expense;
+  const savingsRate = income > 0 ? Math.round((netFlow / income) * 100) : null;
+  const activeAlerts = (alerts || []).filter(a => !a.read).slice(0, 5);
 
-      {/* 6-month trend chart */}
-      {trendChart.length > 0 && (
-        <div>
-          <SectionTitle icon={<TrendingUp className="h-4 w-4 text-blue-500" />} title="הכנסות מול הוצאות — לאורך זמן" link="/smart-analytics" linkLabel="ניתוח מלא" />
-          <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={trendChart}>
-              <defs>
-                <linearGradient id="gI" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
-                <linearGradient id="gE" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.2}/><stop offset="95%" stopColor="#ef4444" stopOpacity={0}/></linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} width={36} />
-              <Tooltip formatter={v => fmt(v)} />
-              <Legend />
-              <Area type="monotone" dataKey="הכנסות" stroke="#10b981" fill="url(#gI)" strokeWidth={2.5} dot={false} />
-              <Area type="monotone" dataKey="הוצאות" stroke="#ef4444" fill="url(#gE)" strokeWidth={2.5} dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+  // Formatting for Category Comparison
+  const catMap = {};
+  (curCategories || []).forEach(c => { catMap[c.category] = { current: c.total, previous: 0 }; });
+  (prevCategories || []).forEach(c => { if(catMap[c.category]) catMap[c.category].previous = c.total; else catMap[c.category] = { current: 0, previous: c.total }; });
+  const categoryRows = Object.entries(catMap)
+    .map(([cat, vals]) => ({ cat, ...vals, delta: vals.previous > 0 ? Math.round(((vals.current - vals.previous) / vals.previous) * 100) : null }))
+    .sort((a, b) => b.current - a.current)
+    .slice(0, 7);
 
-      {/* Category pie + legend */}
-      {pieData.length > 0 && (
-        <div>
-          <SectionTitle icon={<BarChart2 className="h-4 w-4 text-violet-500" />} title="פילוח הוצאות לפי קטגוריה" link="/categories" linkLabel="ניתוח קטגוריות" />
-          <div className="flex flex-col sm:flex-row items-center gap-5">
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={75} dataKey="value" paddingAngle={2}>
-                  {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                </Pie>
-                <Tooltip formatter={v => fmt(v)} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="w-full space-y-2">
-              {pieData.map((d, i) => {
-                const total = pieData.reduce((s, x) => s + x.value, 0);
-                const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
-                return (
-                  <div key={i} className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
-                    <span className="flex-1 text-sm text-slate-600 truncate">{d.name}</span>
-                    <span className="text-xs text-slate-400">{pct}%</span>
-                    <span className="font-semibold text-sm text-slate-800 min-w-[64px] text-left">{fmt(d.value)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+  // Formatting for Trend Chart
+  const trendChart = (trends || []).map(t => ({
+    name: t.month ?? (t.date ? format(new Date(t.date), 'MMM yy', { locale: he }) : ''),
+    הכנסות: t.income ?? 0,
+    הוצאות: t.expense ?? 0,
+  })).filter(t => t.name);
 
-      {/* Anomalies */}
-      {anomalies.length > 0 && (
-        <div>
-          <SectionTitle icon={<AlertCircle className="h-4 w-4 text-amber-500" />} title={`חריגות שזוהו (${anomalies.length})`} />
-          <div className="space-y-2">
-            {anomalies.slice(0, 4).map((a, i) => (
-              <div key={i} className="bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 text-sm text-amber-800">
-                {a.description ?? a.text ?? a.category ?? ''}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+  // Formatting for Assets Pie
+  const assetRows = [
+    { label: 'פיקדונות', value: netWorth?.deposits ?? 0 },
+    { label: 'מניות', value: netWorth?.stocks ?? 0 },
+    { label: 'קרנות', value: netWorth?.funds ?? 0 },
+    { label: 'פנסיה', value: netWorth?.pension ?? 0 },
+    { label: 'נדל"ן', value: netWorth?.realEstate ?? 0 },
+  ].filter(r => r.value > 0);
 
-    </div>
-  );
-}
+  // Formatting for Annual Bar Chart
+  const MONTH_NAMES = ['ינו','פבר','מרץ','אפר','מאי','יוני','יולי','אוג','ספט','אוק','נוב','דצמ'];
+  const curYear = new Date().getFullYear();
+  const yearlyMonthly = yearly?.years?.[curYear]?.monthly ?? {};
+  const monthlyData = Object.entries(yearlyMonthly)
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([m, d]) => ({
+      month: MONTH_NAMES[Number(m) - 1],
+      הכנסות: d.income ?? 0,
+      הוצאות: d.expense ?? 0,
+    }))
+    .filter(m => m.הכנסות > 0 || m.הוצאות > 0);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TAB: נכסים
-// ─────────────────────────────────────────────────────────────────────────────
-function AssetsTab({ history, core }) {
-  const nw  = core?.netWorth;
-  const hs  = core?.healthScore;
-
-  const histData = (history ?? []).map(h => ({
+  // Formatting Net Worth History
+  const histData = (nwHistory || []).map(h => ({
     name: h.date ? format(new Date(h.date), 'MMM yy', { locale: he }) : '',
     שווי: h.netWorth ?? h.value ?? 0,
   })).filter(h => h.name);
 
-  const assetRows = [
-    { label: 'פיקדונות',     value: nw?.deposits       ?? 0 },
-    { label: 'מניות',        value: nw?.stocks          ?? 0 },
-    { label: 'קרנות',        value: nw?.funds           ?? 0 },
-    { label: 'פנסיה',        value: nw?.pension         ?? 0 },
-    { label: 'נדל"ן',        value: nw?.realEstate      ?? 0 },
-    { label: 'חיסכון ילדים', value: nw?.childSavings    ?? 0 },
-    { label: 'מט"ח',         value: nw?.foreignCurrency ?? 0 },
-  ].filter(r => r.value > 0);
-
-  const liabilityRows = [
-    { label: 'הלוואות',  value: nw?.loans      ?? 0 },
-    { label: 'משכנתא',   value: nw?.mortgage   ?? 0 },
-    { label: 'חובות',    value: nw?.debts      ?? 0 },
-  ].filter(r => r.value > 0);
-
-  const pieData = assetRows.map(r => ({ name: r.label, value: r.value }));
-
-  const hasAny = (nw?.totalAssets ?? 0) + (nw?.totalLiabilities ?? 0) > 0;
-
   return (
-    <div className="space-y-7">
+    <div className="min-h-screen bg-slate-50 text-slate-800 p-4 sm:p-6 lg:p-8 font-sans" dir="rtl">
+      <div className="max-w-[1600px] mx-auto space-y-6">
 
-      {/* 3-metric hero */}
-      <div className="grid grid-cols-3 gap-3 text-center">
-        {[
-          { label: 'שווי נקי',      value: nw?.totalNetWorth    ?? 0, cls: 'text-slate-900'   },
-          { label: 'נכסים',         value: nw?.totalAssets      ?? 0, cls: 'text-emerald-600' },
-          { label: 'התחייבויות',    value: nw?.totalLiabilities ?? 0, cls: 'text-red-500'     },
-        ].map((r, i) => (
-          <div key={i} className="bg-slate-50 rounded-2xl p-4">
-            <p className="text-[11px] text-slate-400 mb-1.5">{r.label}</p>
-            <p className={`text-lg font-black ${r.cls}`}>{fmt(r.value)}</p>
+        {/* ─── Header ─── */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-2 gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 flex items-center gap-3">
+              לוח בקרה מרכזי
+            </h1>
+            <p className="text-slate-500 text-sm mt-1">
+              מעודכן ל: {summary?.recentTransactions?.[0]?.date ? format(new Date(summary.recentTransactions[0].date), "dd.MM.yyyy") : 'היום'}
+            </p>
           </div>
-        ))}
-      </div>
+          <Link to="/import/auto" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors flex items-center gap-2 shadow-sm">
+            <Upload className="h-4 w-4" /> ייבוא נתונים
+          </Link>
+        </div>
 
-      {/* Asset pie chart */}
-      {pieData.length > 0 ? (
-        <div>
-          <SectionTitle icon={<PiggyBank className="h-4 w-4 text-emerald-500" />} title="פירוט נכסים" link="/net-worth" linkLabel="תמונה מלאה" />
-          <div className="flex flex-col sm:flex-row items-center gap-5">
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={48} outerRadius={72} dataKey="value" paddingAngle={2}>
-                  {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                </Pie>
-                <Tooltip formatter={v => fmt(v)} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="w-full space-y-2">
-              {assetRows.map((r, i) => (
-                <div key={i} className="flex items-center gap-2 py-1 border-b border-slate-50 last:border-0">
-                  <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
-                  <span className="flex-1 text-sm text-slate-600">{r.label}</span>
-                  <span className="text-sm font-bold text-slate-900">{fmt(r.value)}</span>
+        {/* ─── Row 1: Key Performance Indicators (KPIs) ─── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          <StatCard 
+            label="שווי נקי כולל" value={fmt(netWorth?.totalNetWorth ?? 0)} 
+            sub={healthScore ? `דירוג בריאות: ${healthScore.grade}` : null} 
+            positive={(netWorth?.totalNetWorth ?? 0) >= 0} icon={Home} 
+          />
+          <StatCard 
+            label="הכנסות החודש" value={fmt(income)} 
+            sub={monthly?.prevMonth ? `חודש קודם: ${fmt(monthly.prevMonth.income)}` : null} 
+            positive={income >= (monthly?.prevMonth?.income ?? 0)} icon={TrendingUp} 
+          />
+          <StatCard 
+            label="הוצאות החודש" value={fmt(expense)} 
+            sub={monthly?.prevMonth ? `חודש קודם: ${fmt(monthly.prevMonth.expense)}` : null} 
+            positive={expense <= (monthly?.prevMonth?.expense ?? 0)} icon={TrendingDown} 
+          />
+          <StatCard 
+            label="חיסכון נטו" value={fmt(netFlow)} 
+            sub={savingsRate != null ? `שיעור חיסכון: ${savingsRate}%` : null} 
+            positive={netFlow >= 0} icon={Wallet} 
+          />
+        </div>
+
+        {/* ─── Row 2: Analytics & Budget (Current Focus) ─── */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6">
+          
+          {/* Main Chart: Income vs Expenses Trend (Spans 2 cols) */}
+          <Block colSpan={2} className="min-h-[380px]">
+            <SectionTitle icon={<BarChart2 className="h-4 w-4" />} title="מגמות תזרים מזומנים (6 חודשים)" link="/smart-analytics" linkLabel="דו״ח מלא" />
+            <div className="flex-1 w-full h-full min-h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trendChart} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorInc" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
+                    <linearGradient id="colorExp" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.2}/><stop offset="95%" stopColor="#ef4444" stopOpacity={0}/></linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}k`} tick={{ fontSize: 12, fill: '#64748b' }} width={45} />
+                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={v => fmt(v)} />
+                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                  <Area type="monotone" dataKey="הכנסות" stroke="#10b981" fill="url(#colorInc)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="הוצאות" stroke="#ef4444" fill="url(#colorExp)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Block>
+
+          {/* Top Categories Comparison (Spans 1 col) */}
+          <Block colSpan={1}>
+            <SectionTitle icon={<PieChartIcon className="h-4 w-4" />} title="הוצאות מרכזיות החודש" link="/categories" linkLabel="פירוט" />
+            <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+              {categoryRows.length > 0 ? categoryRows.map((r, i) => {
+                const isUp = r.delta !== null && r.delta > 0;
+                return (
+                  <button key={i} onClick={() => navigate(`/portfolio?category=${encodeURIComponent(r.cat)}`)} className="w-full flex items-center justify-between group text-right hover:bg-slate-50 p-1.5 -mx-1.5 rounded-lg transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                      <div>
+                        <p className="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors">{r.cat}</p>
+                        <p className="text-xs text-slate-500">קודם: {fmt(r.previous)}</p>
+                      </div>
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-bold text-slate-900">{fmt(r.current)}</p>
+                      <p className={`text-xs font-semibold ${isUp ? 'text-red-500' : 'text-emerald-600'}`}>
+                        {r.delta !== null ? `${isUp ? '+' : ''}${r.delta}%` : 'חדש'}
+                      </p>
+                    </div>
+                  </button>
+                );
+              }) : <p className="text-sm text-slate-500 text-center py-10">אין נתוני קטגוריות החודש</p>}
+            </div>
+          </Block>
+
+          {/* Budget & Alerts (Spans 1 col) */}
+          <Block colSpan={1} className="flex flex-col gap-6">
+            <div className="flex-1">
+              <SectionTitle icon={<Wallet className="h-4 w-4" />} title="ניצול תקציב" link="/budget" linkLabel="נהל" />
+              <div className="space-y-4">
+                {(budget?.categories ?? []).filter(c => c.limit > 0).slice(0, 4).map((cat, i) => {
+                  const pct = Math.round((cat.actual / cat.limit) * 100);
+                  const over = pct > 100;
+                  return (
+                    <div key={i}>
+                      <div className="flex justify-between text-xs mb-1.5">
+                        <span className="font-bold text-slate-700">{cat.category}</span>
+                        <span className={over ? 'text-red-500 font-semibold' : 'text-slate-500'}>{fmt(cat.actual)} / {fmt(cat.limit)}</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${over ? 'bg-red-500' : pct > 80 ? 'bg-amber-400' : 'bg-emerald-500'}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                {(!budget?.categories || budget.categories.filter(c => c.limit > 0).length === 0) && (
+                  <p className="text-sm text-slate-500 text-center py-4">לא הוגדרו יעדי תקציב</p>
+                )}
+              </div>
+            </div>
+            {activeAlerts.length > 0 && (
+              <div className="pt-4 border-t border-slate-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                  <span className="text-sm font-bold text-slate-800">התראות פעילות</span>
                 </div>
+                <div className="space-y-2">
+                  {activeAlerts.slice(0, 2).map((a, i) => (
+                    <p key={i} className="text-sm text-slate-700 bg-red-50 border border-red-100 p-2.5 rounded-lg">{a.message ?? a.title}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Block>
+
+        </div>
+
+        {/* ─── Row 3: Wealth & Assets ─── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+          
+          {/* Net Worth Growth Chart (Spans 2 cols) */}
+          <Block colSpan={2} className="min-h-[350px]">
+            <SectionTitle icon={<TrendingUp className="h-4 w-4" />} title="צמיחת שווי נקי (Net Worth)" link="/net-worth" linkLabel="מאזן מלא" />
+            <div className="flex-1 w-full h-full min-h-[200px]">
+              {histData.length > 1 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={histData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="nwColor" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}k`} tick={{ fontSize: 12, fill: '#64748b' }} width={50} />
+                    <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={v => fmt(v)} />
+                    <Area type="monotone" dataKey="שווי" stroke="#3b82f6" fill="url(#nwColor)" strokeWidth={3} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-sm text-slate-500">נדרש תיעוד של יותר מחודש להצגת גרף צמיחה</div>
+              )}
+            </div>
+          </Block>
+
+          {/* Asset Allocation Pie (Spans 1 col) */}
+          <Block colSpan={1} className="flex flex-col">
+            <SectionTitle icon={<PiggyBank className="h-4 w-4" />} title="הרכב נכסים" />
+            {assetRows.length > 0 ? (
+              <div className="flex-1 flex flex-col justify-center">
+                <div className="h-[180px] w-full relative mb-5">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={assetRows} cx="50%" cy="50%" innerRadius={60} outerRadius={85} paddingAngle={2} dataKey="value" stroke="none">
+                        {assetRows.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '8px' }} formatter={v => fmt(v)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-xs text-slate-500 font-bold">סך נכסים</span>
+                    <span className="text-lg font-bold text-slate-900">{fmt(netWorth?.totalAssets ?? 0)}</span>
+                  </div>
+                </div>
+                <div className="space-y-2.5">
+                  {assetRows.map((r, i) => (
+                    <div key={i} className="flex justify-between items-center text-sm px-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                        <span className="text-slate-700 font-medium">{r.label}</span>
+                      </div>
+                      <span className="font-bold text-slate-900 tabular-nums">{fmt(r.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-center gap-3">
+                <PiggyBank className="h-10 w-10 text-slate-300" />
+                <p className="text-sm text-slate-500">אין נכסים מתועדים במערכת</p>
+              </div>
+            )}
+          </Block>
+
+        </div>
+
+        {/* ─── Row 4: Annual + YoY + Recommendations ─── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+
+          {/* Annual Chart with YoY comparison (Spans 2 cols) */}
+          <Block colSpan={2} className="min-h-[340px]">
+            <SectionTitle icon={<Target className="h-4 w-4" />} title={`השוואה שנתית — ${curYear} מול ${curYear - 1}`} link="/reports" linkLabel="דוחות מלאים" />
+            {/* YoY KPI strip */}
+            {yearly?.years?.[curYear] && (
+              <div className="grid grid-cols-4 gap-3 mb-4">
+                {[
+                  { label: 'הכנסות השנה', value: fmt(yearly.years[curYear].totalIncome), change: yearly.comparison?.incomeChange, good: true },
+                  { label: 'הוצאות השנה', value: fmt(yearly.years[curYear].totalExpense), change: yearly.comparison?.expenseChange, good: false },
+                  { label: 'חיסכון נטו', value: fmt(yearly.years[curYear].totalNet), change: null, positive: (yearly.years[curYear].totalNet ?? 0) >= 0 },
+                  { label: 'שיעור חיסכון', value: `${(yearly.years[curYear].savingsRate ?? 0).toFixed(1)}%`, change: yearly.comparison?.savingsRateChange, good: true },
+                ].map((k, i) => {
+                  const pct = k.change != null ? k.change.toFixed(1) : null;
+                  const up = k.change > 0;
+                  const isGood = up ? k.good : !k.good;
+                  return (
+                    <div key={i} className="bg-slate-50 rounded-xl p-3 text-center">
+                      <p className="text-[10px] text-slate-400 mb-1">{k.label}</p>
+                      <p className="text-sm font-bold text-slate-900 tabular-nums">{k.value}</p>
+                      {pct != null && (
+                        <p className={`text-[10px] font-semibold mt-0.5 flex items-center justify-center gap-0.5 ${isGood ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                          {Math.abs(k.change).toFixed(1)}%
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="flex-1 w-full min-h-[200px]">
+              {monthlyData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={monthlyData.map((m, i) => ({
+                    ...m,
+                    'הכנסות קודם': yearly?.years?.[curYear - 1]?.monthly?.[i + 1]?.income ?? 0,
+                    'הוצאות קודם': yearly?.years?.[curYear - 1]?.monthly?.[i + 1]?.expense ?? 0,
+                  }))} barGap={1} barCategoryGap="20%" margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} dy={8} />
+                    <YAxis axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}k`} tick={{ fontSize: 10, fill: '#64748b' }} width={40} />
+                    <Tooltip contentStyle={{ backgroundColor: '#fff', borderColor: '#e2e8f0', borderRadius: '8px' }} formatter={v => fmt(v)} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="הכנסות" fill="#10b981" radius={[2,2,0,0]} maxBarSize={14} />
+                    <Bar dataKey="הוצאות" fill="#ef4444" radius={[2,2,0,0]} maxBarSize={14} />
+                    <Bar dataKey="הכנסות קודם" fill="#86efac" radius={[2,2,0,0]} maxBarSize={14} />
+                    <Bar dataKey="הוצאות קודם" fill="#fca5a5" radius={[2,2,0,0]} maxBarSize={14} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-sm text-slate-400">אין מספיק היסטוריה שנתית</div>
+              )}
+            </div>
+          </Block>
+
+          {/* AI Recommendations */}
+          <Block colSpan={1}>
+            <SectionTitle icon={<CheckCircle2 className="h-4 w-4" />} title="תובנות וייעול" link="/smart-analytics" linkLabel="הכל" />
+            <div className="space-y-3 overflow-y-auto">
+              {(recommendations || []).length > 0 ? recommendations.slice(0, 4).map((rec, i) => (
+                <div key={i} className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 flex items-start gap-2.5">
+                  <div className={`mt-1 h-2 w-2 rounded-full shrink-0 ${rec.priority === 'high' ? 'bg-red-500' : rec.priority === 'medium' ? 'bg-amber-400' : 'bg-blue-400'}`} />
+                  <div>
+                    <p className="text-sm text-slate-700 leading-snug">{rec.suggestion ?? rec.text ?? rec.title}</p>
+                    {rec.potentialSavings && <p className="text-xs font-bold text-emerald-600 mt-1">חיסכון: {fmt(rec.potentialSavings)}</p>}
+                  </div>
+                </div>
+              )) : (
+                <div className="text-center text-slate-400 text-sm py-10">
+                  <CheckCircle2 className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+                  הכל נראה תקין
+                </div>
+              )}
+            </div>
+          </Block>
+        </div>
+
+        {/* ─── Row 5: Category Trends ─── */}
+        {(catTrends || []).length > 0 && (
+          <Block colSpan={4} className="min-h-[300px]">
+            <SectionTitle icon={<BarChart2 className="h-4 w-4" />} title="מגמות הוצאות לפי קטגוריה (6 חודשים)" link="/reports" linkLabel="דוחות" />
+            <div className="flex-1 min-h-[220px]">
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={catTrends.map(m => {
+                  const entry = { month: m.label || m.month };
+                  (catTrendCategories || []).forEach(cat => { entry[cat] = m.categories?.[cat] || 0; });
+                  return entry;
+                })} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} dy={8} />
+                  <YAxis axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}k`} tick={{ fontSize: 11, fill: '#64748b' }} width={40} />
+                  <Tooltip contentStyle={{ backgroundColor: '#fff', borderColor: '#e2e8f0', borderRadius: '8px' }} formatter={v => fmt(v)} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {(catTrendCategories || []).slice(0, 8).map((cat, i) => (
+                    <Area key={cat} type="monotone" dataKey={cat} stackId="1" fill={COLORS[i % COLORS.length]} stroke={COLORS[i % COLORS.length]} fillOpacity={0.5} strokeWidth={1} />
+                  ))}
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Block>
+        )}
+
+        {/* ─── Row 6: Financial Summary Modules ─── */}
+        {finSummary && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-slate-800">תמונה פיננסית כוללת</h2>
+              <Link to="/reports" className="text-xs font-semibold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1">סיכום מלא <ChevronLeft className="h-3 w-3" /></Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {[
+                { label: 'פיקדונות',      value: finSummary.deposits?.totalAmount,       count: finSummary.deposits?.count,       color: 'text-blue-600',    link: '/deposits'        },
+                { label: 'מניות',          value: finSummary.stocks?.totalValue,           count: finSummary.stocks?.count,          color: 'text-emerald-600', link: '/investments'     },
+                { label: 'פנסיה',          value: finSummary.pension?.totalAccumulated,    count: finSummary.pension?.count,          color: 'text-violet-600',  link: '/pension'         },
+                { label: 'הלוואות',        value: finSummary.loans?.totalRemaining,        count: finSummary.loans?.count,            color: 'text-red-600',     link: '/my-loans'        },
+                { label: 'משכנתאות',       value: finSummary.mortgages?.totalBalance,      count: finSummary.mortgages?.count,        color: 'text-orange-600',  link: '/mortgage'        },
+                { label: 'ביטוח/חודש',    value: finSummary.insurance?.monthlyCost,       count: finSummary.insurance?.count,        color: 'text-amber-600',   link: '/insurance'       },
+                { label: 'נדל"ן',          value: finSummary.realEstate?.totalValue,       count: finSummary.realEstate?.count,       color: 'text-teal-600',    link: '/real-estate'     },
+                { label: 'מט"ח',           value: finSummary.foreignCurrency?.totalILS,    count: finSummary.foreignCurrency?.count,  color: 'text-indigo-600',  link: '/foreign-currency'},
+                { label: 'חיסכון ילדים',   value: finSummary.childSavings?.totalBalance,   count: finSummary.childSavings?.count,     color: 'text-pink-600',    link: '/child-savings'   },
+              ].filter(m => m.value != null && m.value !== 0).map((m, i) => (
+                <Link key={i} to={m.link} className="bg-white border border-slate-200 rounded-2xl p-4 hover:shadow-md transition-shadow flex flex-col gap-1">
+                  <p className="text-xs text-slate-400">{m.label}</p>
+                  <p className={`text-base font-bold tabular-nums ${m.color}`}>{fmt(m.value)}</p>
+                  {m.count != null && <p className="text-[10px] text-slate-400">{m.count} רשומות</p>}
+                </Link>
               ))}
             </div>
           </div>
-        </div>
-      ) : (
-        <EmptyState icon="🏦" title="אין נכסים מוגדרים" desc="הוסף פיקדונות, מניות, פנסיה ועוד כדי לעקוב אחר השווי הנקי שלך"
-          action="/deposits" actionLabel="הוסף פיקדון" />
-      )}
+        )}
 
-      {/* Liabilities */}
-      {liabilityRows.length > 0 && (
-        <div>
-          <SectionTitle icon={<TrendingDown className="h-4 w-4 text-red-500" />} title="התחייבויות" />
-          <div className="space-y-1">
-            {liabilityRows.map((r, i) => (
-              <div key={i} className="flex justify-between py-2 border-b border-slate-50 last:border-0 text-sm">
-                <span className="text-slate-600">{r.label}</span>
-                <span className="font-bold text-red-500">{fmt(r.value)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Net worth history */}
-      {histData.length > 1 && (
-        <div>
-          <SectionTitle icon={<TrendingUp className="h-4 w-4 text-blue-500" />} title="שווי נקי — היסטוריה" />
-          <ResponsiveContainer width="100%" height={190}>
-            <AreaChart data={histData}>
-              <defs>
-                <linearGradient id="gNW" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} width={36} />
-              <Tooltip formatter={v => fmt(v)} />
-              <Area type="monotone" dataKey="שווי" stroke="#3b82f6" fill="url(#gNW)" strokeWidth={2.5} dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Health score */}
-      {hs && (
-        <div>
-          <SectionTitle icon={<CheckCircle2 className="h-4 w-4 text-emerald-500" />} title="ציון בריאות פיננסית" link="/net-worth" linkLabel="פרטים נוספים" />
-          <div className="bg-slate-50 rounded-2xl p-4 flex items-center gap-5">
-            <div className="text-6xl font-black text-slate-900 leading-none">{hs.grade}</div>
-            <div className="flex-1">
-              <p className="font-bold text-slate-800 text-base">{hs.label}</p>
-              <p className="text-sm text-slate-400 mt-0.5">ציון {hs.score}/100</p>
-              <div className="mt-2 h-2.5 bg-slate-200 rounded-full overflow-hidden">
-                <div className="h-full rounded-full bg-gradient-to-l from-blue-500 to-indigo-500" style={{ width: `${hs.score}%` }} />
-              </div>
-            </div>
-          </div>
-          {hs.tips?.slice(0, 3).map((t, i) => (
-            <div key={i} className="flex items-start gap-2 mt-2 text-sm text-slate-600">
-              <span className="shrink-0">{t.icon ?? '•'}</span><span>{t.tip ?? t}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TAB: שנתי
-// ─────────────────────────────────────────────────────────────────────────────
-function AnnualTab({ data }) {
-  if (!data) return <TabSpinner />;
-  const yr  = data?.yearly;
-  const fs  = data?.summary;
-  const monthlyData = (yr?.monthlyData ?? []).map(m => ({
-    ...m,
-    month: m.month ?? m.label ?? '',
-    income:  m.income  ?? m.currentIncome  ?? 0,
-    expense: m.expense ?? m.currentExpense ?? 0,
-  }));
-
-  if (!yr && !fs) {
-    return (
-      <EmptyState icon="📅" title="אין נתונים שנתיים" desc="נדרש לפחות שנה של עסקאות לניתוח שנתי" action="/reports" actionLabel="לדוחות" />
-    );
-  }
-
-  return (
-    <div className="space-y-7">
-
-      {/* YoY KPI grid */}
-      {yr && (
-        <div>
-          <SectionTitle icon={<BarChart2 className="h-4 w-4 text-blue-500" />} title={`השוואה שנתית — ${yr.currentYear ?? ''} מול ${yr.previousYear ?? ''}`} link="/reports" linkLabel="דוח מלא" />
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: 'הכנסות',      cur: yr.currentYear?.income,      prev: yr.previousYear?.income,      positive: true  },
-              { label: 'הוצאות',      cur: yr.currentYear?.expense,     prev: yr.previousYear?.expense,     positive: false },
-              { label: 'חיסכון',      cur: yr.currentYear?.savings,     prev: yr.previousYear?.savings,     positive: true  },
-              { label: 'שיעור חיסכון', cur: yr.currentYear?.savingsRate, prev: yr.previousYear?.savingsRate, positive: true, pct: true },
-            ].filter(r => r.cur != null).map((r, i) => {
-              const up = r.positive ? r.cur >= (r.prev ?? 0) : r.cur <= (r.prev ?? 0);
-              return (
-                <div key={i} className="bg-slate-50 rounded-2xl p-4">
-                  <p className="text-xs text-slate-400 mb-1">{r.label}</p>
-                  <p className="text-xl font-black text-slate-900">{r.pct ? `${r.cur?.toFixed(1)}%` : fmt(r.cur)}</p>
-                  {r.prev != null && (
-                    <p className={`text-xs flex items-center gap-0.5 mt-1 ${up ? 'text-emerald-600' : 'text-red-500'}`}>
-                      {up ? <ArrowUpRight className="h-3 w-3"/> : <ArrowDownRight className="h-3 w-3"/>}
-                      {r.pct ? `${r.prev?.toFixed(1)}%` : fmt(r.prev)} שנה קודמת
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Monthly bar chart */}
-      {monthlyData.length > 0 && (
-        <div>
-          <SectionTitle icon={<BarChart2 className="h-4 w-4 text-slate-400" />} title="הכנסות vs הוצאות לפי חודש" />
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={monthlyData} barGap={2}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} width={36} />
-              <Tooltip formatter={v => fmt(v)} />
-              <Legend />
-              <Bar dataKey="income"  name="הכנסות" fill="#10b981" radius={[3,3,0,0]} />
-              <Bar dataKey="expense" name="הוצאות" fill="#ef4444" radius={[3,3,0,0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Financial summary breakdown */}
-      {fs && (
-        <div>
-          <SectionTitle icon={<Home className="h-4 w-4 text-slate-400" />} title="סיכום כולל — נכסים והתחייבויות" link="/net-worth" linkLabel="שווי נקי מלא" />
-          <div className="space-y-1">
-            {Object.entries({
-              'חשבונות':      fs.accounts?.total,
-              'פיקדונות':     fs.deposits?.total,
-              'מניות':        fs.stocks?.total,
-              'פנסיה':        fs.pension?.total,
-              'הלוואות':      fs.loans?.total       != null ? -(fs.loans.total)       : null,
-              'משכנתאות':     fs.mortgages?.total   != null ? -(fs.mortgages.total)   : null,
-              'נדל"ן':        fs.realEstate?.totalValue,
-              'חיסכון ילדים': fs.childSavings?.total,
-              'יעדים':        fs.goals?.totalSaved,
-            }).filter(([, v]) => v != null && v !== 0).map(([label, val], i) => (
-              <div key={i} className="flex justify-between py-2.5 border-b border-slate-50 last:border-0 text-sm">
-                <span className="text-slate-600">{label}</span>
-                <span className={`font-semibold ${val >= 0 ? 'text-slate-900' : 'text-red-500'}`}>{fmt(val)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
+      </div>
     </div>
   );
 }

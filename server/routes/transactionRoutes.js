@@ -1,6 +1,6 @@
 import express from 'express';
 // הוספנו כאן את updateTransaction לייבוא
-import { getTransactions, addTransaction, deleteTransaction, updateTransaction, bulkUpdateMerchant, deleteAllTransactions, searchTransactions, getMerchantTransactions } from '../controllers/transactionController.js';
+import { getTransactions, addTransaction, deleteTransaction, updateTransaction, bulkUpdateMerchant, deleteAllTransactions, searchTransactions, getMerchantTransactions, getMerchantsSummary } from '../controllers/transactionController.js';
 import requireAuth from '../middlewares/requireAuth.js';
 
 const router = express.Router();
@@ -14,6 +14,7 @@ router.route('/')
 
 router.delete('/all', deleteAllTransactions);
 router.get('/search', searchTransactions);
+router.get('/merchants/summary', getMerchantsSummary);
 router.get('/merchant/:name', getMerchantTransactions);
 router.post('/merchant-bulk', bulkUpdateMerchant);
 

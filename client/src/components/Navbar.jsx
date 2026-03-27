@@ -5,7 +5,7 @@ import {
   ChevronDown, Cpu, BarChart3, Receipt, CreditCard, Target, Moon, Sun,
   Wallet, RefreshCw, Scale, GraduationCap, FileSpreadsheet, Upload,
   Shield, Building2, Bell, Calculator, DownloadCloud, Baby, Globe,
-  FileText, Layers, Banknote, HandCoins, ClipboardList,
+  FileText, Layers, Banknote, HandCoins, ClipboardList, Store,
   Coins, PiggyBank, SlidersHorizontal, Lock, LogOut, Activity,
   Lightbulb, X, Search, Users, HelpCircle,
 } from "lucide-react";
@@ -29,6 +29,7 @@ const NAV_GROUPS = [
       { to: "/categories", label: "קטגוריות", icon: Layers    },
       { to: "/budget",     label: "תקציב",    icon: Wallet    },
       { to: "/recurring",  label: "קבועים",   icon: RefreshCw },
+      { to: "/merchants",  label: "בתי עסק",  icon: Store     },
     ],
   },
   {

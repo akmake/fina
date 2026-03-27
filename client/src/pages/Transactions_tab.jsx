@@ -4,7 +4,7 @@ import { format, isSameMonth, startOfMonth, endOfMonth, subMonths } from 'date-f
 import { he } from 'date-fns/locale';
 import { Upload, Search, ChevronDown, Loader2, X, Save, Zap } from 'lucide-react';
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '@/utils/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -19,6 +19,7 @@ import AddTransactionForm from '@/components/transactions/AddTransactionForm';
 
 export default function TransactionsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // ─── Data ───────────────────────────────────────────────────
   const [transactions, setTransactions] = useState([]);
@@ -30,8 +31,9 @@ export default function TransactionsPage() {
   const [oldestMonth,  setOldestMonth]  = useState(null);
 
   // ─── Filters ────────────────────────────────────────────────
-  const [filterType,  setFilterType]  = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType,     setFilterType]     = useState('all');
+  const [searchQuery,    setSearchQuery]    = useState('');
+  const [filterCategory, setFilterCategory] = useState(() => searchParams.get('category') ?? '');
 
   // ─── Scroll sentinel ─────────────────────────────────────────
   const sentinelRef = useRef(null);
@@ -109,6 +111,13 @@ export default function TransactionsPage() {
     finally { setLoadingMore(false); }
   }, [loadingMore, hasMore, oldestMonth, fetchMonth]);
 
+  // ─── Merchant changed (name or category) — update all loaded months instantly ───
+  const handleMerchantChanged = useCallback((oldName, changes) => {
+    setTransactions(prev => prev.map(t =>
+      t.description === oldName ? { ...t, ...changes } : t
+    ));
+  }, []);
+
   // ─── Refresh (after add/delete) ──────────────────────────────
   const refresh = useCallback(async () => {
     try {
@@ -180,8 +189,9 @@ export default function TransactionsPage() {
     let result = transactions;
     if (filterType === 'expense') result = result.filter(t => t.type === 'הוצאה');
     if (filterType === 'income')  result = result.filter(t => t.type === 'הכנסה');
+    if (filterCategory)           result = result.filter(t => t.category === filterCategory);
     return result;
-  }, [transactions, filterType, searchResults]);
+  }, [transactions, filterType, filterCategory, searchResults]);
 
   const groupedByMonth = useMemo(() => {
     const groups = {};
@@ -339,7 +349,17 @@ export default function TransactionsPage() {
 
             {/* Search + filters */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8 gap-4">
-              <h2 className="text-lg sm:text-xl font-bold text-slate-900 shrink-0">פעילות</h2>
+              <div className="flex items-center gap-3 shrink-0">
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900">פעילות</h2>
+                {filterCategory && (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full">
+                    {filterCategory}
+                    <button onClick={() => { setFilterCategory(''); setSearchParams({}); }} className="hover:text-blue-900">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+              </div>
               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                 <div className="relative w-full sm:w-64">
                   <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -394,7 +414,7 @@ export default function TransactionsPage() {
                         <TransactionCard
                           key={t._id}
                           transaction={t}
-                          onClick={() => { setSelectedMerchant(t.description); setIsMerchantDialogOpen(true); }}
+                          onClick={() => { setSelectedMerchant({ name: t.description, category: t.category }); setIsMerchantDialogOpen(true); }}
                           onDelete={handleDelete}
                           onEdit={openEdit}
                         />
@@ -518,9 +538,11 @@ export default function TransactionsPage() {
       <MerchantDialog
         isOpen={isMerchantDialogOpen}
         onOpenChange={setIsMerchantDialogOpen}
-        merchantName={selectedMerchant}
+        merchantName={selectedMerchant?.name ?? selectedMerchant}
+        clickedCategory={selectedMerchant?.category}
         categories={categories}
         onRefresh={refresh}
+        onMerchantChanged={handleMerchantChanged}
       />
 
       {/* Import wizard */}

@@ -57,6 +57,7 @@ const CalDirectImportPage  = lazy(() => import("@/pages/CalDirectImportPage"));
 const MaxImportPage        = lazy(() => import("@/pages/MaxImportPage"));
 const FamilyPage           = lazy(() => import("@/pages/FamilyPage"));
 const HelpPage             = lazy(() => import("@/pages/HelpPage"));
+const MerchantsPage        = lazy(() => import("@/pages/MerchantsPage"));
 
 function PageLoader() {
   return (
@@ -91,6 +92,7 @@ export default function App() {
             <Route path="budget"            element={<BudgetPage />}               />
             <Route path="categories"        element={<CategoryInsightsPage />}     />
             <Route path="recurring"         element={<RecurringPage />}            />
+            <Route path="merchants"         element={<MerchantsPage />}            />
             <Route path="net-worth"         element={<NetWorthPage />}             />
             <Route path="import"            element={<ImportPage />}               />
             <Route path="import/excel"      element={<ExcelImportPage />}          />

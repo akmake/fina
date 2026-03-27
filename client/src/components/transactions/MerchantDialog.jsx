@@ -14,7 +14,7 @@ const SOURCE_LABELS = {
   hapoalim: 'הפועלים', leumi: 'לאומי', discount: 'דיסקונט', mizrahi: 'מזרחי',
 };
 
-export default function MerchantDialog({ isOpen, onOpenChange, merchantName, categories, onRefresh }) {
+export default function MerchantDialog({ isOpen, onOpenChange, merchantName, clickedCategory, categories, onRefresh, onMerchantChanged }) {
   const [editCategoryMode, setEditCategoryMode] = useState(false);
   const [selectedNewCategory, setSelectedNewCategory] = useState('');
   const [customCategory, setCustomCategory]     = useState('');
@@ -25,6 +25,7 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cat
   const [loadingHistory, setLoadingHistory]      = useState(false);
   const [editingTrx, setEditingTrx]             = useState(null); // { _id, date, amount, type, category }
   const [savingTrx, setSavingTrx]               = useState(false);
+  const [savedCategory, setSavedCategory]       = useState(null); // overrides clickedCategory after a save
 
   // Fetch ALL transactions for this merchant from server
   useEffect(() => {
@@ -43,7 +44,7 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cat
     [merchantHistory]
   );
 
-  const currentCategory = merchantHistory[0]?.category || 'כללי';
+  const currentCategory = savedCategory ?? clickedCategory ?? merchantHistory[0]?.category ?? 'כללי';
 
   // Group card numbers by source (credit card company)
   const cardsBySource = useMemo(() => {
@@ -69,8 +70,13 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cat
       await api.post('/transactions/merchant-bulk', { originalName: merchantName, newDisplayName: trimmed });
       setEditNameMode(false);
       onOpenChange(false);
+      if (onMerchantChanged) onMerchantChanged(merchantName, { description: trimmed });
       await onRefresh();
-    } catch { alert('שגיאה בשינוי השם'); }
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'שגיאה לא ידועה';
+      alert('שגיאה בשינוי השם: ' + msg);
+      console.error('handleSaveName error:', err);
+    }
     finally { setUpdatingCategory(false); }
   };
 
@@ -94,13 +100,19 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cat
       setEditCategoryMode(false);
       setCustomCategory('');
       setSelectedNewCategory('');
+      setSavedCategory(catName);
+      if (onMerchantChanged) onMerchantChanged(merchantName, { category: catName });
       // Reload merchant history to reflect category change
       try {
         const { data } = await api.get(`/transactions/merchant/${encodeURIComponent(merchantName)}`);
         setMerchantHistory(data || []);
       } catch { /* ignore - will show stale data */ }
       await onRefresh();
-    } catch { alert('שגיאה בעדכון הקטגוריה'); }
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'שגיאה לא ידועה';
+      alert('שגיאה בעדכון הקטגוריה: ' + msg);
+      console.error('handleSaveCategory error:', err);
+    }
     finally { setUpdatingCategory(false); }
   };
 
@@ -120,7 +132,11 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cat
       setMerchantHistory(data || []);
       setEditingTrx(null);
       await onRefresh();
-    } catch { alert('שגיאה בשמירת העסקה'); }
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'שגיאה לא ידועה';
+      alert('שגיאה בשמירת העסקה: ' + msg);
+      console.error('handleSaveTrx error:', err);
+    }
     finally { setSavingTrx(false); }
   };
 
@@ -130,6 +146,7 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cat
     setSelectedNewCategory('');
     setCustomCategory('');
     setEditingTrx(null);
+    setSavedCategory(null);
     onOpenChange(false);
   };
 
