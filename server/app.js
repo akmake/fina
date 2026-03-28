@@ -73,6 +73,9 @@ await connectDB();
 
 const app = express();
 
+// nginx proxy — חובה לפני rate-limiter
+app.set('trust proxy', 1);
+
 // --- הגדרות אבטחה בסיסיות (Helmet) ---
 app.use(helmet({
   crossOriginResourcePolicy: false,
@@ -84,7 +87,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'"],
+      connectSrc: ["'self'", "https://connect.cal-online.co.il", "https://api.cal-online.co.il", "https://accounts.google.com"],
       frameSrc: ["https://accounts.google.com"],
     },
   },
