@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import api from '@/utils/api';
+import { requestOtp as calRequestOtp, verifyOtp as calVerifyOtp, fetchTransactions as calFetchTransactions } from '@/utils/calDirectApi';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -40,6 +40,7 @@ export default function CalDirectImportPage() {
 
   // שלב 2 — OTP
   const [otp, setOtp]           = useState('');
+  const [uuid, setUuid]         = useState('');
   const [maskedPhone, setMaskedPhone] = useState('');
 
   // מצב
@@ -50,33 +51,35 @@ export default function CalDirectImportPage() {
   // תוצאות
   const [accounts, setAccounts] = useState(null);
 
-  // ── שלב 1: בקשת OTP ──────────────────────────────────────────
+  // ── שלב 1: בקשת OTP (ישירות מהדפדפן) ───────────────────────
   const handleRequestOtp = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/cal/request-otp', { id, last4, channel });
-      setMaskedPhone(data.maskedPhone || '');
+      const { uuid: newUuid, maskedPhone: phone } = await calRequestOtp({ id, last4 });
+      setUuid(newUuid);
+      setMaskedPhone(phone);
       setStage('otp');
     } catch (err) {
-      setError(err.response?.data?.message || 'שגיאה בשליחת הקוד');
+      setError(err.message || 'שגיאה בשליחת הקוד');
     } finally {
       setLoading(false);
     }
   };
 
-  // ── שלב 2: אימות OTP + שליפת נתונים ─────────────────────────
+  // ── שלב 2: אימות OTP + שליפת נתונים (ישירות מהדפדפן) ──────
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     setStage('loading');
     setError('');
     try {
-      const { data } = await api.post('/cal/verify-otp', { id, last4, otp, startDate });
-      setAccounts(data.accounts || []);
+      const authToken = await calVerifyOtp({ id, otp, uuid });
+      const accs      = await calFetchTransactions({ authToken, startDate });
+      setAccounts(accs);
       setStage('results');
     } catch (err) {
-      setError(err.response?.data?.message || 'קוד שגוי או פג תוקף');
+      setError(err.message || 'קוד שגוי או פג תוקף');
       setStage('otp');
     }
   };
@@ -134,7 +137,7 @@ export default function CalDirectImportPage() {
   const totalTxns = accounts ? accounts.reduce((s, a) => s + a.txns.length, 0) : 0;
   const reset = () => {
     setStage('credentials'); setError(''); setAccounts(null);
-    setOtp(''); setMaskedPhone('');
+    setOtp(''); setUuid(''); setMaskedPhone('');
   };
 
   return (

@@ -314,6 +314,30 @@ function convertPendingTransaction(t) {
   };
 }
 
+// ── endpoint: קבל accounts מהלקוח ועבד לDB ────────────────────────────────
+export const processRawAccounts = async (req, res, next) => {
+  const { accounts } = req.body;
+  const userId = req.user._id;
+
+  if (!Array.isArray(accounts)) return next(new AppError('נתונים שגויים', 400));
+
+  const cleanedData = [];
+  for (const acc of accounts) {
+    for (const txn of (acc.txns || [])) {
+      cleanedData.push(calTxnToRow(txn, acc.accountNumber));
+    }
+  }
+
+  if (cleanedData.length === 0) return res.json({ transactions: [], unseenMerchants: [] });
+
+  try {
+    const { transactions, unseenMerchants } = await parseTransactions(cleanedData, 'cal', userId);
+    res.json({ transactions, unseenMerchants });
+  } catch (err) {
+    return next(new AppError(err.message || 'שגיאה בעיבוד עסקאות', 500));
+  }
+};
+
 // ── עזר: פורמט תאריך לכאל (DD/MM/YYYY) ──────────────────────────────────
 function formatDateForCal(date) {
   const d = String(date.getDate()).padStart(2, '0');

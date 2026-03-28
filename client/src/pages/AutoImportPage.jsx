@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '@/utils/api';
+import { requestOtp as calRequestOtp, verifyOtp as calVerifyOtp, fetchTransactions as calFetchTransactions } from '@/utils/calDirectApi';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -47,6 +48,7 @@ export default function AutoImportPage() {
   const [calLast4, setCalLast4] = useState('');
   const [calChannel, setCalChannel] = useState('SMS');
   const [calOtp, setCalOtp] = useState('');
+  const [calUuid, setCalUuid] = useState('');
   const [calMaskedPhone, setCalMaskedPhone] = useState('');
   const [calError, setCalError] = useState('');
   const [calLoading, setCalLoading] = useState(false);
@@ -74,36 +76,37 @@ export default function AutoImportPage() {
     const cfg = companies.find(c => c.value === value);
     setIncomesOnly(cfg?.group === 'בנקים');
     // reset CAL OTP state when switching companies
-    setCalId(''); setCalLast4(''); setCalOtp(''); setCalMaskedPhone(''); setCalError('');
+    setCalId(''); setCalLast4(''); setCalOtp(''); setCalUuid(''); setCalMaskedPhone(''); setCalError('');
     if (stage === 'cal-otp') setStage('credentials');
   };
 
-  // ── CAL OTP: שלב 1 — בקשת קוד ──
+  // ── CAL OTP: שלב 1 — בקשת קוד (ישירות מהדפדפן) ──
   const handleCalRequestOtp = async (e) => {
     e.preventDefault();
     setCalLoading(true);
     setCalError('');
     try {
-      const { data } = await api.post('/cal/request-otp', { id: calId, last4: calLast4, channel: calChannel });
-      setCalMaskedPhone(data.maskedPhone || '');
+      const { uuid, maskedPhone } = await calRequestOtp({ id: calId, last4: calLast4 });
+      setCalUuid(uuid);
+      setCalMaskedPhone(maskedPhone);
       setStage('cal-otp');
     } catch (err) {
-      setCalError(err.response?.data?.message || 'שגיאה בשליחת הקוד');
+      setCalError(err.message || 'שגיאה בשליחת הקוד');
     } finally {
       setCalLoading(false);
     }
   };
 
-  // ── CAL OTP: שלב 2 — אימות + ייבוא ──
+  // ── CAL OTP: שלב 2 — אימות + ייבוא (ישירות מהדפדפן) ──
   const handleCalVerifyAndImport = async (e) => {
     e.preventDefault();
     setStage('loading');
     setCalError('');
     setMessage('מתחבר לכאל ושולף עסקאות...');
     try {
-      const { data } = await api.post('/cal/verify-otp-import', {
-        id: calId, last4: calLast4, otp: calOtp, startDate,
-      }, { timeout: 120000 });
+      const authToken = await calVerifyOtp({ id: calId, otp: calOtp, uuid: calUuid });
+      const accounts  = await calFetchTransactions({ authToken, startDate });
+      const { data }  = await api.post('/cal/process-accounts', { accounts }, { timeout: 60000 });
 
       setParsedData(data.transactions);
       setRawAccounts(null);
@@ -118,7 +121,7 @@ export default function AutoImportPage() {
         await processData([], data.transactions);
       }
     } catch (err) {
-      if (err.response?.status === 401) {
+      if (err.message?.includes('קוד שגוי') || err.message?.includes('פג תוקף')) {
         setCalError('קוד שגוי או פג תוקף');
         setStage('cal-otp');
       } else {
@@ -241,7 +244,7 @@ export default function AutoImportPage() {
     setShowRawData(false);
     setFields({});
     setIncomesOnly(companyConfig?.group === 'בנקים');
-    setCalId(''); setCalLast4(''); setCalOtp(''); setCalMaskedPhone(''); setCalError(''); setCalLoading(false);
+    setCalId(''); setCalLast4(''); setCalOtp(''); setCalUuid(''); setCalMaskedPhone(''); setCalError(''); setCalLoading(false);
   };
 
   const downloadRawJson = () => {
