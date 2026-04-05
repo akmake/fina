@@ -164,9 +164,11 @@ export const loggingMiddleware = async (req, res, next) => {
     try {
       const headerVal = req.headers['x-device-info'];
       if (headerVal) {
-        clientData = JSON.parse(decodeURIComponent(escape(Buffer.from(headerVal, 'base64').toString('binary'))));
+        clientData = JSON.parse(Buffer.from(headerVal, 'base64').toString('utf8'));
       }
-    } catch (e) { /* parsing error, try next source */ }
+    } catch (e) {
+      console.warn('[LogMiddleware] Failed to parse X-Device-Info header:', e.message);
+    }
 
     // Source 2: Device cache (from device-ping endpoint)
     if (!clientData || !Object.keys(clientData).length) {
