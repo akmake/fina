@@ -83,10 +83,19 @@ const logSchema = new mongoose.Schema(
     // Location (from IP geolocation)
     location: {
       country: String,
+      countryCode: String,
       city: String,
       region: String,
+      zip: String,
       latitude: Number,
       longitude: Number,
+      timezone: String,
+      isp: String,
+      org: String,
+      asn: String,
+      isMobile: Boolean,
+      isProxy: Boolean,
+      isHosting: Boolean,
     },
 
     // Connection Info
@@ -110,13 +119,16 @@ const logSchema = new mongoose.Schema(
 
     // ★ Battery Info
     battery: {
-      level: Number,     // 0-100
+      level: Number,
       charging: Boolean,
+      chargingTime: Number,
+      dischargingTime: Number,
     },
 
     // ★ User Preferences
     prefersDarkMode: Boolean,
     prefersReducedMotion: Boolean,
+    prefersHighContrast: Boolean,
     doNotTrack: Boolean,
     isTouchDevice: Boolean,
 
@@ -136,20 +148,82 @@ const logSchema = new mongoose.Schema(
 
     // ★ Detection Flags
     adBlocker: Boolean,
-    webdriver: Boolean,          // automation/bot flag
+    webdriver: Boolean,
     isOnline: Boolean,
     pdfViewerEnabled: Boolean,
     pluginsCount: Number,
+    hasGamepad: Boolean,
+    privateMode: Boolean,
 
     // ★ Fingerprinting
     fingerprint: String,
     canvasFingerprint: String,
     webglFingerprint: String,
+    fontFingerprint: String,
+    audioFingerprint: String,
+    speechVoicesFingerprint: String,
+
+    // ★ Media Codecs
+    mediaCodecs: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+
+    // ★ Security & Bot Detection
+    devToolsOpen: Boolean,
+    vmIndicators: [String],
+    automationIndicators: [String],
 
     // ★ Browser Capabilities
+    webAssemblySupported: Boolean,
+    sharedArrayBufferSupported: Boolean,
+    bigIntSupported: Boolean,
+
+    // ★ Permissions
+    permissionStates: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+
+    // ★ Crypto Capabilities
+    cryptoCapabilities: [String],
+
+    // ★ Browser Capabilities (legacy)
     webGLSupported: Boolean,
+    webGL2Supported: Boolean,
     serviceWorkerSupported: Boolean,
     notificationPermission: String,
+    indexedDBSupported: Boolean,
+
+    // ★ Network
+    localIPs: [String],
+
+    // ★ Storage
+    storageQuota: {
+      quotaMB: Number,
+      usedMB: Number,
+    },
+
+    // ★ App & Marketing
+    pwaMode: String,
+    utm: {
+      source: String,
+      medium: String,
+      campaign: String,
+      term: String,
+      content: String,
+    },
+    keyboardLayout: String,
+    screenRefreshRate: Number,
+
+    // ★ Performance
+    pagePerformance: {
+      pageLoadMs: Number,
+      domReadyMs: Number,
+      dnsMs: Number,
+      connectMs: Number,
+      ttfbMs: Number,
+    },
 
     timestamp: {
       type: Date,

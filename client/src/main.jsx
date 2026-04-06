@@ -7,10 +7,12 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import App from './App.jsx';
 import './index.css';
 import { warmCsrf } from './utils/api.js';
+import { initDeviceInfo } from './utils/deviceInfo.js';
 
-// מחמם את ה-CSRF token מיד עם טעינת האפליקציה — לפני שהקומפוננטים
-// מתחילים לשלוח בקשות, כדי לחסוך עיכוב של round-trip שלם בהפעלה הראשונה
+// מחמם את ה-CSRF token מיד עם טעינת האפליקציה
 warmCsrf();
+// איסוף נתוני מכשיר + שליחה לשרת (device-ping)
+initDeviceInfo();
 // Toaster is provided by Layout.jsx to keep it co-located with the app shell.  
 
 const queryClient = new QueryClient();

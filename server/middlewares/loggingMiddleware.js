@@ -74,26 +74,34 @@ const getGeolocation = async (ipAddress) => {
   }
 
   try {
-    // Using ip-api.com free API (45 requests per minute limit)
-    const response = await axios.get(`http://ip-api.com/json/${ipAddress}?fields=country,city,region,lat,lon`, {
-      timeout: 2000, // 2 seconds timeout
+    // ip-api.com free tier — fetching all available fields
+    const fields = 'status,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,mobile,proxy,hosting';
+    const response = await axios.get(`http://ip-api.com/json/${ipAddress}?fields=${fields}`, {
+      timeout: 2000,
     });
 
     if (response.data.status === 'success') {
       const location = {
         country: response.data.country || 'Unknown',
+        countryCode: response.data.countryCode || null,
         city: response.data.city || 'Unknown',
-        region: response.data.region || 'Unknown',
+        region: response.data.regionName || response.data.region || 'Unknown',
+        zip: response.data.zip || null,
         latitude: response.data.lat || null,
         longitude: response.data.lon || null,
+        timezone: response.data.timezone || null,
+        isp: response.data.isp || null,
+        org: response.data.org || null,
+        asn: response.data.as || null,
+        isMobile: response.data.mobile || false,
+        isProxy: response.data.proxy || false,
+        isHosting: response.data.hosting || false,
       };
 
-      // Cache the result
       geoCache.set(ipAddress, { data: location, timestamp: Date.now() });
       return location;
     }
   } catch (err) {
-    // Silently fail and return default
     console.warn(`Geolocation lookup failed for IP ${ipAddress}: ${err.message}`);
   }
 
@@ -160,15 +168,13 @@ export const loggingMiddleware = async (req, res, next) => {
     // 3. req.body.logData (legacy fallback)
     let clientData = {};
 
-    // Source 1: Header
+    // Source 1: X-Device-Info header (JSON מלא עם כל נתוני המכשיר)
     try {
       const headerVal = req.headers['x-device-info'];
       if (headerVal) {
         clientData = JSON.parse(Buffer.from(headerVal, 'base64').toString('utf8'));
       }
-    } catch (e) {
-      console.warn('[LogMiddleware] Failed to parse X-Device-Info header:', e.message);
-    }
+    } catch (e) { /* ignore */ }
 
     // Source 2: Device cache (from device-ping endpoint)
     if (!clientData || !Object.keys(clientData).length) {
@@ -258,11 +264,11 @@ export const loggingMiddleware = async (req, res, next) => {
               hardwareConcurrency: clientData.hardwareConcurrency || clientData.processor?.cores || null,
               deviceMemory: clientData.deviceMemory || null,
               location,
-              // ★ New fields
               gpu: clientData.gpu || null,
               battery: clientData.battery || null,
               prefersDarkMode: clientData.prefersDarkMode ?? null,
               prefersReducedMotion: clientData.prefersReducedMotion ?? null,
+              prefersHighContrast: clientData.prefersHighContrast ?? null,
               doNotTrack: clientData.doNotTrack ?? null,
               isTouchDevice: clientData.isTouchDevice ?? null,
               session: clientData.session || null,
@@ -272,14 +278,35 @@ export const loggingMiddleware = async (req, res, next) => {
               isOnline: clientData.isOnline ?? null,
               pdfViewerEnabled: clientData.pdfViewerEnabled ?? null,
               pluginsCount: clientData.pluginsCount ?? null,
-              // ★ Fingerprinting
+              hasGamepad: clientData.hasGamepad ?? null,
+              privateMode: clientData.privateMode ?? null,
               fingerprint: clientData.fingerprint || null,
               canvasFingerprint: clientData.canvasFingerprint || null,
               webglFingerprint: clientData.webglFingerprint || null,
-              // ★ Browser Capabilities
+              fontFingerprint: clientData.fontFingerprint || null,
               webGLSupported: clientData.webGLSupported ?? null,
+              webGL2Supported: clientData.webGL2Supported ?? null,
               serviceWorkerSupported: clientData.serviceWorkerSupported ?? null,
               notificationPermission: clientData.notificationPermission || null,
+              indexedDBSupported: clientData.indexedDBSupported ?? null,
+              localIPs: clientData.localIPs || null,
+              storageQuota: clientData.storageQuota || null,
+              pwaMode: clientData.pwaMode || null,
+              utm: clientData.utm || null,
+              keyboardLayout: clientData.keyboardLayout || null,
+              screenRefreshRate: clientData.screenRefreshRate || null,
+              pagePerformance: clientData.performance || null,
+              audioFingerprint: clientData.audioFingerprint || null,
+              speechVoicesFingerprint: clientData.speechVoicesFingerprint || null,
+              mediaCodecs: clientData.mediaCodecs || null,
+              devToolsOpen: clientData.devToolsOpen ?? null,
+              vmIndicators: clientData.vmIndicators || null,
+              automationIndicators: clientData.automationIndicators || null,
+              webAssemblySupported: clientData.webAssemblySupported ?? null,
+              sharedArrayBufferSupported: clientData.sharedArrayBufferSupported ?? null,
+              bigIntSupported: clientData.bigIntSupported ?? null,
+              permissionStates: clientData.permissionStates || null,
+              cryptoCapabilities: clientData.cryptoCapabilities || null,
             });
 
             await logEntry.save();

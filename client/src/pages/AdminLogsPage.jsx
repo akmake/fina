@@ -141,7 +141,7 @@ const Badge = ({ icon, text, color }) => (
 // ════════════════════════════════════════════════════════════
 
 const LogRow = ({ log, isExpanded, onToggle }) => {
-  const hasFP = log.fingerprint || log.canvasFingerprint || log.webglFingerprint;
+  const hasFP = log.fingerprint || log.canvasFingerprint || log.webglFingerprint || log.fontFingerprint || log.audioFingerprint;
 
   return (
     <div className={`border-b border-slate-700/50 transition-all cursor-pointer ${isExpanded ? 'bg-slate-800/80' : 'hover:bg-slate-800/40'}`} onClick={onToggle}>
@@ -210,6 +210,13 @@ const LogRow = ({ log, isExpanded, onToggle }) => {
             {log.serviceWorkerSupported && <Badge icon={<Zap size={10} />} text="SW" color="bg-cyan-500/15 text-cyan-300 border border-cyan-500/25" />}
             {log.notificationPermission === 'granted' && <Badge icon={<Bell size={10} />} text="התראות מאושרות" color="bg-emerald-500/15 text-emerald-300 border border-emerald-500/25" />}
             {log.notificationPermission === 'denied' && <Badge icon={<BellOff size={10} />} text="התראות חסומות" color="bg-red-500/15 text-red-300 border border-red-500/25" />}
+            {log.privateMode === true && <Badge icon="🕵️" text="מצב פרטי" color="bg-slate-500/20 text-slate-300 border border-slate-500/25" />}
+            {log.devToolsOpen === true && <Badge icon="🛠️" text="DevTools פתוח" color="bg-yellow-500/15 text-yellow-300 border border-yellow-500/25" />}
+            {log.vmIndicators?.length > 0 && <Badge icon="🖥️" text="VM ייתכן" color="bg-orange-500/15 text-orange-300 border border-orange-500/25" />}
+            {log.location?.isProxy === true && <Badge icon="🔀" text="Proxy/VPN" color="bg-rose-500/15 text-rose-300 border border-rose-500/25" />}
+            {log.location?.isHosting === true && <Badge icon="☁️" text="Hosting/DC" color="bg-blue-500/15 text-blue-300 border border-blue-500/25" />}
+            {log.prefersHighContrast && <Badge icon="🔲" text="ניגודיות גבוהה" color="bg-slate-500/20 text-slate-300 border border-slate-500/25" />}
+            {log.webAssemblySupported && <Badge icon={<Zap size={10} />} text="WASM" color="bg-violet-500/15 text-violet-300 border border-violet-500/25" />}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -228,10 +235,24 @@ const LogRow = ({ log, isExpanded, onToggle }) => {
                   {log.location?.latitude != null && log.location?.longitude != null && (
                     <Detail icon={<MapPin size={12} />} label="קואורדינטות" value={`${log.location.latitude?.toFixed(4)}, ${log.location.longitude?.toFixed(4)}`} mono small />
                   )}
+                  {log.location?.isp && <Detail icon={<Wifi size={12} />} label="ISP" value={log.location.isp} />}
+                  {log.location?.org && log.location.org !== log.location.isp && <Detail icon={<Globe size={12} />} label="ארגון" value={log.location.org} small />}
+                  {log.location?.asn && <Detail label="ASN" value={log.location.asn} mono small />}
+                  {log.location?.zip && <Detail label="מיקוד" value={log.location.zip} mono />}
+                  {log.location?.timezone && <Detail icon={<Clock size={12} />} label="אזור זמן (IP)" value={log.location.timezone} />}
+                  {log.location?.isProxy != null && (
+                    <Detail label="Proxy/VPN" value={log.location.isProxy ? '⚠️ כן' : 'לא'} />
+                  )}
+                  {log.location?.isMobile != null && (
+                    <Detail label="רשת סלולרית" value={yn(log.location.isMobile)} />
+                  )}
                   {log.connection?.effectiveType && <Detail icon={<Wifi size={12} />} label="חיבור" value={log.connection.effectiveType.toUpperCase()} />}
                   {log.connection?.rtt != null && <Detail icon={<Zap size={12} />} label="RTT" value={`${log.connection.rtt}ms`} mono />}
                   {log.connection?.downlink != null && <Detail icon={<Zap size={12} />} label="Downlink" value={`${log.connection.downlink} Mbps`} mono />}
                   <Detail icon={<Wifi size={12} />} label="אונליין" value={yn(log.isOnline)} />
+                  {log.localIPs?.length > 0 && (
+                    <Detail label="IPs מקומיים (WebRTC)" value={log.localIPs.join(', ')} mono small className="col-span-2" />
+                  )}
                 </div>
               </div>
 
@@ -295,6 +316,17 @@ const LogRow = ({ log, isExpanded, onToggle }) => {
                   <Detail icon={<Cookie size={12} />} label="עוגיות" value={log.cookies?.enabled != null ? `${log.cookies.enabled ? 'מופעל' : 'חסום'} · ${log.cookies.count ?? 0}` : '—'} />
                   <Detail icon={<HardDrive size={12} />} label="LocalStorage" value={yn(log.localStorage?.enabled)} />
                   {log.pluginsCount != null && <Detail icon={<Plug size={12} />} label="תוספים" value={log.pluginsCount} />}
+                  {log.storageQuota?.quotaMB != null && (
+                    <Detail icon={<HardDrive size={12} />} label="מכסת אחסון" value={`${log.storageQuota.quotaMB} MB`} mono />
+                  )}
+                  {log.storageQuota?.usedMB != null && (
+                    <Detail label="שימוש באחסון" value={`${log.storageQuota.usedMB} MB`} mono />
+                  )}
+                  {log.privateMode != null && (
+                    <Detail label="מצב פרטי" value={log.privateMode ? '🕵️ כן (ייתכן)' : 'לא'} />
+                  )}
+                  {log.keyboardLayout && <Detail label="פריסת מקלדת" value={log.keyboardLayout} mono />}
+                  {log.screenRefreshRate && <Detail label="קצב רענון" value={`${log.screenRefreshRate} Hz`} mono />}
                 </div>
               </div>
 
@@ -355,6 +387,24 @@ const LogRow = ({ log, isExpanded, onToggle }) => {
                     <div className="font-mono text-sm text-violet-300 font-bold">{log.webglFingerprint}</div>
                   </div>
                 )}
+                {log.fontFingerprint && (
+                  <div className="bg-slate-800/60 rounded-lg px-3 py-2">
+                    <div className="text-[10px] text-slate-500 mb-0.5">Font Fingerprint</div>
+                    <div className="font-mono text-sm text-pink-300 font-bold">{log.fontFingerprint}</div>
+                  </div>
+                )}
+                {log.audioFingerprint && (
+                  <div className="bg-slate-800/60 rounded-lg px-3 py-2">
+                    <div className="text-[10px] text-slate-500 mb-0.5">Audio Fingerprint</div>
+                    <div className="font-mono text-sm text-cyan-300 font-bold">{log.audioFingerprint}</div>
+                  </div>
+                )}
+                {log.speechVoicesFingerprint && (
+                  <div className="bg-slate-800/60 rounded-lg px-3 py-2">
+                    <div className="text-[10px] text-slate-500 mb-0.5">Speech Voices FP</div>
+                    <div className="font-mono text-sm text-teal-300 font-bold">{log.speechVoicesFingerprint}</div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -365,10 +415,15 @@ const LogRow = ({ log, isExpanded, onToggle }) => {
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
               {[
                 { label: 'WebGL', val: log.webGLSupported },
+                { label: 'WebGL 2', val: log.webGL2Supported },
                 { label: 'Service Worker', val: log.serviceWorkerSupported },
                 { label: 'PDF Viewer', val: log.pdfViewerEnabled },
                 { label: 'עוגיות', val: log.cookies?.enabled },
                 { label: 'LocalStorage', val: log.localStorage?.enabled },
+                { label: 'IndexedDB', val: log.indexedDBSupported },
+                { label: 'WebAssembly', val: log.webAssemblySupported },
+                { label: 'SharedArrayBuffer', val: log.sharedArrayBufferSupported },
+                { label: 'BigInt', val: log.bigIntSupported },
               ].map(({ label, val }) => (
                 <div key={label} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold ${val === true ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : val === false ? 'bg-red-500/10 text-red-300 border border-red-500/20' : 'bg-slate-700/30 text-slate-500 border border-slate-600/20'}`}>
                   {val === true ? <Eye size={12} /> : val === false ? <EyeOff size={12} /> : <HelpCircle size={12} />}
@@ -381,7 +436,73 @@ const LogRow = ({ log, isExpanded, onToggle }) => {
                 התראות: <span className={`font-bold ${log.notificationPermission === 'granted' ? 'text-emerald-300' : log.notificationPermission === 'denied' ? 'text-red-300' : 'text-slate-300'}`}>{log.notificationPermission}</span>
               </div>
             )}
+            {log.cryptoCapabilities?.length > 0 && (
+              <div className="mt-3">
+                <div className="text-[10px] text-slate-500 mb-1">Crypto Algorithms</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {log.cryptoCapabilities.map(alg => (
+                    <span key={alg} className="px-2 py-0.5 bg-violet-500/10 text-violet-300 border border-violet-500/20 rounded text-[10px] font-mono">{alg}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {log.mediaCodecs && (
+              <div className="mt-3">
+                <div className="text-[10px] text-slate-500 mb-1">Media Codecs</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(log.mediaCodecs).map(([codec, support]) => (
+                    <span key={codec} className={`px-2 py-0.5 rounded text-[10px] font-mono border ${support === 'probably' ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' : support === 'maybe' ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/20' : 'bg-slate-700/30 text-slate-500 border-slate-600/20'}`}>
+                      {codec}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* ★ Security Intelligence */}
+          {(log.vmIndicators?.length > 0 || log.automationIndicators?.length > 0 || log.devToolsOpen != null || log.permissionStates) && (
+            <div className="mt-4 bg-gradient-to-r from-rose-500/5 to-orange-500/5 rounded-xl p-4 border border-rose-500/20">
+              <SectionHeader icon={<Shield size={14} />} title="אינטיליגנציית אבטחה" color="text-rose-400" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2.5">
+                  {log.devToolsOpen != null && (
+                    <Detail label="DevTools פתוח" value={log.devToolsOpen ? '⚠️ כן' : 'לא'} />
+                  )}
+                  {log.vmIndicators?.length > 0 && (
+                    <div>
+                      <div className="text-[11px] text-slate-500 mb-1">אינדיקטורי VM</div>
+                      <div className="flex flex-wrap gap-1">
+                        {log.vmIndicators.map(v => <span key={v} className="px-2 py-0.5 bg-orange-500/10 text-orange-300 border border-orange-500/20 rounded text-[10px] font-mono">{v}</span>)}
+                      </div>
+                    </div>
+                  )}
+                  {log.automationIndicators?.length > 0 && (
+                    <div>
+                      <div className="text-[11px] text-slate-500 mb-1">אינדיקטורי אוטומציה</div>
+                      <div className="flex flex-wrap gap-1">
+                        {log.automationIndicators.map(v => <span key={v} className="px-2 py-0.5 bg-red-500/10 text-red-300 border border-red-500/20 rounded text-[10px] font-mono">{v}</span>)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {log.permissionStates && (
+                  <div>
+                    <div className="text-[11px] text-slate-500 mb-1.5">הרשאות דפדפן</div>
+                    <div className="grid grid-cols-2 gap-1">
+                      {Object.entries(log.permissionStates).map(([perm, state]) => (
+                        <div key={perm} className="flex items-center gap-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${state === 'granted' ? 'bg-emerald-400' : state === 'denied' ? 'bg-red-400' : 'bg-slate-500'}`} />
+                          <span className="text-[10px] text-slate-400 truncate">{perm}</span>
+                          <span className={`text-[10px] font-bold ${state === 'granted' ? 'text-emerald-400' : state === 'denied' ? 'text-red-400' : 'text-slate-500'}`}>{state === 'granted' ? '✓' : state === 'denied' ? '✗' : '?'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ★ Request Info */}
           <div className="mt-4 bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
@@ -426,11 +547,12 @@ const AdminLogsPage = () => {
     const canvasFPs = new Set();
     let bots = 0, adBlock = 0, touch = 0, dark = 0, dnt = 0;
     let withGPU = 0, withBattery = 0, withSession = 0;
+    let proxies = 0, vms = 0, devtools = 0, privateMode = 0;
 
     logs.forEach(l => {
       if (l.fingerprint) fps.add(l.fingerprint);
       if (l.canvasFingerprint) canvasFPs.add(l.canvasFingerprint);
-      if (l.webdriver) bots++;
+      if (l.webdriver || l.automationIndicators?.length) bots++;
       if (l.adBlocker) adBlock++;
       if (l.isTouchDevice) touch++;
       if (l.prefersDarkMode) dark++;
@@ -438,12 +560,17 @@ const AdminLogsPage = () => {
       if (l.gpu?.renderer) withGPU++;
       if (l.battery?.level != null) withBattery++;
       if (l.session?.pageViews) withSession++;
+      if (l.location?.isProxy) proxies++;
+      if (l.vmIndicators?.length) vms++;
+      if (l.devToolsOpen) devtools++;
+      if (l.privateMode) privateMode++;
     });
 
     return {
       uniqueFingerprints: fps.size,
       uniqueCanvasFingerprints: canvasFPs.size,
       bots, adBlock, touch, dark, dnt, withGPU, withBattery, withSession,
+      proxies, vms, devtools, privateMode,
       dataQuality: Math.round((withSession / logs.length) * 100),
     };
   }, [logs]);
@@ -524,18 +651,20 @@ const AdminLogsPage = () => {
     if (!logs.length) return toast.error('אין לוגים');
 
     const headers = [
-      'Time', 'IP', 'Country', 'City', 'Region', 'Lat', 'Lon',
+      'Time', 'IP', 'Country', 'Country Code', 'City', 'Region', 'ZIP', 'Lat', 'Lon', 'ISP', 'ASN', 'Org', 'Proxy/VPN', 'Mobile Network', 'Hosting/DC',
       'Browser', 'Browser Version', 'OS', 'OS Version', 'Device', 'Platform', 'Architecture',
       'Screen W', 'Screen H', 'Avail W', 'Avail H', 'Color Depth', 'Pixel Ratio', 'Retina', 'Refresh Rate', 'Orientation',
       'CPU Cores', 'RAM (GB)', 'GPU Vendor', 'GPU Renderer', 'Touch Points',
-      'Battery %', 'Charging',
+      'Battery %', 'Charging', 'Battery Charging Time (s)', 'Battery Discharging Time (s)',
       'Connection', 'RTT (ms)', 'Downlink (Mbps)', 'Save Data',
-      'Cookies', 'Cookie Count', 'LocalStorage',
-      'Language', 'Languages', 'Timezone',
-      'Dark Mode', 'Touch', 'DNT', 'Reduced Motion', 'Online',
-      'Ad Blocker', 'Bot/Webdriver', 'PDF Viewer', 'Plugins',
-      'WebGL', 'Service Worker', 'Notifications',
-      'Fingerprint', 'Canvas FP', 'WebGL FP',
+      'Local IPs (WebRTC)',
+      'Cookies', 'Cookie Count', 'LocalStorage', 'Storage Quota (MB)', 'Storage Used (MB)', 'Private Mode',
+      'Language', 'Languages', 'Timezone', 'Keyboard Layout',
+      'Dark Mode', 'High Contrast', 'Touch', 'DNT', 'Reduced Motion', 'Online',
+      'Ad Blocker', 'Bot/Webdriver', 'Automation Indicators', 'DevTools Open', 'VM Indicators', 'PDF Viewer', 'Plugins', 'Gamepad',
+      'WebGL', 'WebGL2', 'Service Worker', 'IndexedDB', 'WebAssembly', 'SharedArrayBuffer', 'BigInt', 'Notifications', 'Crypto Algorithms',
+      'Fingerprint', 'Canvas FP', 'WebGL FP', 'Font FP', 'Audio FP', 'Speech Voices FP',
+      'Screen Refresh Rate (measured)',
       'Session Pages', 'Session Duration (s)', 'New Session',
       'Cameras', 'Microphones', 'Speakers',
       'Page', 'Method', 'Status', 'Response (ms)',
@@ -550,8 +679,10 @@ const AdminLogsPage = () => {
       const row = [
         new Date(l.timestamp).toLocaleString('he-IL'),
         l.ipAddress,
-        l.location?.country || '', l.location?.city || '', l.location?.region || '',
-        l.location?.latitude || '', l.location?.longitude || '',
+        l.location?.country || '', l.location?.countryCode || '', l.location?.city || '', l.location?.region || '',
+        l.location?.zip || '', l.location?.latitude || '', l.location?.longitude || '',
+        l.location?.isp || '', l.location?.asn || '', l.location?.org || '',
+        ynCSV(l.location?.isProxy), ynCSV(l.location?.isMobile), ynCSV(l.location?.isHosting),
         l.browser?.name || '', l.browser?.version || '',
         l.os?.name || '', l.os?.version || '', l.device || '', l.platform || '', l.os?.architecture || '',
         l.screen?.width || '', l.screen?.height || '', l.screen?.availWidth || '', l.screen?.availHeight || '',
@@ -560,14 +691,25 @@ const AdminLogsPage = () => {
         l.processor?.cores || l.hardwareConcurrency || '', l.deviceMemory || '',
         l.gpu?.vendor || '', l.gpu?.renderer || '', l.processor?.maxTouchPoints ?? '',
         l.battery?.level != null ? l.battery.level : '', ynCSV(l.battery?.charging),
+        l.battery?.chargingTime ?? '', l.battery?.dischargingTime ?? '',
         l.connection?.effectiveType || '', l.connection?.rtt ?? '', l.connection?.downlink ?? '', ynCSV(l.connection?.saveData),
+        (l.localIPs || []).join('; '),
         ynCSV(l.cookies?.enabled), l.cookies?.count ?? '', ynCSV(l.localStorage?.enabled),
-        l.userLanguage || '', (l.languages || []).join('; '), l.timezone || '',
-        ynCSV(l.prefersDarkMode), ynCSV(l.isTouchDevice), ynCSV(l.doNotTrack),
+        l.storageQuota?.quotaMB ?? '', l.storageQuota?.usedMB ?? '', ynCSV(l.privateMode),
+        l.userLanguage || '', (l.languages || []).join('; '), l.timezone || '', l.keyboardLayout || '',
+        ynCSV(l.prefersDarkMode), ynCSV(l.prefersHighContrast), ynCSV(l.isTouchDevice), ynCSV(l.doNotTrack),
         ynCSV(l.prefersReducedMotion), ynCSV(l.isOnline),
-        ynCSV(l.adBlocker), ynCSV(l.webdriver), ynCSV(l.pdfViewerEnabled), l.pluginsCount ?? '',
-        ynCSV(l.webGLSupported), ynCSV(l.serviceWorkerSupported), l.notificationPermission || '',
+        ynCSV(l.adBlocker), ynCSV(l.webdriver),
+        (l.automationIndicators || []).join('; '), ynCSV(l.devToolsOpen),
+        (l.vmIndicators || []).join('; '),
+        ynCSV(l.pdfViewerEnabled), l.pluginsCount ?? '', ynCSV(l.hasGamepad),
+        ynCSV(l.webGLSupported), ynCSV(l.webGL2Supported), ynCSV(l.serviceWorkerSupported),
+        ynCSV(l.indexedDBSupported), ynCSV(l.webAssemblySupported),
+        ynCSV(l.sharedArrayBufferSupported), ynCSV(l.bigIntSupported),
+        l.notificationPermission || '', (l.cryptoCapabilities || []).join('; '),
         l.fingerprint || '', l.canvasFingerprint || '', l.webglFingerprint || '',
+        l.fontFingerprint || '', l.audioFingerprint || '', l.speechVoicesFingerprint || '',
+        l.screenRefreshRate ?? '',
         l.session?.pageViews ?? '', l.session?.durationSeconds ?? '', ynCSV(l.session?.isNewSession),
         l.mediaDevices?.cameras ?? '', l.mediaDevices?.microphones ?? '', l.mediaDevices?.speakers ?? '',
         l.page || '', l.method || '', l.statusCode || '', l.responseTime || '',
@@ -711,12 +853,16 @@ const AdminLogsPage = () => {
                   <BarChart3 size={16} className="text-amber-400" />
                   <span className="text-sm font-bold text-slate-300">סטטיסטיקות זיהוי — מתוך {logs.length} ביקורים</span>
                 </div>
-                <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-7 gap-2">
                   {[
                     { label: 'טביעות', val: computedStats.uniqueFingerprints, icon: <Fingerprint size={12} />, clr: 'text-indigo-300' },
                     { label: 'Canvas FP', val: computedStats.uniqueCanvasFingerprints, icon: <Hash size={12} />, clr: 'text-purple-300' },
                     { label: 'בוטים', val: computedStats.bots, icon: <Bot size={12} />, clr: 'text-orange-300' },
                     { label: 'AdBlock', val: computedStats.adBlock, icon: <Shield size={12} />, clr: 'text-red-300' },
+                    { label: 'Proxy/VPN', val: computedStats.proxies, icon: <Globe size={12} />, clr: 'text-rose-300' },
+                    { label: 'VM', val: computedStats.vms, icon: <Monitor size={12} />, clr: 'text-orange-300' },
+                    { label: 'DevTools', val: computedStats.devtools, icon: <Zap size={12} />, clr: 'text-yellow-300' },
+                    { label: 'מצב פרטי', val: computedStats.privateMode, icon: <EyeOff size={12} />, clr: 'text-slate-300' },
                     { label: 'מסך מגע', val: computedStats.touch, icon: <MousePointer size={12} />, clr: 'text-purple-300' },
                     { label: 'מצב כהה', val: computedStats.dark, icon: <Moon size={12} />, clr: 'text-slate-300' },
                     { label: 'DNT', val: computedStats.dnt, icon: <Shield size={12} />, clr: 'text-rose-300' },

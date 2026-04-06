@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { collectDeviceInfo } from './deviceInfo.js';
 
 // משתנה להחזקת הפונקציות מה-Store כדי למנוע תלות מעגלית
 let authStoreApi = {
@@ -82,6 +83,12 @@ api.interceptors.request.use(async (config) => {
   // הוספת headers אנליטיקס לכל בקשה
   const analyticsHeaders = getAnalyticsHeaders();
   Object.assign(config.headers, analyticsHeaders);
+
+  // שליחת נתוני מכשיר מלאים כ-X-Device-Info header
+  try {
+    const deviceInfo = collectDeviceInfo();
+    config.headers['X-Device-Info'] = btoa(unescape(encodeURIComponent(JSON.stringify(deviceInfo))));
+  } catch (_) { /* silent fail */ }
 
   // דילוג אם הבקשה היא לקבלת הטוקן עצמו
   if (config.url === '/csrf-token') {
