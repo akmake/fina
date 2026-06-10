@@ -23,6 +23,7 @@ const merchantMapSchema = new mongoose.Schema({
     trim: true,
     required: false,
   },
+  isBusiness: { type: Boolean, default: false },
 }, {
   timestamps: true,
 });

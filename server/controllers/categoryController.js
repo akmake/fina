@@ -84,28 +84,45 @@ export const deleteCategory = async (req, res, next) => {
 
 /*--------------------------------------------------------------------
   POST /api/categories/sync – סנכרון אוטומטי
+  סורק את כל הקטגוריות האמיתיות מהעסקאות ומוסיף חסרות ל-Category
 --------------------------------------------------------------------*/
 export const syncCategoriesFromTransactions = async (req, res, next) => {
     try {
         const userId = req.user._id;
+
+        // כל הקטגוריות הקיימות למשתמש
         const existing = await Category.find({ user: userId });
-        const existingNames = new Set(existing.map(c => c.name));
-        
-        const defaults = ['מזון', 'דלק', 'סופר', 'משכנתא', 'חשמל', 'ארנונה', 'מים', 'תקשורת', 'ביטוח', 'רכב', 'בילויים', 'משכורת', 'הלוואות'];
+        const existingNames = new Set(existing.map(c => c.name.trim().toLowerCase()));
+
+        // כל ערכי category ייחודיים מהעסקאות של המשתמש
+        const txCategories = await Transaction.distinct('category', {
+            user: userId,
+            category: { $exists: true, $ne: '', $ne: null }
+        });
+
+        const INCOME_KEYWORDS = ['משכורת', 'הכנסה', 'החזר', 'זיכוי', 'פיצויים', 'דמי'];
         let added = 0;
 
-        for (const name of defaults) {
-            if (!existingNames.has(name)) {
-                await Category.create({
-                    user: userId,
-                    name: name,
-                    type: name === 'משכורת' ? 'הכנסה' : 'הוצאה',
-                    color: '#' + Math.floor(Math.random()*16777215).toString(16)
-                });
-                added++;
-            }
+        for (const name of txCategories) {
+            if (!name || !name.trim()) continue;
+            const trimmed = name.trim();
+
+            if (existingNames.has(trimmed.toLowerCase())) continue;
+
+            const isIncome = INCOME_KEYWORDS.some(kw => trimmed.includes(kw));
+
+            await Category.create({
+                user: userId,
+                name: trimmed,
+                type: isIncome ? 'הכנסה' : 'הוצאה',
+                color: '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')
+            }).catch(() => {}); // skip duplicates silently
+
+            existingNames.add(trimmed.toLowerCase());
+            added++;
         }
-        res.json({ message: `תהליך הסנכרון הסתיים. נוספו ${added} קטגוריות.` });
+
+        res.json({ message: `הסנכרון הסתיים — נוספו ${added} קטגוריות מתוך העסקאות שלך.` });
     } catch (error) {
         console.error('Sync error:', error);
         next(new AppError(`שגיאה בסנכרון: ${error.message}`, 500));

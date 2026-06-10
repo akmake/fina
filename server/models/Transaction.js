@@ -66,6 +66,8 @@ const transactionSchema = new mongoose.Schema({
   scraperCategory: { type: String }, // קטגוריה מהאתר (לא הקטגוריה הפנימית שלנו)
   memo: { type: String },
   cardNumber: { type: String },
+  isBusiness: { type: Boolean, default: false },
+  businessNote: { type: String, default: '' },
 }, {
   timestamps: true,
 });

@@ -44,6 +44,7 @@ import calRoutes from './routes/calRoutes.js';
 import maaserRoutes from './routes/maaserRoutes.js';
 import familyRoutes from './routes/familyRoutes.js';
 import adminUsersRoutes from './routes/adminUsers.js';
+import businessRoutes from './routes/businessRoutes.js';
 
 // ייבוא מידלוור
 import rateLimiter from './middlewares/rateLimiter.js';
@@ -110,7 +111,7 @@ app.use(cors({
     }
   },
   credentials: true, // חובה להעברת עוגיות
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-XSRF-Token', 'X-Fina-Client',
     'X-Screen-Width', 'X-Screen-Height', 'X-Color-Depth', 'X-HW-Cores', 'X-HW-Memory',
     'X-Connection-Type', 'X-Connection-Downlink', 'X-Connection-RTT', 'X-Session-Id', 'X-Device-Info'],
@@ -175,6 +176,7 @@ app.use('/api/scrape',  requireAuth, scraperRoutes);
 app.use('/api/cal',   calRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/admin/users', adminUsersRoutes);
+app.use('/api/business',    requireAuth, familyScope, businessRoutes);
 
 // --- טיפול בשגיאות ---
 
