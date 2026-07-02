@@ -25,6 +25,7 @@
 | [docs/contracts.md](docs/contracts.md) | conventions, response formats, naming, patterns |
 | [docs/sync-map.md](docs/sync-map.md) | which files change together |
 | [docs/known-unknowns.md](docs/known-unknowns.md) | open questions, unclear logic |
+| [docs/product-spec-v2.md](docs/product-spec-v2.md) | v2 product re-spec: SaaS direction, roles, modules, build order |
 | [docs/modules/](docs/modules/) | per-module deep-dives |
 
 ---
