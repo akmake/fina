@@ -3,6 +3,7 @@ import Budget from '../models/Budget.js';
 import Transaction from '../models/Transaction.js';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { scopeFilter } from '../utils/scopeFilter.js';
+import { audit } from '../utils/audit.js';
 
 // ──────────────────────────────────────────────────
 // חישוב הוצאות בפועל מתוך עסקאות
@@ -124,8 +125,12 @@ export const upsertBudget = async (req, res) => {
 // ──────────────────────────────────────────────────
 export const deleteBudget = async (req, res) => {
   try {
-    const budget = await Budget.findOneAndDelete({ _id: req.params.id, user: req.user._id });
+    const budget = await Budget.softDeleteOne({ _id: req.params.id, user: req.user._id });
     if (!budget) return res.status(404).json({ message: 'תקציב לא נמצא' });
+    await audit(req, 'budget.delete', 'Budget', {
+      entityId: budget._id,
+      before: { month: budget.month, year: budget.year, totalLimit: budget.totalLimit },
+    });
     res.json({ message: 'התקציב נמחק בהצלחה' });
   } catch (error) {
     console.error('Error deleting budget:', error);

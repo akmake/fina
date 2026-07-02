@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import softDelete from '../utils/softDelete.js';
 
 const transactionSchema = new mongoose.Schema({
   user: {
@@ -72,8 +73,14 @@ const transactionSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+transactionSchema.plugin(softDelete);
+
 // אינדקס למניעת כפילויות — כולל processedDate כדי לא לחסום תשלומים שונים של אותה עסקה
-transactionSchema.index({ user: 1, date: 1, description: 1, amount: 1, type: 1, processedDate: 1 }, { unique: true });
+// חלקי: עסקה שנמחקה (soft delete) לא חוסמת יצירה מחדש של עסקה זהה
+transactionSchema.index(
+  { user: 1, date: 1, description: 1, amount: 1, type: 1, processedDate: 1 },
+  { unique: true, partialFilterExpression: { deletedAt: null } }
+);
 
 // Additional indexes for common queries
 transactionSchema.index({ user: 1, date: -1 }); // For user transactions sorted by date

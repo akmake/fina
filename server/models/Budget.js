@@ -1,5 +1,6 @@
 // server/models/Budget.js
 import mongoose from 'mongoose';
+import softDelete from '../utils/softDelete.js';
 
 // פריט תקציב בודד – כל קטגוריה עם סכום מותר
 const budgetItemSchema = new mongoose.Schema({
@@ -36,8 +37,13 @@ const budgetSchema = new mongoose.Schema({
   toObject: { virtuals: true },
 });
 
-// מניעת כפילויות – תקציב אחד לכל חודש/שנה למשתמש
-budgetSchema.index({ user: 1, month: 1, year: 1 }, { unique: true });
+budgetSchema.plugin(softDelete);
+
+// מניעת כפילויות – תקציב אחד לכל חודש/שנה למשתמש (מחוק-רך לא חוסם יצירה מחדש)
+budgetSchema.index(
+  { user: 1, month: 1, year: 1 },
+  { unique: true, partialFilterExpression: { deletedAt: null } }
+);
 
 // וירטואלים
 budgetSchema.virtual('percentUsed').get(function() {

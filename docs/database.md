@@ -1,4 +1,4 @@
-> Last updated: 2026-03-12
+> Last updated: 2026-07-03
 
 # Database
 
@@ -80,6 +80,7 @@ Located in `server/models/`.
 | `DataRecordModel` | `DataRecordModel.js` | Generic data records (flexible schema) |
 | `Suggestion` | `Suggestion.js` | `user`, `type`, `content`, `isRead`, `createdAt` |
 | `ElectricalProject` | `ElectricalProject.js` | `user`, `name`, `canvasData` (Fabric.js JSON), `components[]`, `createdAt` |
+| `AuditLog` | `AuditLog.js` | `actor`, `action`, `entity`, `entityId`, `before`, `after`, `ip`, `at` — append-only, נכתב דרך `utils/audit.js` |
 
 ---
 
@@ -125,9 +126,24 @@ All documents include `user` field (ObjectId ref to User) for tenant isolation. 
 
 ---
 
+## Soft Delete
+
+Business entities use the `softDelete` plugin (`server/utils/softDelete.js`):
+**Transaction, Budget, Goal, Loan, Account**.
+
+- Adds `deletedAt` (default `null`); all `find`/`count`/`aggregate` queries auto-filter deleted docs
+- Delete endpoints call `Model.softDeleteOne(filter)` / `softDeleteMany(filter)` instead of hard delete
+- Access deleted docs with `.withDeleted()` query helper; restore with `Model.restoreOne(filter)`
+- Unique indexes on Transaction and Budget are **partial** (`partialFilterExpression: { deletedAt: null }`) so a soft-deleted doc doesn't block re-creation
+- `server.js` runs `syncIndexes()` for Transaction + Budget on startup to migrate the old unique indexes
+
+Hard-deleted still: User (admin action, audited), Log cleanup, MerchantMap/CategoryRule management.
+
+---
+
 ## Known Issues / Pitfalls
 
 - Database name is `corse` (historical name — not `fina` or `finance`)
-- `bcrypt` and `bcryptjs` are both in `package.json` — server uses `bcrypt` (native); client never hashes passwords
-- No soft-delete pattern — documents are hard-deleted; no `deletedAt` field exists
+- Passwords hashed with `bcrypt` (native) on the server; `bcryptjs` was removed from dependencies
 - `DataRecordModel` has a flexible schema — unknown exactly what data types are stored there (requires clarification)
+- `centerModel.js` and the orphan store-era routes (`adminCenters`, `adminOrders`, `cartRoutes`) were deleted in Phase 0 cleanup

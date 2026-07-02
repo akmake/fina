@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import softDelete from '../utils/softDelete.js';
 
 const loanSchema = new mongoose.Schema(
   {
@@ -44,5 +45,7 @@ const loanSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+loanSchema.plugin(softDelete);
 
 export default mongoose.model('Loan', loanSchema);

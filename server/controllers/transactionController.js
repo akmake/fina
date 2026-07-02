@@ -3,6 +3,7 @@ import Transaction from '../models/Transaction.js';
 import FinanceProfile from '../models/FinanceProfile.js';
 import MerchantMap from '../models/MerchantMap.js';
 import { scopeFilter } from '../utils/scopeFilter.js';
+import { audit } from '../utils/audit.js';
 
 // --- פונקציית עזר לתרגום סוגים ---
 const normalizeType = (type) => {
@@ -172,7 +173,7 @@ export const deleteTransaction = async (req, res) => {
       const session = await mongoose.startSession();
       session.startTransaction();
       try {
-        await Transaction.deleteOne({ _id: id }, { session });
+        await Transaction.updateOne({ _id: id }, { deletedAt: new Date() }, { session });
         await FinanceProfile.updateOne(
           { user: req.user._id },
           { $inc: { [account]: reverseAmount } },
@@ -186,13 +187,17 @@ export const deleteTransaction = async (req, res) => {
         throw err;
       }
     } else {
-      await Transaction.deleteOne({ _id: id });
+      await Transaction.softDeleteOne({ _id: id });
       await FinanceProfile.updateOne(
         { user: req.user._id },
         { $inc: { [account]: reverseAmount } }
       );
     }
 
+    await audit(req, 'transaction.delete', 'Transaction', {
+      entityId: transaction._id,
+      before: { amount: transaction.amount, date: transaction.date, description: transaction.description },
+    });
     res.json({ message: 'העסקה נמחקה בהצלחה' });
   } catch (error) {
     console.error('Delete transaction error:', error);
@@ -410,11 +415,14 @@ export const updateTransaction = async (req, res) => {
 // @route  DELETE /api/transactions/all
 export const deleteAllTransactions = async (req, res) => {
   try {
-    await Transaction.deleteMany({ user: req.user._id });
+    const result = await Transaction.softDeleteMany({ user: req.user._id });
     await FinanceProfile.updateOne(
       { user: req.user._id },
       { $set: { checking: 0, cash: 0 } }
     );
+    await audit(req, 'transaction.deleteAll', 'Transaction', {
+      before: { count: result.modifiedCount },
+    });
     res.json({ message: 'כל העסקאות נמחקו בהצלחה' });
   } catch (error) {
     console.error('Delete all transactions error:', error);

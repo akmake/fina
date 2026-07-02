@@ -1,4 +1,4 @@
-> Last updated: 2026-03-12
+> Last updated: 2026-07-03
 
 # Auth Flow
 
@@ -154,7 +154,10 @@ POST /api/auth/logout
 
 ## Known Issues / Pitfalls
 
-- `JWT_ACCESS_SECRET` defaults to placeholder string `"your-super-secret-access-key-change-it-now"` — **must change in production**
-- Bank scraper routes (`/api/scrape`, `/api/cal`) are intentionally **unauthenticated** — they rely on credentials in the request body
+- JWT secrets have **no defaults** — `server/server.js` refuses to start if `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` are missing, and in production also rejects placeholder-looking or short (<32 chars) values
+- Bank scraper routes (`/api/scrape`, `/api/cal`, `/api/import`) **require auth** (jwt cookie + CSRF header) and are rate limited (`scrapeLimiter`, 10/hour prod)
+- `/api/auth/*` is rate limited (`authLimiter`, 20/15min prod) against brute-force
+- `role` is **never accepted from the register request body** — first admin is created with `server/createAdmin.js` only
+- Two `requireAuth` implementations exist: `middlewares/authMiddleware.js` (JWT-only, sets `{id,_id,role}` — used in `app.js` mounts) and `middlewares/requireAuth.js` (DB lookup, full user doc — used inside `calRoutes.js`/`transactionRoutes.js`). Consolidation planned for Phase 1 (Household)
 - Google Client ID must match between `server/.env` and `client/.env` — mismatch causes silent OAuth failure
 - Token refresh uses a queue to prevent race conditions when multiple requests 401 simultaneously

@@ -58,8 +58,8 @@
 - Default route `/` redirects to `/finance-dashboard`
 - Unauthenticated users are redirected to `/login` via `<ProtectedRoute>`
 - Admin-only routes are guarded by `requireAdmin` middleware on the server
-- Server public routes (no auth): `/api/auth/*`, `/api/import`, `/api/scrape`, `/api/health`, `/api/csrf-token`
-- Server protected routes: everything else requires `requireAuth` middleware
+- Server public routes (no auth): `/api/auth/*` (rate limited), `/api/health`, `/api/csrf-token`, `/api/logs/device-ping` (rate limited)
+- Server protected routes: everything else requires `requireAuth` — including `/api/scrape`, `/api/cal`, `/api/import` (also `scrapeLimiter`)
 - CSRF protection is active on all **mutating** requests (POST/PUT/DELETE) — header `X-Fina-Client: web-app` must be present
 
 ---
@@ -76,8 +76,11 @@
 
 ## Known Pitfalls
 
-- `bcrypt` and `bcryptjs` are both listed as dependencies — use `bcrypt` on the server (native binding)
-- Bank scraping routes (`/api/scrape`, `/api/cal`) are **public** (no auth) — they rely on user-provided credentials in the request body
-- `JWT_ACCESS_SECRET` defaults to a placeholder string — must be changed in production
+- Server entry point is `server/server.js` (env validation + DB connect); `server/app.js` only assembles the Express app (exported for tests)
+- Bank scraping routes (`/api/scrape`, `/api/cal`, `/api/import`) require auth + are rate limited — do NOT make them public again
+- JWT secrets have no defaults — the server refuses to start without them (and rejects placeholders in production)
+- Transaction/Budget/Goal/Loan/Account use **soft delete** (`deletedAt`, `server/utils/softDelete.js`) — never hard-delete these; unique indexes are partial (`deletedAt: null`)
+- Sensitive actions (deletes, role changes) must call `audit()` from `server/utils/audit.js`
 - Vite proxy in `vite.config.js` forwards `/api` to `localhost:4000` in dev — production needs a reverse proxy
 - The database name is `corse` (not `fina` or `finance`)
+- Run server tests with `npm test` inside `server/` (Vitest + Supertest + in-memory Mongo)

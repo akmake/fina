@@ -88,7 +88,7 @@ export const googleAuth = async (req, res) => {
 
 export const registerUser = async (req, res) => {
   try {
-    let { name, email, password, role } = req.body;
+    let { name, email, password } = req.body;
 
     if (!name || !email || !password)
       return res.status(400).json({ message: 'שם, אימייל וסיסמה הם שדות חובה' });
@@ -100,9 +100,9 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'משתמש עם אימייל זה כבר קיים' });
 
     const hash = await bcrypt.hash(password, 12);
-    const finalRole = role === 'admin' ? 'admin' : 'user';
 
-    const user = await User.create({ name, email, passwordHash: hash, role: finalRole });
+    // role לעולם לא מגיע מהלקוח — אדמין ראשון נוצר עם createAdmin.js בלבד
+    const user = await User.create({ name, email, passwordHash: hash, role: 'user' });
 
     createAndSendTokens(user, res);
     const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role };

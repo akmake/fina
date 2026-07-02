@@ -1,4 +1,4 @@
-> Last updated: 2026-03-12
+> Last updated: 2026-07-03
 
 # Architecture
 
@@ -21,15 +21,14 @@ server (Express) :4000
         ├── PUBLIC routes (no auth, no CSRF):
         │     /api/health
         │     /api/csrf-token
-        │     /api/auth/*
-        │     /api/import
-        │     /api/scrape
-        │     /api/cal
+        │     /api/auth/*            (rate limited — 20/15min prod)
+        │     /api/logs/device-ping  (rate limited — public by design)
         │
         ├── CSRF middleware (X-Fina-Client: web-app header check)
         │
         └── PROTECTED routes (requireAuth + CSRF):
               all other /api/* routes
+              /api/scrape, /api/cal, /api/import — also scrapeLimiter (10/hour prod)
                     │
                     ▼
               MongoDB Atlas (database: corse)
@@ -60,13 +59,15 @@ fina/
 │   ├── .env              # VITE_* variables
 │   └── vite.config.js    # Vite + PWA config, /api proxy
 └── server/
-    ├── app.js            # Express app entry
-    ├── routes/           # Route handlers (46 files)
-    ├── controllers/      # Business logic (37 files)
-    ├── models/           # Mongoose schemas (30 files)
-    ├── middlewares/      # Auth, CSRF, rate limit, logging
-    ├── config/           # db.js, routes.js
-    ├── utils/            # Helper functions (14 files)
+    ├── server.js         # Entry point: env validation, DB connect, listen
+    ├── app.js            # Express app assembly (middleware + routes, no listen)
+    ├── routes/           # Route handlers
+    ├── controllers/      # Business logic
+    ├── models/           # Mongoose schemas (incl. AuditLog)
+    ├── middlewares/      # Auth, CSRF, rate limiters, logging
+    ├── config/           # db.js
+    ├── utils/            # Helpers (incl. softDelete plugin, audit)
+    ├── tests/            # Vitest + Supertest (npm test)
     └── .env              # Server secrets
 ```
 
@@ -105,10 +106,13 @@ fina/
 | Layer | Mechanism | File |
 |-------|-----------|------|
 | Transport | HTTPS (prod) / HTTP (dev) | Infrastructure |
+| Env validation | Fail-fast on missing/placeholder `MONGO_URI` + JWT secrets | `server/server.js` |
 | CORS | Origin whitelist via `CLIENT_URL` | `server/app.js` |
 | CSRF | Custom header `X-Fina-Client: web-app` | `server/middlewares/csrf.js` |
 | Auth | JWT in httpOnly cookies | `server/middlewares/authMiddleware.js` |
-| Rate limiting | express-rate-limit | `server/middlewares/rateLimiter.js` |
+| Rate limiting | `publicLimiter` (100/10min), `authLimiter` (20/15min), `scrapeLimiter` (10/hour) — prod only | `server/middlewares/rateLimiter.js` |
+| Audit log | Append-only `AuditLog` for deletes + role changes | `server/models/AuditLog.js`, `server/utils/audit.js` |
+| Soft delete | `deletedAt` on Transaction/Budget/Goal/Loan/Account | `server/utils/softDelete.js` |
 | Input sanitization | express-mongo-sanitize (NoSQL injection) | `server/app.js` |
 | Security headers | Helmet | `server/app.js` |
 | Admin access | `requireAdmin` role check | `server/middlewares/requireAdmin.js` |
@@ -120,7 +124,9 @@ fina/
 
 | File | Purpose |
 |------|---------|
-| `server/app.js` | Middleware stack + route mounting |
+| `server/server.js` | Entry point — env validation, DB connect + index sync, listen |
+| `server/app.js` | Middleware stack + route mounting (exported for tests) |
+| `server/vitest.config.js` | Test config (in-memory MongoDB, scraper stub) |
 | `server/config/db.js` | MongoDB connection setup |
 | `client/vite.config.js` | Vite build, PWA, `/api` proxy |
 | `client/src/utils/api.js` | Axios instance + interceptors (auth refresh, CSRF) |

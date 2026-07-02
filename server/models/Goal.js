@@ -1,5 +1,6 @@
 // server/models/Goal.js
 import mongoose from 'mongoose';
+import softDelete from '../utils/softDelete.js';
 
 const milestoneSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
@@ -89,6 +90,8 @@ goalSchema.virtual('isOnTrack').get(function () {
   const neededMonthlyRate = this.remaining / monthsLeft;
   return this.monthlyContribution >= neededMonthlyRate;
 });
+
+goalSchema.plugin(softDelete);
 
 goalSchema.index({ user: 1, status: 1 });
 goalSchema.index({ user: 1, category: 1 });

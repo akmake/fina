@@ -1,5 +1,6 @@
 import express from 'express';
 import { requireAuth, requireAdmin } from '../middlewares/authMiddleware.js';
+import { publicLimiter } from '../middlewares/rateLimiter.js';
 import {
   getAllLogs,
   getLogsSummary,
@@ -15,7 +16,8 @@ import {
 const router = express.Router();
 
 // ★ Device ping — client sends device info once, stored in server cache
-router.post('/device-ping', receiveDevicePing);
+// ציבורי בכוונה (נשלח גם לפני login) — לכן מוגבל בקצב
+router.post('/device-ping', publicLimiter, receiveDevicePing);
 
 // ★ Toggle + Status — שליטה על הלוגים
 router.post('/admin/toggle', requireAuth, requireAdmin, toggleLogging);

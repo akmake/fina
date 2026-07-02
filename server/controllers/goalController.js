@@ -1,6 +1,7 @@
 // server/controllers/goalController.js
 import Goal from '../models/Goal.js';
 import { scopeFilter } from '../utils/scopeFilter.js';
+import { audit } from '../utils/audit.js';
 
 const CATEGORY_LABELS = {
   home_purchase: 'קניית דירה',
@@ -129,8 +130,12 @@ export const depositToGoal = async (req, res) => {
 // DELETE /api/goals/:id
 export const deleteGoal = async (req, res) => {
   try {
-    const goal = await Goal.findOneAndDelete({ _id: req.params.id, user: req.user._id });
+    const goal = await Goal.softDeleteOne({ _id: req.params.id, user: req.user._id });
     if (!goal) return res.status(404).json({ message: 'יעד לא נמצא' });
+    await audit(req, 'goal.delete', 'Goal', {
+      entityId: goal._id,
+      before: { name: goal.name, targetAmount: goal.targetAmount, currentAmount: goal.currentAmount },
+    });
     res.json({ message: 'יעד נמחק' });
   } catch (error) {
     console.error('Error deleting goal:', error);

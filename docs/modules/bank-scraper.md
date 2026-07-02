@@ -6,7 +6,8 @@
 
 Automated bank data import using the `israeli-bank-scrapers` npm package.
 Allows users to connect their Israeli bank accounts and automatically import transactions.
-These routes are intentionally **public** (no JWT required) since they use user-provided bank credentials.
+Since Phase 0 hardening (2026-07) these routes **require auth** (jwt cookie + CSRF header)
+and are rate limited via `scrapeLimiter` (10/hour in production).
 
 ## User Flow
 
@@ -40,9 +41,9 @@ Excel import:
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/scrape` | **None** | Bank scraping with user credentials |
-| POST | `/api/cal` | **None** | CAL bank direct import |
-| POST | `/api/import` | **None** | Excel/XLSX file import |
+| POST | `/api/scrape` | **JWT + CSRF + scrapeLimiter** | Bank scraping with user credentials |
+| POST | `/api/cal/*` | **JWT + CSRF + scrapeLimiter** | CAL bank direct import (OTP flow) |
+| POST | `/api/import` | **JWT + CSRF + scrapeLimiter** | Excel/XLSX file import |
 
 ## Request Format (Scraper)
 
@@ -92,7 +93,8 @@ See [docs/database.md](../database.md) for full schema reference.
 
 ## Coupling Warnings (narrative)
 
-- These routes are **public by design** — do NOT add `requireAuth` without changing the client to send credentials+auth together
+- These routes require auth — the client is already inside `ProtectedRoute` and Axios sends the cookie + CSRF header automatically
+- In tests, `israeli-bank-scrapers` is stubbed (`server/tests/stubs/israeli-bank-scrapers.js`) — the real package pulls puppeteer and breaks Vitest resolution
 - The `identifier` field on `Transaction` is used for deduplication — scrapers return this from the bank
 - Changing `MerchantMap` or `CategoryRule` schemas affects the categorization pipeline
 - `israeli-bank-scrapers` library updates may break existing bank integrations — version-pin carefully

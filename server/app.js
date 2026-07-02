@@ -1,10 +1,11 @@
+// הרכבת אפליקציית Express בלבד — חיבור DB והאזנה לפורט נמצאים ב-server.js
+// (ההפרדה מאפשרת לטעון את האפליקציה בבדיקות בלי שרת חי)
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import mongoSanitize from 'express-mongo-sanitize';
-import mongoose from 'mongoose';
 
 // ייבוא נתיבים
 import authRoutes from './routes/auth.js';
@@ -47,30 +48,13 @@ import adminUsersRoutes from './routes/adminUsers.js';
 import businessRoutes from './routes/businessRoutes.js';
 
 // ייבוא מידלוור
-import rateLimiter from './middlewares/rateLimiter.js';
+import rateLimiter, { authLimiter, scrapeLimiter } from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
 import { requestLogger, errorHandler } from './middlewares/errorHandler.js';
 import { csrfTokenHandler, csrfProtection } from './middlewares/csrf.js';
 import { familyScope } from './middlewares/familyScope.js';
 import logger from './utils/logger.js';
 import loggingMiddleware from './middlewares/loggingMiddleware.js';
-
-// חיבור למסד הנתונים
-const connectDB = async () => {
-  try {
-    const conn = await mongoose.connect(process.env.MONGO_URI);
-    logger.info(`MongoDB Connected: ${conn.connection.host}`);
-
-    // Sync indexes (drops old unique index, creates new one with processedDate)
-    const Transaction = (await import('./models/Transaction.js')).default;
-    await Transaction.syncIndexes();
-  } catch (error) {
-    logger.error(`MongoDB Connection Error: ${error.message}`);
-    process.exit(1);
-  }
-};
-// הפעלת החיבור
-await connectDB();
 
 const app = express();
 
@@ -132,7 +116,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // --- נתיבים ציבוריים (ללא CSRF) ---
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 
 // --- Endpoint לקבלת ה-CSRF Token ---
 app.get('/api/csrf-token', rateLimiter, csrfTokenHandler);
@@ -171,9 +155,9 @@ app.use('/api/child-savings',   requireAuth, familyScope, childSavingsRoutes);
 app.use('/api/foreign-currency',requireAuth, familyScope, foreignCurrencyRoutes);
 app.use('/api/reports',         requireAuth, familyScope, reportRoutes);
 app.use('/api/maaser',          requireAuth, familyScope, maaserRoutes);
-app.use('/api/import',  requireAuth, importRoutes);
-app.use('/api/scrape',  requireAuth, scraperRoutes);
-app.use('/api/cal',   calRoutes);
+app.use('/api/import',  requireAuth, scrapeLimiter, importRoutes);
+app.use('/api/scrape',  requireAuth, scrapeLimiter, scraperRoutes);
+app.use('/api/cal',     scrapeLimiter, calRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/admin/users', adminUsersRoutes);
 app.use('/api/business',    requireAuth, familyScope, businessRoutes);
@@ -188,8 +172,5 @@ app.use('*', (req, res) => {
 
 // טיפול שגיאות גלובלי
 app.use(errorHandler);
-
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
 
 export default app;

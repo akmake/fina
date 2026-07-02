@@ -1,4 +1,4 @@
-> Last updated: 2026-03-12
+> Last updated: 2026-07-03
 
 # API Reference
 
@@ -21,9 +21,26 @@ All protected routes require:
 | POST | `/auth/google` | Google OAuth `{ credential: id_token }` |
 | POST | `/auth/logout` | Clears JWT cookies |
 | POST | `/auth/refresh` | Refresh access token using refresh cookie |
-| POST | `/import` | Import data (file upload, no auth) |
+| POST | `/logs/device-ping` | Device analytics ping (public by design — sent before login; rate limited) |
+
+> `/auth/*` routes are rate limited (20 requests / 15 min in production) to block brute-force.
+
+---
+
+## Bank Import Routes (Auth Required + Scrape Rate Limit)
+
+Since Phase 0 hardening these routes require a valid `jwt` cookie + CSRF header,
+and are limited to 10 requests/hour in production (each request may launch a headless browser).
+
+| Method | Path | Description |
+|--------|------|-------------|
 | POST | `/scrape` | Bank scraping with user-provided credentials |
-| POST | `/cal` | Calendar / bank direct import |
+| GET | `/scrape/companies` | List supported banks |
+| POST | `/cal/request-otp` | CAL direct import — request OTP |
+| POST | `/cal/verify-otp` | CAL — verify OTP and fetch |
+| POST | `/cal/verify-otp-import` | CAL — verify OTP and import |
+| POST | `/cal/process-accounts` | CAL — process raw account payload |
+| POST | `/import` | Excel/XLSX file import |
 
 ---
 

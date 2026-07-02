@@ -1,5 +1,6 @@
 // server/models/Account.js
 import mongoose from 'mongoose';
+import softDelete from '../utils/softDelete.js';
 
 const accountSchema = new mongoose.Schema(
   {
@@ -10,11 +11,9 @@ const accountSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+accountSchema.plugin(softDelete);
+
 const Account = mongoose.model('Account', accountSchema);
 
-/* יצוא כפול — לשני העולמות */
-export default Account;          // ES-Modules
-export { Account };              // ייבוא שמי אם תרצה
-// CommonJS fallback (אם קוד ישן דורש):
-// eslint-disable-next-line no-undef
-if (typeof module !== 'undefined') module.exports = Account;
+export default Account;
+export { Account };
