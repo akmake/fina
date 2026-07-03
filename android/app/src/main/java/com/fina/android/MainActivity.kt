@@ -72,35 +72,3 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable fun DashboardScreen(name: String, data: DashboardResponse?, loading: Boolean, error: String?, refresh: () -> Unit, logout: () -> Unit) {
-    Scaffold(topBar = { TopAppBar(title = { Text("שלום ${name.ifBlank { "לך" }} 👋") }, actions = {
-        IconButton(refresh) { Icon(Icons.Default.Refresh, "רענון") }; IconButton(logout) { Icon(Icons.AutoMirrored.Filled.Logout, "התנתקות") }
-    }) }) { padding ->
-        Column(Modifier.padding(padding).padding(16.dp).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            if (loading && data == null) LinearProgressIndicator(Modifier.fillMaxWidth())
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            data?.let { dashboard ->
-                val month = dashboard.monthlySummary.thisMonth
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SummaryCard("הכנסות", money(month.income), MaterialTheme.colorScheme.secondary, Modifier.weight(1f))
-                    SummaryCard("הוצאות", money(month.expense), MaterialTheme.colorScheme.error, Modifier.weight(1f))
-                }
-                SummaryCard("יתרה בחשבונות", money(dashboard.accounts.sumOf { it.balance }), MaterialTheme.colorScheme.primary, Modifier.fillMaxWidth())
-                Text("פעולות אחרונות", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                if (dashboard.recentTransactions.isEmpty()) Text("עוד אין תנועות להצגה", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                dashboard.recentTransactions.take(6).forEach { tx ->
-                    ListItem(headlineContent = { Text(tx.description.ifBlank { tx.merchant.ifBlank { tx.category.ifBlank { "תנועה" } } }) },
-                        supportingContent = { Text(tx.category) }, trailingContent = { Text(money(tx.amount), fontWeight = FontWeight.SemiBold) })
-                    HorizontalDivider()
-                }
-            }
-        }
-    }
-}
-
-@Composable private fun SummaryCard(title: String, value: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier) {
-    Card(modifier) { Column(Modifier.padding(16.dp)) { Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(6.dp)); Text(value, color = color, fontWeight = FontWeight.Bold, fontSize = 21.sp) } }
-}
-
-private fun money(value: Double): String = NumberFormat.getCurrencyInstance(Locale("he", "IL")).format(value)

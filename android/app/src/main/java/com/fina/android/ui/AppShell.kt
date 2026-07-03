@@ -20,7 +20,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.fina.android.DashboardScreen
 import com.fina.android.data.model.Transaction
 import com.fina.android.data.model.TransactionInput
 import java.text.NumberFormat
@@ -47,7 +46,7 @@ private enum class MainTab(val title: String, val icon: ImageVector) {
     ) { padding ->
         Box(Modifier.padding(bottom = padding.calculateBottomPadding())) {
             when (tab) {
-                MainTab.HOME -> DashboardScreen(state.user?.name.orEmpty(), state.dashboard, state.loading, state.error, vm::loadDashboard, vm::logout)
+                MainTab.HOME -> DashboardScreen(vm, state)
                 MainTab.TRANSACTIONS -> TransactionsScreen(vm, state)
                 MainTab.BUDGET -> BudgetScreen(vm, state)
                 MainTab.INVESTMENTS -> InvestmentsScreen(vm, state)
