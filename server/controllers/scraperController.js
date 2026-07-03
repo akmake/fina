@@ -1,8 +1,28 @@
 import { createScraper, CompanyTypes } from 'israeli-bank-scrapers';
 import puppeteer from 'puppeteer';
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { parseTransactions } from '../utils/excelParser.js';
 import AppError from '../utils/AppError.js';
+
+// ── Widen the scraper login "waiting for redirect" timeout ──────────────────
+// israeli-bank-scrapers hardcodes a 20s redirect wait inside its scrapers (incl.
+// MAX), so a slow bank login is declared a failure long before it would actually
+// complete. Wrap the shared navigation helper (scrapers read this property at call
+// time) so login waits up to 90s before giving up. Pure runtime patch — no
+// node_modules edits, survives reinstalls.
+try {
+  const require = createRequire(import.meta.url);
+  const navigation = require('israeli-bank-scrapers/lib/helpers/navigation.js');
+  if (navigation?.waitForRedirect && !navigation.__finaWidened) {
+    const original = navigation.waitForRedirect;
+    navigation.waitForRedirect = (pageOrFrame, timeout = 20000, ...rest) =>
+      original(pageOrFrame, Math.max(timeout, 90000), ...rest);
+    navigation.__finaWidened = true;
+  }
+} catch (err) {
+  console.warn('[scraper] could not widen redirect timeout:', err.message);
+}
 
 const RENDER_CHROME_ARGS = [
   '--no-sandbox',
@@ -379,6 +399,11 @@ export const scrapeCompany = async (req, res, next) => {
       showBrowser: false,
       executablePath,
       args,
+      // Give slow/heavy bank sites (notably MAX) more room before giving up.
+      // The library's hardcoded 20s "waiting for redirect" wait is widened to 90s
+      // by the waitForRedirect wrapper at the top of this file.
+      defaultTimeout: 90000,
+      navigationRetryCount: 2,
     });
 
     const result = await scraper.scrape(credentials);

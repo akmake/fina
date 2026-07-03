@@ -213,7 +213,7 @@ export default function AutoImportPage() {
         startDate,
         incomesOnly,
         ...fields,
-      }, { timeout: 120000 });
+      }, { timeout: 300000 });
 
       setParsedData(data.transactions);
       setBalances(data.balances || []);
