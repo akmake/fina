@@ -20,7 +20,16 @@ Located in `server/models/`.
 
 | Model | File | Key Fields |
 |-------|------|-----------|
-| `User` | `User.js` | `email`, `password` (hashed), `name`, `googleId`, `role` (`user`/`admin`), `createdAt` |
+| `User` | `User.js` | `email`, `passwordHash`, `name`, `googleId`, `role` (`user`/`admin` — system-level), `activeHousehold`→`Household`, `familyGroup` (legacy), `tokenVersion`, `createdAt` |
+
+### Tenancy (v2 — Households)
+
+| Model | File | Key Fields |
+|-------|------|-----------|
+| `Household` | `Household.js` | `name`, `owner`→`User`, `plan` (`free`/`premium`), `isPersonal`, `inviteCode` — the tenant that owns all household-scoped data |
+| `HouseholdMember` | `HouseholdMember.js` | `household`→`Household`, `user`→`User` (null while invited), `role` (`owner`/`partner`/`viewer`), `status` (`invited`/`active`/`removed`), `invitedBy`, `invitedEmail`, `inviteToken`, `tokenExpires`, `joinedAt` |
+
+> **Scope note (Phase 1):** data isolation still runs through the per-document `user` field via `utils/scopeFilter.js`; `req.scopeUsers` is now derived from active `HouseholdMember`s (see `middlewares/familyScope.js`). Adding a physical `household` field to every business model is deferred (equivalent for the single-active-household model). `FamilyGroup` is superseded by `Household`; `/api/family` remains as a compatibility shim.
 
 ### Finance Core
 

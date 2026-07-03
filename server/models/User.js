@@ -48,6 +48,14 @@ const userSchema = new mongoose.Schema(
       ref: 'FamilyGroup',
       default: null,
     },
+    // v2 tenancy: the household whose data the user is currently acting within.
+    // A user may belong to several households (via HouseholdMember); this points
+    // at the "active" one used for scoping. `role` above is the system-level role.
+    activeHousehold: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Household',
+      default: null,
+    },
   },
   { timestamps: true }
 );

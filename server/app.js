@@ -44,6 +44,7 @@ import scraperRoutes from './routes/scraperRoutes.js';
 import calRoutes from './routes/calRoutes.js';
 import maaserRoutes from './routes/maaserRoutes.js';
 import familyRoutes from './routes/familyRoutes.js';
+import householdRoutes from './routes/householdRoutes.js';
 import adminUsersRoutes from './routes/adminUsers.js';
 import businessRoutes from './routes/businessRoutes.js';
 
@@ -126,6 +127,7 @@ app.use(csrfProtection);
 
 // --- נתיבים מוגנים (דורשים התחברות) ---
 app.use('/api/family',    requireAuth, familyRoutes);
+app.use('/api/household', requireAuth, householdRoutes);
 app.use('/api/dashboard', requireAuth, familyScope, dashboardRoutes);
 app.use('/api/analytics',       requireAuth, familyScope, analyticsRoutes);
 app.use('/api/projects',        requireAuth, projectRoutes);

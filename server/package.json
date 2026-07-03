@@ -8,6 +8,7 @@
     "start": "node server.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "migrate:households": "node ./scripts/migrateToHouseholds.js",
     "install:chrome": "node ./scripts/installChrome.mjs",
     "postinstall": "node ./scripts/installChrome.mjs"
   },

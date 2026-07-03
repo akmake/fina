@@ -1,105 +1,136 @@
-import FamilyGroup from '../models/FamilyGroup.js';
+/**
+ * Legacy /api/family compatibility shim.
+ *
+ * The canonical tenancy API is now /api/household (see householdController.js).
+ * This shim keeps the existing client FamilyPage working by mapping the old
+ * FamilyGroup-shaped contract onto Households:
+ *   - "family" == the caller's active Household once it is shared (isPersonal=false)
+ *   - a personal (private) household reports as `null` so the UI still offers
+ *     create / join.
+ *
+ * Requires resolveHousehold to have run (req.household / req.member populated).
+ */
+import Household from '../models/Household.js';
+import HouseholdMember from '../models/HouseholdMember.js';
 import User from '../models/User.js';
 
-// ── GET /api/family ──────────────────────────────────────────
+async function shapeFamily(householdId) {
+  const household = await Household.findById(householdId)
+    .populate('owner', 'name email')
+    .lean();
+  if (!household) return null;
+
+  const members = await HouseholdMember.find({ household: householdId, status: 'active' })
+    .populate('user', 'name email avatar')
+    .lean();
+
+  return {
+    _id: household._id,
+    name: household.name,
+    inviteCode: household.inviteCode,
+    createdBy: household.owner,
+    members: members.filter((m) => m.user).map((m) => m.user),
+  };
+}
+
+// ── GET /api/family ──────────────────────────────────────────────────────────
 export const getFamily = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('familyGroup').lean();
-    if (!user?.familyGroup) return res.json(null);
-
-    const group = await FamilyGroup.findById(user.familyGroup)
-      .populate('members', 'name email avatar')
-      .populate('createdBy', 'name email')
-      .lean();
-
-    res.json(group);
+    if (!req.household || req.household.isPersonal) return res.json(null);
+    res.json(await shapeFamily(req.household._id));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// ── POST /api/family/create ──────────────────────────────────
+// ── POST /api/family/create ──────────────────────────────────────────────────
+// Turns the caller's (personal) active household into a shared, named family.
 export const createFamily = async (req, res) => {
   try {
-    const existing = await User.findById(req.user._id).select('familyGroup').lean();
-    if (existing?.familyGroup) {
+    if (!req.household) return res.status(400).json({ message: 'אין הקשר משק בית' });
+    if (!req.household.isPersonal) {
       return res.status(400).json({ message: 'כבר שייך לקבוצה משפחתית' });
     }
+    if (req.member?.role !== 'owner') {
+      return res.status(403).json({ message: 'רק בעל הבית יכול ליצור קבוצה' });
+    }
 
-    const group = await FamilyGroup.create({
-      name:      req.body.name || 'המשפחה שלנו',
-      createdBy: req.user._id,
-      members:   [req.user._id],
-    });
+    await Household.updateOne(
+      { _id: req.household._id },
+      { name: (req.body.name || '').trim() || 'המשפחה שלנו', isPersonal: false }
+    );
 
-    await User.findByIdAndUpdate(req.user._id, { familyGroup: group._id });
-
-    const populated = await FamilyGroup.findById(group._id)
-      .populate('members', 'name email avatar')
-      .populate('createdBy', 'name email')
-      .lean();
-
-    res.status(201).json(populated);
+    res.status(201).json(await shapeFamily(req.household._id));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// ── POST /api/family/join ────────────────────────────────────
+// ── POST /api/family/join ────────────────────────────────────────────────────
 export const joinFamily = async (req, res) => {
   try {
-    const { inviteCode } = req.body;
+    const inviteCode = (req.body.inviteCode || '').toUpperCase().trim();
     if (!inviteCode) return res.status(400).json({ message: 'קוד הזמנה חסר' });
 
-    const existing = await User.findById(req.user._id).select('familyGroup').lean();
-    if (existing?.familyGroup) {
-      return res.status(400).json({ message: 'כבר שייך לקבוצה משפחתית' });
-    }
+    const household = await Household.findOne({ inviteCode });
+    if (!household) return res.status(404).json({ message: 'קוד הזמנה לא תקין' });
 
-    const group = await FamilyGroup.findOne({ inviteCode: inviteCode.toUpperCase().trim() });
-    if (!group) return res.status(404).json({ message: 'קוד הזמנה לא תקין' });
+    const already = await HouseholdMember.findOne({
+      household: household._id,
+      user: req.user._id,
+      status: 'active',
+    }).lean();
+    if (already) return res.status(400).json({ message: 'כבר חבר בקבוצה' });
 
-    if (group.members.some(m => m.toString() === req.user._id.toString())) {
-      return res.status(400).json({ message: 'כבר חבר בקבוצה' });
-    }
+    await HouseholdMember.create({
+      household: household._id,
+      user: req.user._id,
+      role: 'partner',
+      status: 'active',
+      joinedAt: new Date(),
+    });
+    await User.updateOne({ _id: req.user._id }, { activeHousehold: household._id });
+    await Household.updateOne({ _id: household._id }, { isPersonal: false });
 
-    group.members.push(req.user._id);
-    await group.save();
-    await User.findByIdAndUpdate(req.user._id, { familyGroup: group._id });
-
-    const populated = await FamilyGroup.findById(group._id)
-      .populate('members', 'name email avatar')
-      .populate('createdBy', 'name email')
-      .lean();
-
-    res.json(populated);
+    res.json(await shapeFamily(household._id));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// ── POST /api/family/leave ───────────────────────────────────
+// ── POST /api/family/leave ───────────────────────────────────────────────────
 export const leaveFamily = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('familyGroup').lean();
-    if (!user?.familyGroup) return res.status(400).json({ message: 'לא שייך לקבוצה' });
-
-    const group = await FamilyGroup.findById(user.familyGroup);
-    if (!group) return res.status(404).json({ message: 'קבוצה לא נמצאה' });
-
-    group.members = group.members.filter(m => m.toString() !== req.user._id.toString());
-    await User.findByIdAndUpdate(req.user._id, { familyGroup: null });
-
-    // אם אין עוד חברים — מחק את הקבוצה
-    if (group.members.length === 0) {
-      await FamilyGroup.findByIdAndDelete(group._id);
-    } else {
-      // אם היוצר עוזב — העבר בעלות לחבר הבא
-      if (group.createdBy.toString() === req.user._id.toString()) {
-        group.createdBy = group.members[0];
-      }
-      await group.save();
+    if (!req.household || req.household.isPersonal) {
+      return res.status(400).json({ message: 'לא שייך לקבוצה' });
     }
+
+    const member = await HouseholdMember.findOne({
+      household: req.household._id,
+      user: req.user._id,
+      status: 'active',
+    });
+    if (!member) return res.status(400).json({ message: 'לא שייך לקבוצה' });
+
+    // Owner may only leave once no other active members remain
+    if (member.role === 'owner') {
+      const others = await HouseholdMember.countDocuments({
+        household: req.household._id,
+        status: 'active',
+        user: { $ne: req.user._id, $type: 'objectId' },
+      });
+      if (others > 0) {
+        return res.status(400).json({ message: 'העבר בעלות לחבר אחר לפני עזיבה' });
+      }
+    }
+
+    member.status = 'removed';
+    await member.save();
+
+    const { ensurePersonalHousehold } = await import('../utils/ensureHousehold.js');
+    const user = await User.findById(req.user._id).select('name').lean();
+    const personal = await ensurePersonalHousehold(user || { _id: req.user._id });
+    await User.updateOne({ _id: req.user._id }, { activeHousehold: personal._id });
 
     res.json({ message: 'עזבת את הקבוצה המשפחתית' });
   } catch (err) {
@@ -107,19 +138,17 @@ export const leaveFamily = async (req, res) => {
   }
 };
 
-// ── PUT /api/family/name ─────────────────────────────────────
+// ── PUT /api/family/name ─────────────────────────────────────────────────────
 export const updateFamilyName = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('familyGroup').lean();
-    if (!user?.familyGroup) return res.status(400).json({ message: 'לא שייך לקבוצה' });
-
-    const group = await FamilyGroup.findByIdAndUpdate(
-      user.familyGroup,
-      { name: req.body.name },
-      { new: true }
-    ).populate('members', 'name email avatar').populate('createdBy', 'name email').lean();
-
-    res.json(group);
+    if (!req.household || req.household.isPersonal) {
+      return res.status(400).json({ message: 'לא שייך לקבוצה' });
+    }
+    if (!['owner', 'partner'].includes(req.member?.role)) {
+      return res.status(403).json({ message: 'אין הרשאה' });
+    }
+    await Household.updateOne({ _id: req.household._id }, { name: (req.body.name || '').trim() });
+    res.json(await shapeFamily(req.household._id));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

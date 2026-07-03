@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User.js';
+import { ensurePersonalHousehold } from '../utils/ensureHousehold.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -73,6 +74,9 @@ export const googleAuth = async (req, res) => {
       } else {
         // משתמש חדש לחלוטין
         user = await User.create({ googleId, email, name, avatar });
+        const household = await ensurePersonalHousehold(user);
+        user.activeHousehold = household._id;
+        await user.save();
       }
     }
 
@@ -103,6 +107,11 @@ export const registerUser = async (req, res) => {
 
     // role לעולם לא מגיע מהלקוח — אדמין ראשון נוצר עם createAdmin.js בלבד
     const user = await User.create({ name, email, passwordHash: hash, role: 'user' });
+
+    // Every new user gets a personal household (their default tenant)
+    const household = await ensurePersonalHousehold(user);
+    user.activeHousehold = household._id;
+    await user.save();
 
     createAndSendTokens(user, res);
     const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role };

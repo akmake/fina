@@ -81,6 +81,7 @@
 - JWT secrets have no defaults — the server refuses to start without them (and rejects placeholders in production)
 - Transaction/Budget/Goal/Loan/Account use **soft delete** (`deletedAt`, `server/utils/softDelete.js`) — never hard-delete these; unique indexes are partial (`deletedAt: null`)
 - Sensitive actions (deletes, role changes) must call `audit()` from `server/utils/audit.js`
+- Tenancy (Phase 1): `Household` + `HouseholdMember` are the tenant layer. `familyScope` (`server/middlewares/familyScope.js`) resolves `req.household`/`req.member` and derives `req.scopeUsers` from active members; data isolation still flows through the per-document `user` field via `utils/scopeFilter.js` (no physical `household` field on business models yet). Viewers are blocked from writes by HTTP method inside `familyScope`. Canonical API is `/api/household`; `/api/family` is a compat shim. New users get a personal household on register (`utils/ensureHousehold.js`); run `npm run migrate:households` for existing data.
 - Vite proxy in `vite.config.js` forwards `/api` to `localhost:4000` in dev — production needs a reverse proxy
 - The database name is `corse` (not `fina` or `finance`)
 - Run server tests with `npm test` inside `server/` (Vitest + Supertest + in-memory Mongo)

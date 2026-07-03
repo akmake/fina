@@ -27,6 +27,30 @@ All protected routes require:
 
 ---
 
+## Household / Tenancy Routes (Auth Required)
+
+Canonical tenancy API. All routes run `resolveHousehold` first. Role guards use
+the caller's `HouseholdMember.role` (owner/partner/viewer). Mutating routes need the CSRF header.
+
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| GET | `/household` | any | Active household + members |
+| GET | `/household/mine` | any | All households the user is an active member of (for switching) |
+| PUT | `/household/name` | owner/partner | Rename household |
+| POST | `/household/invite` | owner | Invite by `{ email, role }` → returns invitation `token` |
+| POST | `/household/accept` | any (auth) | Accept an invitation `{ token }` |
+| POST | `/household/join-code` | any (auth) | Join by shareable `{ code }` as partner |
+| POST | `/household/switch` | member | Switch active household `{ householdId }` |
+| POST | `/household/leave` | any member | Leave current household (owner must transfer first) |
+| PUT | `/household/members/:memberId/role` | owner | Change a member's role (keeps ≥1 owner) |
+| DELETE | `/household/members/:memberId` | owner | Remove a member (soft, keeps their data) |
+
+> Legacy `/family/*` (`GET /`, `POST /create`, `POST /join`, `POST /leave`, `PUT /name`)
+> remains as a **compatibility shim** over Households for the existing client FamilyPage.
+> Sensitive actions (invite, join, role change, remove, leave) write an `AuditLog` entry.
+
+---
+
 ## Bank Import Routes (Auth Required + Scrape Rate Limit)
 
 Since Phase 0 hardening these routes require a valid `jwt` cookie + CSRF header,

@@ -26,6 +26,9 @@
 | Any `server/routes/*.js` | `docs/api-reference.md` — update the route table |
 | Any new route file | `server/app.js` (must be mounted), `docs/api-reference.md` |
 | `server/utils/` (any helper) | All controllers that import it |
+| `server/middlewares/familyScope.js` | `server/utils/ensureHousehold.js`, `server/utils/scopeFilter.js`, every router mounted with `familyScope` in `app.js`, `docs/auth-flow.md`, `CLAUDE.md` |
+| `server/models/Household.js` / `HouseholdMember.js` | `server/controllers/householdController.js`, `server/controllers/familyController.js` (shim), `server/utils/ensureHousehold.js`, `server/scripts/migrateToHouseholds.js`, `docs/database.md` |
+| Household roles / permissions | `server/middlewares/requireHouseholdRole.js`, `familyScope` viewer-write block, `docs/product-spec-v2.md` (§8 matrix), `docs/api-reference.md` |
 
 ---
 

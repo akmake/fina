@@ -305,8 +305,8 @@ Monorepo (client React+Vite / server Express), MongoDB Atlas, Zustand + React Qu
 
 | שלב | שם | תכולה | קריטריון סיום |
 |-----|-----|--------|----------------|
-| **0** | ייצוב ואבטחה | auth על routes ציבוריים, הסרת secrets ברירת-מחדל, envelope אחיד, מחיקת legacy, soft delete, AuditLog בסיסי, בדיקות ל-auth+isolation | אין endpoint לא מאובטח; CI ירוק |
-| **1** | Household | מודל Household+Members, מיגרציית נתונים, familyScope מורחב, הזמנות, מטריצת הרשאות | שני משתמשים חולקים משק בית ורואים אותם נתונים; viewer לא יכול לכתוב |
+| **0** ✅ | ייצוב ואבטחה | auth על routes ציבוריים, הסרת secrets ברירת-מחדל, envelope אחיד, מחיקת legacy, soft delete, AuditLog בסיסי, בדיקות ל-auth+isolation | אין endpoint לא מאובטח; CI ירוק |
+| **1** ✅ | Household | מודל Household+HouseholdMember, `User.activeHousehold`, מיגרציה (`scripts/migrateToHouseholds.js`), `familyScope` מבוסס-household, הזמנות (email token + invite code), מטריצת הרשאות owner/partner/viewer | ✔ הושלם — שני משתמשים חולקים משק בית ורואים אותם נתונים; viewer חסום מכתיבה (בדיקות ב-`tests/household.test.js`) |
 | **2** | Import 2.0 | BankConnection מוצפן, ImportJob אסינכרוני, תזמון יומי, אשף ייבוא אחד ב-UI, טיפול ב-OTP | סנכרון אוטומטי יומי עובד ללא נוכחות משתמש |
 | **3** | Core Loop | איחוד דשבורד, סיווג מהיר + למידת כללים, מחזור תקציב מלא, מנוע התראות + Notifications, יעדים מחוברים, איחוד תיק נכסים | הלולאה 5.1 שלמה מקצה לקצה |
 | **4** | SaaS Shell | onboarding, אימות email, billing/plans, ייצוא ומחיקת חשבון, back-office אדמין, 2FA | משתמש זר יכול להירשם, לשלם ולהשתמש בלי ליווי |
