@@ -191,3 +191,42 @@ export const refresh = async (req, res) => {
     return res.status(403).json({ message: 'Invalid or expired refresh token.' });
   }
 };
+
+export const updateProfile = async (req, res) => {
+  const name = req.body?.name?.trim();
+  if (!name) return res.status(400).json({ message: 'שם מלא הוא שדה חובה' });
+  if (name.length > 100) return res.status(400).json({ message: 'השם ארוך מדי' });
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: { name } },
+    { new: true, runValidators: true }
+  ).select('_id name email role createdAt');
+
+  if (!user) return res.status(404).json({ message: 'המשתמש לא נמצא' });
+  return res.json({ user });
+};
+
+export const changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ message: 'יש להזין סיסמה נוכחית וסיסמה חדשה' });
+  }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ message: 'הסיסמה החדשה חייבת להכיל לפחות 8 תווים' });
+  }
+
+  const user = await User.findById(req.user._id);
+  if (!user?.passwordHash) {
+    return res.status(400).json({ message: 'לחשבון זה אין סיסמה מקומית' });
+  }
+  if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+    return res.status(401).json({ message: 'הסיסמה הנוכחית שגויה' });
+  }
+
+  user.passwordHash = await bcrypt.hash(newPassword, 12);
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
+  await user.save();
+  createAndSendTokens(user, res);
+  return res.json({ message: 'הסיסמה עודכנה בהצלחה' });
+};

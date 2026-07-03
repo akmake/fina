@@ -53,4 +53,32 @@ describe('הרשמה והתחברות', () => {
     const res = await request(app).post('/api/auth/refresh');
     expect(res.status).toBe(401);
   });
+  it('profile update requires auth and the client security header', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/register').send({ name: 'Old', email: 'profile@test.com', password: 'Str0ngPass!' });
+
+    const blocked = await agent.put('/api/auth/profile').send({ name: 'New' });
+    expect(blocked.status).toBe(403);
+
+    const updated = await agent.put('/api/auth/profile').set(CSRF).send({ name: 'New Name' });
+    expect(updated.status).toBe(200);
+    expect(updated.body.user.name).toBe('New Name');
+  });
+
+  it('password change verifies the current password and accepts the new one', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/register').send({ name: 'Tester', email: 'password@test.com', password: 'Str0ngPass!' });
+
+    const wrong = await agent.put('/api/auth/change-password').set(CSRF)
+      .send({ currentPassword: 'wrong-password', newPassword: 'AnotherPass1!' });
+    expect(wrong.status).toBe(401);
+
+    const changed = await agent.put('/api/auth/change-password').set(CSRF)
+      .send({ currentPassword: 'Str0ngPass!', newPassword: 'AnotherPass1!' });
+    expect(changed.status).toBe(200);
+
+    const login = await request(app).post('/api/auth/login')
+      .send({ email: 'password@test.com', password: 'AnotherPass1!' });
+    expect(login.status).toBe(200);
+  });
 });
