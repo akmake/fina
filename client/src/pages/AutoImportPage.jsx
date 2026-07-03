@@ -53,6 +53,12 @@ export default function AutoImportPage() {
   const [calError, setCalError] = useState('');
   const [calLoading, setCalLoading] = useState(false);
 
+  // One Zero OTP flow state (SMS two-factor)
+  const [ozOtp, setOzOtp] = useState('');
+  const [ozOtpContext, setOzOtpContext] = useState('');
+  const [ozError, setOzError] = useState('');
+  const [ozLoading, setOzLoading] = useState(false);
+
   useEffect(() => {
     api.get('/scrape/companies').then(res => {
       setCompanies(res.data);
@@ -69,6 +75,7 @@ export default function AutoImportPage() {
 
   const isBank = companyConfig?.group === 'בנקים';
   const isCalOtp = selectedCompany === 'visaCal';
+  const isOneZeroOtp = companyConfig?.otpFlow === true;
 
   const handleCompanyChange = (value) => {
     setSelectedCompany(value);
@@ -77,7 +84,9 @@ export default function AutoImportPage() {
     setIncomesOnly(cfg?.group === 'בנקים');
     // reset CAL OTP state when switching companies
     setCalId(''); setCalLast4(''); setCalOtp(''); setCalUuid(''); setCalMaskedPhone(''); setCalError('');
-    if (stage === 'cal-otp') setStage('credentials');
+    // reset One Zero OTP state when switching companies
+    setOzOtp(''); setOzOtpContext(''); setOzError('');
+    if (stage === 'cal-otp' || stage === 'onezero-otp') setStage('credentials');
   };
 
   // ── CAL OTP: שלב 1 — בקשת קוד (ישירות מהדפדפן) ──
@@ -127,6 +136,67 @@ export default function AutoImportPage() {
       } else {
         setIsError(true);
         setMessage(err.response?.data?.message || err.message || 'שגיאה בייבוא מכאל');
+        setStage('result');
+      }
+    }
+  };
+
+  // ── One Zero OTP: שלב 1 — בקשת קוד ל-SMS ──
+  const handleOneZeroRequestOtp = async (e) => {
+    e.preventDefault();
+    setOzLoading(true);
+    setOzError('');
+    try {
+      const { data } = await api.post('/scrape/onezero/otp/start', {
+        phoneNumber: fields.phoneNumber,
+      });
+      setOzOtpContext(data.otpContext);
+      setStage('onezero-otp');
+    } catch (err) {
+      setOzError(err.response?.data?.message || err.message || 'שגיאה בשליחת הקוד');
+    } finally {
+      setOzLoading(false);
+    }
+  };
+
+  // ── One Zero OTP: שלב 2 — אימות קוד + ייבוא ──
+  const handleOneZeroVerifyAndImport = async (e) => {
+    e.preventDefault();
+    setStage('loading');
+    setOzError('');
+    setMessage('מתחבר ל-One Zero ושולף עסקאות...');
+    try {
+      const { data } = await api.post('/scrape/onezero/otp/verify', {
+        otpContext: ozOtpContext,
+        otpCode: ozOtp,
+        email: fields.email,
+        password: fields.password,
+        startDate,
+        incomesOnly,
+      }, { timeout: 120000 });
+
+      setParsedData(data.transactions);
+      setBalances(data.balances || []);
+      setFutureDebits(data.futureDebits || []);
+      setRawAccounts(data.rawAccounts || null);
+
+      if (data.unseenMerchants?.length > 0) {
+        setUnseenMerchants(data.unseenMerchants);
+        const init = {};
+        data.unseenMerchants.forEach(n => { init[n] = { newName: n, category: '' }; });
+        setMappings(init);
+        setStage('map');
+      } else {
+        await processData([], data.transactions);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || '';
+      if (msg.includes('קוד') || msg.includes('OTP') || msg.includes('פג תוקף')) {
+        setOzError('קוד שגוי או פג תוקף — נסה שוב');
+        setStage('onezero-otp');
+      } else {
+        setIsError(true);
+        setMessage(msg || 'שגיאה בייבוא מ-One Zero');
         setStage('result');
       }
     }
@@ -245,6 +315,7 @@ export default function AutoImportPage() {
     setFields({});
     setIncomesOnly(companyConfig?.group === 'בנקים');
     setCalId(''); setCalLast4(''); setCalOtp(''); setCalUuid(''); setCalMaskedPhone(''); setCalError(''); setCalLoading(false);
+    setOzOtp(''); setOzOtpContext(''); setOzError(''); setOzLoading(false);
   };
 
   const downloadRawJson = () => {
@@ -277,7 +348,7 @@ export default function AutoImportPage() {
         <CardContent className="min-h-[400px] flex items-center justify-center">
 
           {stage === 'credentials' && (
-            <form onSubmit={isCalOtp ? handleCalRequestOtp : handleScrape} className="w-full max-w-md space-y-4">
+            <form onSubmit={isCalOtp ? handleCalRequestOtp : isOneZeroOtp ? handleOneZeroRequestOtp : handleScrape} className="w-full max-w-md space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">חברת אשראי / בנק</label>
                 <Select value={selectedCompany} onValueChange={handleCompanyChange}>
@@ -374,9 +445,9 @@ export default function AutoImportPage() {
                 הפרטים שלך משמשים רק להתחברות ולא נשמרים בשרת.
               </p>
 
-              {calError && (
+              {(calError || ozError) && (
                 <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-md p-3 text-sm">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />{calError}
+                  <AlertTriangle className="h-4 w-4 shrink-0" />{calError || ozError}
                 </div>
               )}
 
@@ -384,6 +455,11 @@ export default function AutoImportPage() {
                 <Button type="submit" size="lg" className="w-full" disabled={calLoading || calId.length < 8 || calLast4.length !== 4}>
                   {calLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Smartphone className="ml-2 h-4 w-4" />}
                   שלחו לי קוד ב-{OTP_CHANNELS.find(c => c.value === calChannel)?.label}
+                </Button>
+              ) : isOneZeroOtp ? (
+                <Button type="submit" size="lg" className="w-full" disabled={ozLoading || !fields.email || !fields.password || !fields.phoneNumber}>
+                  {ozLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Smartphone className="ml-2 h-4 w-4" />}
+                  שלחו לי קוד ב-SMS
                 </Button>
               ) : (
                 <Button type="submit" size="lg" className="w-full" disabled={!selectedCompany}>
@@ -416,6 +492,37 @@ export default function AutoImportPage() {
                 </div>
               )}
               <Button type="submit" size="lg" className="w-full" disabled={calOtp.length !== 6}>
+                כניסה וייבוא עסקאות
+              </Button>
+              <button type="button" onClick={() => setStage('credentials')}
+                className="w-full text-sm text-slate-400 hover:text-slate-600 text-center">
+                חזור
+              </button>
+            </form>
+          )}
+
+          {stage === 'onezero-otp' && (
+            <form onSubmit={handleOneZeroVerifyAndImport} className="w-full max-w-md space-y-4">
+              <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-slate-600">שלחנו קוד אימות ב-SMS למספר:</p>
+                <p className="text-lg font-bold text-slate-800 mt-1">{fields.phoneNumber}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">הקוד שקיבלת</label>
+                <Input
+                  type="text" inputMode="numeric"
+                  value={ozOtp} onChange={e => setOzOtp(e.target.value.replace(/\D/g,''))}
+                  maxLength={8} required placeholder="000000"
+                  className="text-center text-2xl tracking-widest"
+                  autoFocus
+                />
+              </div>
+              {ozError && (
+                <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-md p-3 text-sm">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />{ozError}
+                </div>
+              )}
+              <Button type="submit" size="lg" className="w-full" disabled={ozOtp.length < 4}>
                 כניסה וייבוא עסקאות
               </Button>
               <button type="button" onClick={() => setStage('credentials')}

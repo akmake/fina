@@ -47,7 +47,7 @@
 | Database | MongoDB Atlas (Mongoose 8.4) |
 | Auth | JWT (httpOnly cookies) + Google OAuth |
 | Security | Helmet, CORS, CSRF (custom header), Rate limiting |
-| Bank scraping | israeli-bank-scrapers 6.7.1 |
+| Bank scraping | israeli-bank-scrapers 6.7.9 |
 | Language / Direction | Hebrew (RTL), `lang="he" dir="rtl"` |
 
 ---

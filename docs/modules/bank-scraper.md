@@ -1,10 +1,10 @@
-> Last updated: 2026-03-12
+> Last updated: 2026-07-03
 
 # Module: Bank Scraper
 
 ## Overview
 
-Automated bank data import using the `israeli-bank-scrapers` npm package.
+Automated bank data import using the `israeli-bank-scrapers` npm package (v6.7.9).
 Allows users to connect their Israeli bank accounts and automatically import transactions.
 Since Phase 0 hardening (2026-07) these routes **require auth** (jwt cookie + CSRF header)
 and are rate limited via `scrapeLimiter` (10/hour in production).
@@ -21,6 +21,12 @@ Import page:
 
 Alternative (CAL bank direct):
   └── POST /api/cal → dedicated CAL bank import
+
+One Zero (SMS OTP, two-step):
+  ├── POST /api/scrape/onezero/otp/start  → sends SMS, returns otpContext
+  ├── User enters the code from SMS
+  └── POST /api/scrape/onezero/otp/verify → exchanges code for a long-term
+      token, scrapes, and returns transactions (+ otpLongTermToken for reuse)
 
 Excel import:
   └── POST /api/import → XLSX parsing → bulk transaction create
@@ -41,25 +47,45 @@ Excel import:
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/scrape` | **JWT + CSRF + scrapeLimiter** | Bank scraping with user credentials |
+| GET  | `/api/scrape/companies` | **JWT + CSRF + scrapeLimiter** | List companies + required fields + `otpFlow` flag |
+| POST | `/api/scrape` | **JWT + CSRF + scrapeLimiter** | Bank scraping with user credentials (rejects `otpFlow` companies) |
+| POST | `/api/scrape/onezero/otp/start` | **JWT + CSRF + scrapeLimiter** | One Zero — trigger SMS OTP |
+| POST | `/api/scrape/onezero/otp/verify` | **JWT + CSRF + scrapeLimiter** | One Zero — verify code + scrape |
 | POST | `/api/cal/*` | **JWT + CSRF + scrapeLimiter** | CAL bank direct import (OTP flow) |
 | POST | `/api/import` | **JWT + CSRF + scrapeLimiter** | Excel/XLSX file import |
 
 ## Request Format (Scraper)
 
+Credentials are sent **flat** (one key per field the company needs — the fields
+come from `GET /scrape/companies`), not nested under a `credentials` object:
+
 ```json
 {
-  "bank": "hapoalim",
-  "credentials": {
-    "username": "...",
-    "password": "...",
-    "nationalId": "..."
-  },
-  "startDate": "2024-01-01"
+  "company": "hapoalim",
+  "userCode": "...",
+  "password": "...",
+  "startDate": "2024-01-01",
+  "incomesOnly": true
 }
 ```
 
-Supported banks via `israeli-bank-scrapers`: Hapoalim, Leumi, Discount, Mizrahi, OneZero, Max, Visa Cal, Isracard, Amex, and others.
+Supported banks via `israeli-bank-scrapers`: Hapoalim, Leumi, Discount, Mercantile,
+Mizrahi, Otsar Hahayal, Union, Beinleumi, Massad, Yahav, Beyahad Bishvilha,
+Behatsdaa, Pagi, One Zero — plus credit cards Max, Visa Cal, Isracard, Amex.
+
+### One Zero OTP (special case)
+
+One Zero (`company: "oneZero"`, marked `otpFlow: true`) authenticates via SMS OTP,
+so it is **not** importable through `POST /scrape`. Instead:
+
+1. `POST /scrape/onezero/otp/start` with `{ phoneNumber }` (full international,
+   must start with `+`) → sends the SMS, returns `{ otpContext }`.
+2. `POST /scrape/onezero/otp/verify` with `{ otpContext, otpCode, email, password,
+   startDate?, incomesOnly? }` → exchanges the code for a long-term token, scrapes,
+   and returns the usual payload plus `otpLongTermToken` (for optional future reuse).
+
+`otpContext` is the only state carried between the two requests — no scraper
+instance is kept on the server between calls.
 
 ## Auto-Categorization Pipeline
 
@@ -85,7 +111,8 @@ See [docs/database.md](../database.md) for full schema reference.
 
 | If you change... | Also update... |
 |-----------------|----------------|
-| `server/routes/scraperRoutes.js` | `server/routes/calRoutes.js` (parallel scraper), `docs/modules/bank-scraper.md`, `docs/api-reference.md` |
+| `server/routes/scraperRoutes.js` | `server/controllers/scraperController.js`, `client/src/pages/AutoImportPage.jsx` (import UI + OTP flow), `docs/modules/bank-scraper.md`, `docs/api-reference.md` |
+| `COMPANY_CONFIG` (supported banks/fields) | `server/tests/stubs/israeli-bank-scrapers.js` (stub `CompanyTypes` must include every `companyId` used), `client/src/pages/AutoImportPage.jsx` |
 | Scraper response field names | `server/controllers/transactionController.js` (import mapping), `server/models/Transaction.js` |
 | `server/models/MerchantMap.js` | Auto-categorization in `server/controllers/transactionController.js` |
 | `server/routes/importRoutes.js` | XLSX column mapping logic, `docs/modules/bank-scraper.md` |

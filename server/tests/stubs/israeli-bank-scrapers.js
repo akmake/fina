@@ -4,6 +4,7 @@ export const CompanyTypes = {
   hapoalim: 'hapoalim',
   leumi: 'leumi',
   discount: 'discount',
+  mercantile: 'mercantile',
   mizrahi: 'mizrahi',
   otsarHahayal: 'otsarHahayal',
   visaCal: 'visaCal',
@@ -14,6 +15,9 @@ export const CompanyTypes = {
   beinleumi: 'beinleumi',
   massad: 'massad',
   yahav: 'yahav',
+  beyahadBishvilha: 'beyahadBishvilha',
+  behatsdaa: 'behatsdaa',
+  pagi: 'pagi',
   oneZero: 'oneZero',
 };
 

@@ -34,8 +34,10 @@ and are limited to 10 requests/hour in production (each request may launch a hea
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/scrape` | Bank scraping with user-provided credentials |
-| GET | `/scrape/companies` | List supported banks |
+| POST | `/scrape` | Bank scraping with user-provided credentials (rejects OTP-flow companies, e.g. One Zero) |
+| GET | `/scrape/companies` | List supported banks (each entry includes `otpFlow` + required `fields`) |
+| POST | `/scrape/onezero/otp/start` | One Zero — trigger SMS OTP (body: `phoneNumber`), returns `otpContext` |
+| POST | `/scrape/onezero/otp/verify` | One Zero — verify code + scrape (body: `otpContext`, `otpCode`, `email`, `password`, `startDate?`, `incomesOnly?`); response includes `otpLongTermToken` |
 | POST | `/cal/request-otp` | CAL direct import — request OTP |
 | POST | `/cal/verify-otp` | CAL — verify OTP and fetch |
 | POST | `/cal/verify-otp-import` | CAL — verify OTP and import |
