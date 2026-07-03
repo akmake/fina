@@ -1,5 +1,6 @@
 import { createScraper, CompanyTypes } from 'israeli-bank-scrapers';
 import puppeteer from 'puppeteer';
+import { existsSync } from 'node:fs';
 import { parseTransactions } from '../utils/excelParser.js';
 import AppError from '../utils/AppError.js';
 
@@ -15,7 +16,12 @@ const resolveExecutablePath = () => {
   if (process.env.CHROME_BIN) return process.env.CHROME_BIN;
 
   try {
-    return puppeteer.executablePath();
+    // executablePath() derives a path from install metadata WITHOUT checking the
+    // binary is actually there. A partial/interrupted Chrome download leaves the
+    // folder present but chrome.exe missing, so this returns a path that makes the
+    // launcher throw "Browser was not found". Only hand back a path that exists.
+    const resolved = puppeteer.executablePath();
+    return resolved && existsSync(resolved) ? resolved : undefined;
   } catch {
     return undefined;
   }
