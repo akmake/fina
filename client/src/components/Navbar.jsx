@@ -35,6 +35,7 @@ const NAV_GROUPS = [
   {
     label: "השקעות וחיסכון", icon: PiggyBank,
     items: [
+      { to: "/assets",           label: "תיק נכסים", icon: PiggyBank     },
       { to: "/investments",      label: "מניות",    icon: TrendingUp    },
       { to: "/deposits",         label: "פיקדונות", icon: Landmark      },
       { to: "/funds",            label: "קרנות",    icon: BarChart3     },
