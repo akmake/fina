@@ -29,5 +29,6 @@ Full-stack personal finance management application. Hebrew RTL. React + Node.js 
 | [modules/projects.md](modules/projects.md) | Projects, goals, child savings |
 | [modules/real-estate.md](modules/real-estate.md) | Real estate, insurance |
 | [modules/bank-scraper.md](modules/bank-scraper.md) | Bank scraping, data import |
+| [modules/import.md](modules/import.md) | Import 2.0 — saved bank connections & unattended daily sync (Phase 2) |
 | [modules/electrical.md](modules/electrical.md) | Electrical CAD editor |
 | [modules/analytics.md](modules/analytics.md) | Dashboard, analytics, reporting |

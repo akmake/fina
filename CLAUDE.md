@@ -46,7 +46,7 @@
 | Backend | Node.js + Express 4.19.2 |
 | Database | MongoDB Atlas (Mongoose 8.4) |
 | Auth | JWT (httpOnly cookies) + Google OAuth |
-| Security | Helmet, CORS, CSRF (custom header), Rate limiting |
+| Security | Helmet, CORS, CSRF (custom header), Rate limiting, AES-256-GCM credential encryption |
 | Bank scraping | israeli-bank-scrapers 6.7.9 |
 | Language / Direction | Hebrew (RTL), `lang="he" dir="rtl"` |
 
@@ -59,7 +59,7 @@
 - Unauthenticated users are redirected to `/login` via `<ProtectedRoute>`
 - Admin-only routes are guarded by `requireAdmin` middleware on the server
 - Server public routes (no auth): `/api/auth/*` (rate limited), `/api/health`, `/api/csrf-token`, `/api/logs/device-ping` (rate limited)
-- Server protected routes: everything else requires `requireAuth` — including `/api/scrape`, `/api/cal`, `/api/import` (also `scrapeLimiter`)
+- Server protected routes: everything else requires `requireAuth` — including `/api/scrape`, `/api/cal`, `/api/import` (also `scrapeLimiter`), and `/api/connections` (`requireAuth` + `familyScope`; its `/:id/sync` adds `scrapeLimiter`)
 - CSRF protection is active on all **mutating** requests (POST/PUT/DELETE) — header `X-Fina-Client: web-app` must be present
 
 ---
@@ -79,7 +79,8 @@
 - Server entry point is `server/server.js` (env validation + DB connect); `server/app.js` only assembles the Express app (exported for tests)
 - Bank scraping routes (`/api/scrape`, `/api/cal`, `/api/import`) require auth + are rate limited — do NOT make them public again
 - JWT secrets have no defaults — the server refuses to start without them (and rejects placeholders in production)
-- Transaction/Budget/Goal/Loan/Account use **soft delete** (`deletedAt`, `server/utils/softDelete.js`) — never hard-delete these; unique indexes are partial (`deletedAt: null`)
+- Transaction/Budget/Goal/Loan/Account/BankConnection use **soft delete** (`deletedAt`, `server/utils/softDelete.js`) — never hard-delete these; unique indexes are partial (`deletedAt: null`)
+- Import 2.0 (Phase 2): saved bank connections (`BankConnection`) store credentials **encrypted** (AES-256-GCM via `server/utils/crypto.js`, key = `FINA_ENCRYPTION_KEY`, 64 hex chars). Secrets are `select:false` + stripped from JSON — NEVER return them. Unattended daily sync runs via `server/services/importScheduler.js` (started in `server.js`), executing `ImportJob`s through `importRunner`. The scrape core is shared in `server/services/scrapeService.js`; persistence in `server/services/transactionPersistence.js`. Missing `FINA_ENCRYPTION_KEY` → fatal in production, auto-sync disabled in dev. See [docs/modules/import.md](docs/modules/import.md)
 - Sensitive actions (deletes, role changes) must call `audit()` from `server/utils/audit.js`
 - Tenancy (Phase 1): `Household` + `HouseholdMember` are the tenant layer. `familyScope` (`server/middlewares/familyScope.js`) resolves `req.household`/`req.member` and derives `req.scopeUsers` from active members; data isolation still flows through the per-document `user` field via `utils/scopeFilter.js` (no physical `household` field on business models yet). Viewers are blocked from writes by HTTP method inside `familyScope`. Canonical API is `/api/household`; `/api/family` is a compat shim. New users get a personal household on register (`utils/ensureHousehold.js`); run `npm run migrate:households` for existing data.
 - Vite proxy in `vite.config.js` forwards `/api` to `localhost:4000` in dev — production needs a reverse proxy

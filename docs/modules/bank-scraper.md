@@ -9,6 +9,13 @@ Allows users to connect their Israeli bank accounts and automatically import tra
 Since Phase 0 hardening (2026-07) these routes **require auth** (jwt cookie + CSRF header)
 and are rate limited via `scrapeLimiter` (10/hour in production).
 
+> **Refactor (Phase 2, 2026-07):** the scrape core — `COMPANY_CONFIG`, credential
+> shaping, `runScrape`, and the One Zero OTP helpers — now lives in
+> `server/services/scrapeService.js`. `scraperController.js` is a thin HTTP layer
+> over it, and the **saved-connection** job runner reuses the same service for
+> unattended sync. For the always-on daily import feature see
+> [import.md](import.md). This one-time-import flow is unchanged.
+
 ## User Flow
 
 ```
