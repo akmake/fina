@@ -37,8 +37,8 @@ Located in `server/models/`.
 |-------|------|-----------|
 | `Transaction` | `Transaction.js` | `user`, `amount`, `date`, `description`, `category`, `type` (income/expense), `account`, bank scraper fields (`identifier`, `processedDate`, `memo`) |
 | `Category` | `Category.js` | `user`, `name`, `type`, `color`, `icon`, `isDefault` |
-| `CategoryRule` | `CategoryRule.js` | `user`, `pattern` (regex/string), `category`, `priority` |
-| `Budget` | `Budget.js` | `user`, `category`, `amount`, `period` (monthly/yearly), `startDate` |
+| `CategoryRule` | `CategoryRule.js` | `user`, `searchString`, `matchType` (contains/exact/starts_with), `newName`, `category` (ref) |
+| `Budget` | `Budget.js` | `user`, `month`, `year`, `totalLimit`, `items[]` {category, limit, spent, color}, `alertThreshold`, `carryOverEnabled` (Phase 3 §5.4), soft-delete |
 | `Account` | `Account.js` | `user`, `name`, `type` (bank/credit/cash), `balance`, `currency`, `bankId` |
 | `FinanceProfile` | `FinanceProfile.js` | `user`, income details, expense targets, risk profile |
 | `RecurringTransaction` | `RecurringTransaction.js` | `user`, `amount`, `description`, `category`, `frequency`, `nextDate`, `isActive` |
@@ -66,7 +66,7 @@ Located in `server/models/`.
 
 | Model | File | Key Fields |
 |-------|------|-----------|
-| `Goal` | `Goal.js` | `user`, `name`, `targetAmount`, `currentAmount`, `deadline`, `category` |
+| `Goal` | `Goal.js` | `user`, `name`, `category`, `targetAmount`, `currentAmount`, `targetDate`, `monthlyContribution`, `milestones[]`, linked source (`linkedAccountType`, `linkedAccountId`), `trackingMode` (manual/category/account), `linkedCategory`, `lastTrackedAt` (Phase 3 §5.6), soft-delete |
 | `Project` | `Project.js` | `user`, `name`, `type` (goal/task), `status`, `budget`, `tasks[]`, `deadline` |
 | `ChildSavings` | `ChildSavings.js` | `user`, `childName`, `targetAmount`, `currentAmount`, `monthlyContribution`, `targetDate` |
 
@@ -81,7 +81,7 @@ Located in `server/models/`.
 
 | Model | File | Key Fields |
 |-------|------|-----------|
-| `Alert` | `Alert.js` | `user`, `type`, `threshold`, `condition`, `isActive`, `lastTriggered` |
+| `Alert` | `Alert.js` | `user`, `type` (enum incl. `bank_sync_failed`), `title`, `message`, `severity`, `icon`, `actionUrl`, `isRead`, `isDismissed`, `expiresAt` (TTL); Phase 3 notification engine: `channels[]` (inapp/email), `emailSentAt`, `dedupeKey`. **This is the in-app notification store** (no separate `Notification` model) |
 | `ForeignCurrency` | `ForeignCurrency.js` | `user`, `currency`, `amount`, `purchaseRate`, `currentRate` |
 | `Log` | `Log.js` | `timestamp`, `level`, `message`, `meta`, `userId`, `ip` |
 | `MerchantMap` | `MerchantMap.js` | `originalName`, `cleanName`, `category` — merchant name normalization |

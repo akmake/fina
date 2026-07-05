@@ -128,19 +128,29 @@ returned. Mounted at `/api/connections`. See [modules/import.md](modules/import.
 |--------|------|------|-------------|
 | GET | `/categories` | Yes | List all categories |
 | POST | `/categories` | Yes | Create category |
-| PUT | `/categories/:id` | Yes | Update category |
 | DELETE | `/categories/:id` | Yes | Delete category |
+| POST | `/categories/sync` | Yes | Backfill categories from transactions |
+| GET | `/categories/rules/all` | Yes | List category rules |
+| POST | `/categories/rules` | Yes | Create rule (body `applyToExisting` retro-categorizes; returns `appliedCount`) |
+| POST | `/categories/rules/suggest` | Yes | **Phase 3** — suggest a rule from a txn/description (§5.3); returns `searchString`, `matchCount`, `ruleExists` |
+| POST | `/categories/rules/apply` | Yes | Apply all rules to existing transactions |
+| DELETE | `/categories/rules/:id` | Yes | Delete rule |
 
 ---
 
 ## Budget
 
+Mounted at `/api/budgets` (`requireAuth` + `familyScope`).
+
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/budget` | Yes | Get budgets |
-| POST | `/budget` | Yes | Create budget |
-| PUT | `/budget/:id` | Yes | Update budget |
-| DELETE | `/budget/:id` | Yes | Delete budget |
+| GET | `/budgets?month=&year=` | Yes | Get month budget + actual spending |
+| GET | `/budgets/summary?year=` | Yes | Yearly budget summary |
+| POST | `/budgets` | Yes | Create/update month budget |
+| POST | `/budgets/copy` | Yes | Copy budget between months |
+| POST | `/budgets/rollover` | Yes | **Phase 3** — roll a month forward, optional `carryOver` of unspent balance (§5.4) |
+| POST | `/budgets/check-thresholds?month=&year=` | Yes | **Phase 3** — raise 75/90/100% budget notifications |
+| DELETE | `/budgets/:id` | Yes | Soft-delete budget |
 
 ---
 
@@ -213,10 +223,13 @@ returned. Mounted at `/api/connections`. See [modules/import.md](modules/import.
 | POST | `/projects` | Yes | Create project |
 | PUT | `/projects/:id` | Yes | Update project |
 | DELETE | `/projects/:id` | Yes | Delete project |
-| GET | `/goals` | Yes | List goals |
+| GET | `/goals` | Yes | List goals (refreshes connected goals first) |
 | POST | `/goals` | Yes | Create goal |
 | PUT | `/goals/:id` | Yes | Update goal |
-| DELETE | `/goals/:id` | Yes | Delete goal |
+| DELETE | `/goals/:id` | Yes | Soft-delete goal |
+| POST | `/goals/:id/deposit` | Yes | Add a contribution to a goal |
+| POST | `/goals/:id/recompute` | Yes | **Phase 3** — recompute a connected goal from its linked source (§5.6) |
+| POST | `/goals/recompute-all` | Yes | **Phase 3** — recompute all connected goals |
 | GET | `/child-savings` | Yes | List child savings |
 | POST | `/child-savings` | Yes | Create child savings |
 | PUT | `/child-savings/:id` | Yes | Update |
