@@ -69,11 +69,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/help",            label: "מדריך שימוש",    icon: HelpCircle      },
       { to: "/management",      label: "אוטומציה",       icon: Cpu             },
-      { to: "/import/excel",    label: "ייבוא אקסל",     icon: FileSpreadsheet },
-      { to: "/import/auto",     label: "ייבוא אוטומטי",  icon: DownloadCloud   },
-      //{ to: "/import/max",      label: "ייבוא מקס",      icon: CreditCard      },
-      //{ to: "/import",          label: "ייבוא נתונים",   icon: Upload          },
-      //{ to: "/discount-import", label: "ייבוא דיסקונט",  icon: Banknote        },
+      { to: "/connections",     label: "חיבורים וייבוא", icon: DownloadCloud   },
       { to: "/suggestions",     label: "הצעות שיפור",    icon: Lightbulb       },
     ],
   },
