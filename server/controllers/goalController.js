@@ -2,6 +2,7 @@
 import Goal from '../models/Goal.js';
 import { scopeFilter } from '../utils/scopeFilter.js';
 import { audit } from '../utils/audit.js';
+import { recomputeGoal, recomputeAllGoals } from '../services/goalTrackingService.js';
 
 const CATEGORY_LABELS = {
   home_purchase: 'קניית דירה',
@@ -36,6 +37,10 @@ const CATEGORY_ICONS = {
 // GET /api/goals
 export const getGoals = async (req, res) => {
   try {
+    // רענון יעדים מחוברים (§5.6) לפני החזרה, כדי שהרשימה תשקף נתונים חיים.
+    // best-effort — כשל ברענון לא מפיל את הטעינה.
+    await recomputeAllGoals(scopeFilter(req)).catch(() => {});
+
     const goals = await Goal.find(scopeFilter(req)).sort({ priority: 1, createdAt: -1 });
 
     const activeGoals = goals.filter(g => g.status === 'active');
@@ -124,6 +129,30 @@ export const depositToGoal = async (req, res) => {
   } catch (error) {
     console.error('Error depositing to goal:', error);
     res.status(500).json({ message: 'שגיאה בהפקדה ליעד' });
+  }
+};
+
+// POST /api/goals/:id/recompute — רענון יעד מחובר יחיד מהמקור המקושר (§5.6)
+export const recomputeGoalHandler = async (req, res) => {
+  try {
+    const goal = await Goal.findOne({ _id: req.params.id, ...scopeFilter(req) });
+    if (!goal) return res.status(404).json({ message: 'יעד לא נמצא' });
+    const { changed } = await recomputeGoal(goal, scopeFilter(req));
+    res.json({ goal, changed });
+  } catch (error) {
+    console.error('Error recomputing goal:', error);
+    res.status(500).json({ message: 'שגיאה ברענון היעד' });
+  }
+};
+
+// POST /api/goals/recompute-all — רענון כל היעדים המחוברים
+export const recomputeAllHandler = async (req, res) => {
+  try {
+    const result = await recomputeAllGoals(scopeFilter(req));
+    res.json(result);
+  } catch (error) {
+    console.error('Error recomputing goals:', error);
+    res.status(500).json({ message: 'שגיאה ברענון היעדים' });
   }
 };
 

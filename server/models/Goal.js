@@ -47,6 +47,14 @@ const goalSchema = new mongoose.Schema({
   linkedAccountType: { type: String, enum: ['deposit', 'fund', 'savings', 'manual'], default: 'manual' },
   linkedAccountId: { type: mongoose.Schema.Types.ObjectId },
 
+  // מעקב אוטומטי (§5.6) — יעד מחובר לנתונים אמיתיים במקום מספר סטטי
+  //   manual   — הסכום מוזן ידנית (ברירת מחדל, התנהגות קיימת)
+  //   category — הסכום מחושב מסכום התנועות בקטגוריה linkedCategory מאז startDate
+  //   account  — הסכום נשאב מיתרת החשבון המקושר (deposit/fund)
+  trackingMode: { type: String, enum: ['manual', 'category', 'account'], default: 'manual' },
+  linkedCategory: { type: String, trim: true },      // שם קטגוריית התנועות למעקב
+  lastTrackedAt: { type: Date },                     // מתי currentAmount עודכן אוטומטית לאחרונה
+
   // תאריכים
   targetDate: { type: Date },
   startDate: { type: Date, default: Date.now },
@@ -89,6 +97,16 @@ goalSchema.virtual('isOnTrack').get(function () {
   if (monthsLeft <= 0) return this.remaining === 0;
   const neededMonthlyRate = this.remaining / monthsLeft;
   return this.monthlyContribution >= neededMonthlyRate;
+});
+
+// תאריך צפוי להשלמה בקצב ההפקדה הנוכחי (תחזית §5.6) — null אם אין קצב/כבר הושלם
+goalSchema.virtual('projectedDate').get(function () {
+  if (this.remaining === 0) return null;
+  if (!this.monthlyContribution || this.monthlyContribution <= 0) return null;
+  const months = Math.ceil(this.remaining / this.monthlyContribution);
+  const d = new Date();
+  d.setMonth(d.getMonth() + months);
+  return d;
 });
 
 goalSchema.plugin(softDelete);
