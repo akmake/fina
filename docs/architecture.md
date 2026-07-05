@@ -89,6 +89,10 @@ fina/
 | `CLIENT_URL` | Allowed CORS origin | `server/app.js` (CORS config) | CORS blocks all browser requests |
 | `GOOGLE_CLIENT_ID` | Google OAuth app client ID | `server/controllers/authController.js` | Google login fails silently |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth app secret | `server/controllers/authController.js` | Google login fails |
+| `FINA_ENCRYPTION_KEY` | 64 hex chars (32 bytes) — AES-256-GCM key for bank-connection credentials (`openssl rand -hex 32`) | `server/utils/crypto.js` | **FATAL in production**; in dev the app starts but bank connections + auto-sync are disabled |
+| `IMPORT_MAX_CONCURRENCY` | Max simultaneous scrapes (default 2 — each launches Chrome) | `server/services/importRunner.js` | Defaults to 2 |
+| `IMPORT_SCHEDULER_INTERVAL_MS` | How often the auto-sync scheduler checks for due connections (default 30 min) | `server/services/importScheduler.js` | Defaults to 30 min |
+| `IMPORT_SYNC_INTERVAL_MS` | Per-connection sync cadence (default 24 h) | `server/services/importScheduler.js` | Defaults to daily |
 
 ### Client (`client/.env`)
 
@@ -106,7 +110,8 @@ fina/
 | Layer | Mechanism | File |
 |-------|-----------|------|
 | Transport | HTTPS (prod) / HTTP (dev) | Infrastructure |
-| Env validation | Fail-fast on missing/placeholder `MONGO_URI` + JWT secrets | `server/server.js` |
+| Env validation | Fail-fast on missing/placeholder `MONGO_URI` + JWT secrets; `FINA_ENCRYPTION_KEY` required in production | `server/server.js` |
+| Credential encryption | Bank credentials stored AES-256-GCM (`FINA_ENCRYPTION_KEY`); never returned to clients | `server/utils/crypto.js`, `server/models/BankConnection.js` |
 | CORS | Origin whitelist via `CLIENT_URL` | `server/app.js` |
 | CSRF | Custom header `X-Fina-Client: web-app` | `server/middlewares/csrf.js` |
 | Auth | JWT in httpOnly cookies | `server/middlewares/authMiddleware.js` |

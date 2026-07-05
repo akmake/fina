@@ -90,6 +90,8 @@ Located in `server/models/`.
 | `Suggestion` | `Suggestion.js` | `user`, `type`, `content`, `isRead`, `createdAt` |
 | `ElectricalProject` | `ElectricalProject.js` | `user`, `name`, `canvasData` (Fabric.js JSON), `components[]`, `createdAt` |
 | `AuditLog` | `AuditLog.js` | `actor`, `action`, `entity`, `entityId`, `before`, `after`, `ip`, `at` — append-only, נכתב דרך `utils/audit.js` |
+| `BankConnection` | `BankConnection.js` | `user`, `household`, `company`, `displayName`, `credentials` (AES-256-GCM blob, `select:false`), `otpLongTermToken` (encrypted, One Zero), `status` (`active`/`error`/`disabled`/`needs_otp`), `autoSync`, `incomesOnly`, `lastSyncAt`, `lastSyncStatus`, `lastInserted`, `nextSyncAt` — **soft delete**; secrets stripped from JSON. See [modules/import.md](modules/import.md) |
+| `ImportJob` | `ImportJob.js` | `user`, `household`, `connection`, `company`, `trigger` (`manual`/`scheduled`), `status` (`queued`/`running`/`success`/`error`/`partial`), `startedAt`, `finishedAt`, `durationMs`, `stats{received,inserted,skipped,accounts}`, `balances[]`, `error` — logs; **TTL 90 days** |
 
 ---
 
@@ -119,6 +121,8 @@ User
  ├─ has many → Alert
  ├─ has many → ForeignCurrency
  ├─ has many → Suggestion
+ ├─ has many → BankConnection   (→ has many ImportJob)
+ ├─ has many → ImportJob
  └─ has many → ElectricalProject
 ```
 
@@ -138,7 +142,7 @@ All documents include `user` field (ObjectId ref to User) for tenant isolation. 
 ## Soft Delete
 
 Business entities use the `softDelete` plugin (`server/utils/softDelete.js`):
-**Transaction, Budget, Goal, Loan, Account**.
+**Transaction, Budget, Goal, Loan, Account, BankConnection**.
 
 - Adds `deletedAt` (default `null`); all `find`/`count`/`aggregate` queries auto-filter deleted docs
 - Delete endpoints call `Model.softDeleteOne(filter)` / `softDeleteMany(filter)` instead of hard delete

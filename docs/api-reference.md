@@ -70,6 +70,25 @@ and are limited to 10 requests/hour in production (each request may launch a hea
 
 ---
 
+## Saved Bank Connections (Auth + familyScope) — Phase 2, Import 2.0
+
+Encrypted, reusable bank/credit connections that sync **unattended** (daily
+scheduler + on-demand). Credentials are AES-256-GCM at rest and are **never**
+returned. Mounted at `/api/connections`. See [modules/import.md](modules/import.md).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/connections/companies` | Supported institutions + required credential fields (`visaCal` excluded client-side — browser-OTP, not reusable) |
+| GET | `/connections` | List the household's connections (metadata only — no secrets) |
+| POST | `/connections` | Create (body: `company`, `displayName?`, `autoSync?`, `incomesOnly?`, `otpLongTermToken?` for One Zero, `...credFields`). Credentials encrypted on write |
+| PATCH | `/connections/:id` | Update `displayName`/`autoSync`/`incomesOnly`, or rotate credentials/token |
+| DELETE | `/connections/:id` | Soft delete (audited) |
+| POST | `/connections/:id/sync` | Trigger sync now → `202 { jobId }` (scrape rate-limited); poll the job |
+| GET | `/connections/:id/jobs` | Recent sync history (last 20) for a connection |
+| GET | `/connections/jobs/:id` | Poll a single ImportJob's status/stats |
+
+---
+
 ## Auth Routes
 
 | Method | Path | Auth | Description |

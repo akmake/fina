@@ -53,6 +53,7 @@ const ForeignCurrencyPage  = lazy(() => import("@/pages/ForeignCurrencyPage"));
 const ReportsPage          = lazy(() => import("@/pages/ReportsPage"));
 const MaaserPage           = lazy(() => import("@/pages/MaaserPage"));
 const AutoImportPage       = lazy(() => import("@/pages/AutoImportPage"));
+const BankConnectionsPage  = lazy(() => import("@/pages/BankConnectionsPage"));
 const CalDirectImportPage  = lazy(() => import("@/pages/CalDirectImportPage"));
 const MaxImportPage        = lazy(() => import("@/pages/MaxImportPage"));
 const FamilyPage           = lazy(() => import("@/pages/FamilyPage"));
@@ -99,6 +100,8 @@ export default function App() {
             <Route path="import"            element={<ImportPage />}               />
             <Route path="import/excel"      element={<ExcelImportPage />}          />
             <Route path="import/auto"       element={<AutoImportPage />}           />
+            <Route path="import/connections" element={<BankConnectionsPage />}      />
+            <Route path="connections"       element={<BankConnectionsPage />}       />
             <Route path="import/cal"        element={<CalDirectImportPage />}      />
             <Route path="import/max"        element={<MaxImportPage />}            />
             <Route path="management"        element={<ManagementPage />}           />

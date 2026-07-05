@@ -72,6 +72,12 @@
 | `server/routes/scraperRoutes.js` | `server/routes/calRoutes.js` (parallel scraper), `docs/modules/bank-scraper.md`, `client/src/pages/` scraper pages |
 | Scraper response format | Transaction import logic, auto-categorization, `MerchantMap` model |
 | `server/models/MerchantMap.js` | Auto-categorization in `CategoryRule` processing |
+| `server/services/scrapeService.js` (COMPANY_CONFIG, scrape core) | `server/controllers/scraperController.js`, `server/services/importRunner.js`, `docs/modules/bank-scraper.md`, `docs/modules/import.md` |
+| `server/services/transactionPersistence.js` | `server/controllers/importController.js`, `server/services/importRunner.js` (both persist via it) |
+| `server/models/BankConnection.js` / `ImportJob.js` | `server/controllers/bankConnectionController.js`, `server/services/importRunner.js`, `server/services/importScheduler.js`, `docs/database.md`, `docs/modules/import.md` |
+| `server/utils/crypto.js` | `server/models/BankConnection.js`, `server/services/importRunner.js`, `server/server.js` (env check), `docs/architecture.md` (env table) |
+| `server/services/importRunner.js` / `importScheduler.js` | `server/controllers/bankConnectionController.js`, `server/server.js` (scheduler start), `client/src/stores/connectionsStore.js` (job polling), `docs/modules/import.md` |
+| `client/src/stores/connectionsStore.js` | `client/src/pages/BankConnectionsPage.jsx`, `docs/state-management.md`, `docs/modules/import.md` |
 
 ---
 
