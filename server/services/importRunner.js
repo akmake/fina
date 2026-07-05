@@ -3,6 +3,7 @@ import ImportJob from '../models/ImportJob.js';
 import { decrypt, decryptJSON } from '../utils/crypto.js';
 import { runScrape, scrapeOneZeroWithToken } from './scrapeService.js';
 import { persistTransactions } from './transactionPersistence.js';
+import { notify } from './notificationService.js';
 import AppError from '../utils/AppError.js';
 import logger from '../utils/logger.js';
 
@@ -112,11 +113,31 @@ export const runImportJob = async (jobId) => {
     await job.save().catch((e) => logger.error(`[importRunner] failed to save job error: ${e.message}`));
 
     // Expired One Zero token → flag for re-auth; anything else → generic error.
-    const connStatus = (job.company === 'oneZero' && err.statusCode === 401) ? 'needs_otp' : 'error';
+    const needsOtp = job.company === 'oneZero' && err.statusCode === 401;
+    const connStatus = needsOtp ? 'needs_otp' : 'error';
     await BankConnection.updateOne(
       { _id: job.connection },
       { $set: { status: connStatus, lastSyncAt: finishedAt, lastSyncStatus: 'error', lastError: err.message } },
     ).catch((e) => logger.error(`[importRunner] failed to update connection status: ${e.message}`));
+
+    // Notify the owner that an unattended/manual sync failed (Phase 3 engine).
+    // De-duped per connection per day so a stuck connection doesn't spam.
+    await notify({
+      user: job.user,
+      type: 'bank_sync_failed',
+      title: needsOtp ? 'נדרש אימות מחדש לחיבור הבנק' : 'סנכרון בנק אוטומטי נכשל',
+      message: needsOtp
+        ? `החיבור ל-${job.company} דורש קוד חד-פעמי מחדש. יש להתחבר שוב מעמוד החיבורים.`
+        : `הסנכרון של ${job.company} נכשל: ${err.message}`,
+      icon: needsOtp ? '🔐' : '⚠️',
+      severity: needsOtp ? 'warning' : 'danger',
+      actionUrl: '/connections',
+      actionLabel: 'לחיבורים',
+      relatedModel: 'BankConnection',
+      relatedId: job.connection,
+      channels: ['inapp', 'email'],
+      dedupeKey: `bank_sync_failed:${job.connection}`,
+    }).catch((e) => logger.error(`[importRunner] failed to notify sync failure: ${e.message}`));
 
     logger.error(`[importRunner] job ${jobId} (${job.company}) failed: ${err.message}`);
     return job;
