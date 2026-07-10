@@ -35,6 +35,7 @@ const NAV_GROUPS = [
   {
     label: "השקעות וחיסכון", icon: PiggyBank,
     items: [
+      { to: "/assets",           label: "תיק נכסים", icon: PiggyBank     },
       { to: "/investments",      label: "מניות",    icon: TrendingUp    },
       { to: "/deposits",         label: "פיקדונות", icon: Landmark      },
       { to: "/funds",            label: "קרנות",    icon: BarChart3     },
@@ -69,11 +70,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/help",            label: "מדריך שימוש",    icon: HelpCircle      },
       { to: "/management",      label: "אוטומציה",       icon: Cpu             },
-      { to: "/import/excel",    label: "ייבוא אקסל",     icon: FileSpreadsheet },
-      { to: "/import/auto",     label: "ייבוא אוטומטי",  icon: DownloadCloud   },
-      //{ to: "/import/max",      label: "ייבוא מקס",      icon: CreditCard      },
-      //{ to: "/import",          label: "ייבוא נתונים",   icon: Upload          },
-      //{ to: "/discount-import", label: "ייבוא דיסקונט",  icon: Banknote        },
+      { to: "/connections",     label: "חיבורים וייבוא", icon: DownloadCloud   },
       { to: "/suggestions",     label: "הצעות שיפור",    icon: Lightbulb       },
     ],
   },
@@ -129,7 +126,7 @@ export default function Navbar() {
   return (
     <>
       {/* ════════════════ DESKTOP SIDEBAR ════════════════ */}
-      <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
+      <div className="hidden md:flex md:w-20 md:flex-col md:fixed md:inset-y-0 md:z-40">
         <DesktopSidebar groups={groups} user={user} isAuthenticated={isAuthenticated} logout={logout} />
       </div>
 
@@ -413,67 +410,287 @@ function MoreSheet({ open, onClose, groups, user, logout, pathname }) {
 function DesktopSidebar({ groups, user, isAuthenticated, logout, onClose }) {
   const { isDark, toggleDark } = useUIStore();
   const location = useLocation();
+  const activeGroup = groups.find(group =>
+    group.items.some(item => isPathActive(item.to, location.pathname))
+  );
+  const [panelGroup, setPanelGroup] = useState(null);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    setPanelGroup(null);
+    setQuery("");
+  }, [location.pathname]);
+
+  const selectedGroup = groups.find(group => group.label === panelGroup);
+  const normalizedQuery = query.trim().toLocaleLowerCase("he");
+  const visibleItems = selectedGroup?.items.filter(item =>
+    item.label.toLocaleLowerCase("he").includes(normalizedQuery)
+  ) || [];
+
+  const togglePanel = label => {
+    setQuery("");
+    setPanelGroup(current => current === label ? null : label);
+  };
+
+  return (
+    <div className="relative h-full w-20">
+      <aside className="relative z-20 flex h-full w-20 flex-col items-center border-l border-slate-200 bg-[#fbfcfe] py-3 dark:border-white/[0.08] dark:bg-[#101217]">
+        <Link
+          to="/"
+          onClick={onClose}
+          className="mb-5 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-sm font-black text-white shadow-lg shadow-blue-600/20"
+          aria-label="fina"
+        >
+          F
+        </Link>
+
+        <nav className="flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-2 [scrollbar-width:none]">
+          {groups.map(group => {
+            const GroupIcon = group.icon;
+            const isActive = activeGroup?.label === group.label;
+            const isOpen = panelGroup === group.label;
+            return (
+              <button
+                key={group.label}
+                type="button"
+                onClick={() => togglePanel(group.label)}
+                title={group.label}
+                aria-label={group.label}
+                aria-expanded={isOpen}
+                className={`group relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl transition-all ${
+                  isOpen
+                    ? "bg-slate-900 text-white shadow-md dark:bg-white dark:text-slate-950"
+                    : isActive
+                      ? "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400"
+                      : "text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-500 dark:hover:bg-white/[0.06] dark:hover:text-slate-200"
+                }`}
+              >
+                {isActive && !isOpen && (
+                  <span className="absolute -right-2 h-5 w-[3px] rounded-l-full bg-blue-600" />
+                )}
+                <GroupIcon className="h-[19px] w-[19px]" strokeWidth={1.8} />
+                <span className="pointer-events-none absolute right-[54px] z-50 hidden whitespace-nowrap rounded-lg bg-slate-950 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-lg group-hover:block dark:bg-white dark:text-slate-950">
+                  {group.label}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="mt-3 flex flex-col items-center gap-2 border-t border-slate-200 pt-3 dark:border-white/[0.08]">
+          <button
+            type="button"
+            onClick={toggleDark}
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-white/[0.06] dark:hover:text-white"
+            aria-label={isDark ? "מצב בהיר" : "מצב כהה"}
+          >
+            {isDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+          </button>
+
+          {isAuthenticated ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-[11px] font-bold text-white ring-2 ring-white dark:bg-white dark:text-slate-950 dark:ring-[#101217]">
+                  {initials(user?.name)}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56 rounded-xl p-1" side="left" align="end" sideOffset={12}>
+                <DropdownMenuLabel className="font-normal px-3 py-2">
+                  <p className="text-[13px] font-semibold">{user?.name}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-slate-400">{user?.email}</p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild><Link to="/profile"><UserCircle className="ml-2 h-4 w-4" />פרופיל</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to="/settings"><Settings className="ml-2 h-4 w-4" />הגדרות</Link></DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="text-red-600"><LogOut className="ml-2 h-4 w-4" />התנתקות</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link to="/login" className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white" title="התחברות">
+              <UserCircle className="h-5 w-5" />
+            </Link>
+          )}
+        </div>
+      </aside>
+
+      {selectedGroup && (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-0 cursor-default bg-slate-950/5 backdrop-blur-[1px] dark:bg-black/20"
+            onClick={() => setPanelGroup(null)}
+            aria-label="סגירת תפריט"
+          />
+          <section className="absolute right-20 top-0 z-10 flex h-full w-[292px] flex-col border-l border-slate-200 bg-white shadow-2xl shadow-slate-900/10 dark:border-white/[0.08] dark:bg-[#15181f] dark:shadow-black/30">
+            <header className="px-5 pb-4 pt-5">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                    <selectedGroup.icon className="h-[18px] w-[18px]" strokeWidth={1.8} />
+                  </div>
+                  <div>
+                    <h2 className="text-[14px] font-bold text-slate-950 dark:text-white">{selectedGroup.label}</h2>
+                    <p className="text-[10px] text-slate-400">{selectedGroup.items.length} כלים</p>
+                  </div>
+                </div>
+                <button onClick={() => setPanelGroup(null)} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/[0.06] dark:hover:text-white">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <label className="flex h-10 items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-blue-400 focus-within:bg-white dark:border-white/[0.08] dark:bg-white/[0.04] dark:focus-within:border-blue-500/60">
+                <Search className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                <input
+                  value={query}
+                  onChange={event => setQuery(event.target.value)}
+                  placeholder="חיפוש בתפריט..."
+                  className="min-w-0 flex-1 bg-transparent text-[12px] text-slate-900 outline-none placeholder:text-slate-400 dark:text-white"
+                  autoFocus
+                />
+              </label>
+            </header>
+
+            <div className="mx-5 h-px bg-slate-100 dark:bg-white/[0.07]" />
+            <div className="flex-1 overflow-y-auto px-3 py-3">
+              {visibleItems.map(item => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={onClose}
+                  className={({ isActive }) => `group flex min-h-12 items-center gap-3 rounded-xl px-3 transition-colors ${
+                    isActive
+                      ? "bg-blue-600 text-white"
+                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/[0.06] dark:hover:text-white"
+                  }`}
+                >
+                  {({ isActive }) => (
+                    <>
+                      <item.icon className={`h-[17px] w-[17px] flex-shrink-0 ${isActive ? "text-white" : "text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white"}`} strokeWidth={1.8} />
+                      <span className="text-[13px] font-medium">{item.label}</span>
+                    </>
+                  )}
+                </NavLink>
+              ))}
+              {!visibleItems.length && (
+                <p className="px-3 py-8 text-center text-xs text-slate-400">לא נמצאו תוצאות</p>
+              )}
+            </div>
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
+function LegacyDesktopSidebar({ groups, user, isAuthenticated, logout, onClose }) {
+  const { isDark, toggleDark } = useUIStore();
+  const location = useLocation();
+  const pinnedPaths = ["/finance-dashboard", "/portfolio", "/budget"];
+  const pinnedItems = pinnedPaths
+    .map(path => groups.flatMap(group => group.items).find(item => item.to === path))
+    .filter(Boolean);
+  const menuGroups = groups
+    .map(group => ({ ...group, items: group.items.filter(item => !pinnedPaths.includes(item.to)) }))
+    .filter(group => group.items.length);
 
   const [expanded, setExpanded] = useState(() => {
     const init = {};
     let found = false;
-    groups.forEach(g => {
+    menuGroups.forEach(g => {
       if (g.items.some(i => isPathActive(i.to, location.pathname))) {
         init[g.label] = true;
         found = true;
       }
     });
-    if (!found && groups[0]) init[groups[0].label] = true;
+    if (!found && menuGroups[0]) init[menuGroups[0].label] = true;
     return init;
   });
 
-  const toggle = label => setExpanded(p => ({ ...p, [label]: !p[label] }));
+  useEffect(() => {
+    const activeGroup = menuGroups.find(group =>
+      group.items.some(item => isPathActive(item.to, location.pathname))
+    );
+    if (activeGroup) setExpanded(previous => ({ ...previous, [activeGroup.label]: true }));
+  }, [location.pathname]);
+
+  const toggle = label => setExpanded(previous => ({
+    ...previous,
+    [label]: !previous[label],
+  }));
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-[#0f1117] border-l border-slate-200/80 dark:border-white/[0.06]">
+    <aside className="flex h-full flex-col bg-white text-slate-900 dark:bg-[#111318] dark:text-slate-100 border-l border-slate-200/80 dark:border-white/[0.08]">
 
       {/* Brand */}
-      <div className="h-16 px-5 flex items-center justify-between border-b border-slate-200/80 dark:border-white/[0.06] flex-shrink-0">
+      <div className="h-16 px-5 flex items-center justify-between flex-shrink-0">
         <Link to="/" onClick={onClose} className="flex items-center gap-2.5">
-          <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow">
-            <span className="text-white text-xs font-black">F</span>
+          <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm shadow-blue-600/20">
+            <span className="text-white text-[13px] font-bold">F</span>
           </div>
-          <span className="text-[17px] font-black tracking-tight text-slate-900 dark:text-white">fina</span>
+          <span className="text-lg font-bold tracking-tight">fina</span>
         </Link>
         <button
           onClick={toggleDark}
-          className="h-8 w-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+          aria-label={isDark ? "מעבר למצב בהיר" : "מעבר למצב כהה"}
+          className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/[0.07] dark:hover:text-slate-200 transition-colors"
         >
           {isDark ? <Sun className="h-4 w-4" strokeWidth={1.8} /> : <Moon className="h-4 w-4" strokeWidth={1.8} />}
         </button>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
-        {groups.map((group, gi) => {
+      <nav className="flex-1 overflow-y-auto px-3 pb-4 [scrollbar-width:thin]">
+        <div className="space-y-1">
+          {pinnedItems.map(item => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={onClose}
+              className={({ isActive }) => `flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors ${
+                isActive
+                  ? "bg-blue-600 text-white shadow-sm shadow-blue-600/15"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
+              }`}
+            >
+              <item.icon className="h-[17px] w-[17px] flex-shrink-0" strokeWidth={1.8} />
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
+        </div>
+
+        <div className="my-4 h-px bg-slate-100 dark:bg-white/[0.07]" />
+        <p className="mb-2 px-3 text-[10px] font-bold tracking-[0.08em] text-slate-400 dark:text-slate-500">
+          כל הכלים
+        </p>
+
+        <div className="space-y-1">
+        {menuGroups.map((group, gi) => {
           const open = expanded[group.label];
+          const active = group.items.some(item => isPathActive(item.to, location.pathname));
           return (
             <div key={gi}>
               <button
                 onClick={() => toggle(group.label)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors mt-1 ${
-                  open
-                    ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400"
-                    : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-800 dark:hover:text-slate-200"
+                aria-expanded={open}
+                className={`w-full flex h-9 items-center justify-between rounded-lg px-3 transition-colors ${
+                  open || active
+                    ? "text-slate-900 dark:text-slate-100"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-slate-200"
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <group.icon className="h-[15px] w-[15px] flex-shrink-0" strokeWidth={1.8} />
+                  <group.icon className={`h-4 w-4 flex-shrink-0 ${active ? "text-blue-600 dark:text-blue-400" : "text-slate-400"}`} strokeWidth={1.8} />
                   <span className="text-[12.5px] font-semibold">{group.label}</span>
                 </div>
                 <ChevronDown
-                  className="h-3.5 w-3.5 transition-transform duration-200"
+                  className="h-3.5 w-3.5 text-slate-400 transition-transform duration-200"
                   style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
                   strokeWidth={2}
                 />
               </button>
               {open && (
-                <ul className="mt-0.5 space-y-0.5">
+                <ul className="mb-2 mt-1 space-y-0.5 border-r border-slate-200 pr-3 mr-5 dark:border-white/[0.09]">
                   {group.items.map(item => (
                     <li key={item.to}>
                       <NavLink
@@ -481,14 +698,14 @@ function DesktopSidebar({ groups, user, isAuthenticated, logout, onClose }) {
                         end={item.to === "/"}
                         onClick={onClose}
                         className={({ isActive }) =>
-                          `flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12.5px] font-medium transition-colors ${
+                          `flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[12px] font-medium transition-colors ${
                             isActive
-                              ? "bg-blue-600 text-white shadow-sm"
-                              : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100"
+                              ? "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
+                              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/[0.05] dark:hover:text-slate-100"
                           }`
                         }
                       >
-                        <item.icon className="flex-shrink-0 h-[14px] w-[14px]" strokeWidth={1.8} />
+                        <item.icon className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={1.8} />
                         {item.label}
                       </NavLink>
                     </li>
@@ -498,6 +715,7 @@ function DesktopSidebar({ groups, user, isAuthenticated, logout, onClose }) {
             </div>
           );
         })}
+        </div>
       </nav>
 
       {/* Privacy */}
@@ -508,7 +726,7 @@ function DesktopSidebar({ groups, user, isAuthenticated, logout, onClose }) {
       </div>
 
       {/* User footer */}
-      <div className="px-3 py-3 border-t border-slate-200/80 dark:border-white/[0.06] flex-shrink-0">
+      <div className="mx-3 mb-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-1 dark:border-white/[0.07] dark:bg-white/[0.03] flex-shrink-0">
         {isAuthenticated ? (
           <DesktopUserNav user={user} logout={logout} onClose={onClose} />
         ) : (
@@ -520,7 +738,7 @@ function DesktopSidebar({ groups, user, isAuthenticated, logout, onClose }) {
           </Link>
         )}
       </div>
-    </div>
+    </aside>
   );
 }
 
@@ -531,8 +749,8 @@ function DesktopUserNav({ user, logout, onClose }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors text-start group">
-          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[12px] font-bold flex-shrink-0 shadow">
+        <button className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-start group">
+          <div className="h-8 w-8 rounded-lg bg-slate-900 dark:bg-slate-100 flex items-center justify-center text-white dark:text-slate-900 text-[11px] font-bold flex-shrink-0">
             {initials(user?.name)}
           </div>
           <div className="flex-1 min-w-0">

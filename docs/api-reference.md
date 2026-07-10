@@ -21,9 +21,15 @@ All protected routes require:
 | POST | `/auth/google` | Google OAuth `{ credential: id_token }` |
 | POST | `/auth/logout` | Clears JWT cookies |
 | POST | `/auth/refresh` | Refresh access token using refresh cookie |
+| POST | `/auth/verify-email` | Verify email `{ token }` (Phase 4 — from the email link) |
+| POST | `/auth/2fa/login` | Second login step for 2FA users `{ mfaToken, code }` → sets JWT cookies |
 | POST | `/logs/device-ping` | Device analytics ping (public by design — sent before login; rate limited) |
 
 > `/auth/*` routes are rate limited (20 requests / 15 min in production) to block brute-force.
+>
+> **Login with 2FA (Phase 4):** if the user has 2FA on, `POST /auth/login` returns
+> `{ twoFactorRequired: true, mfaToken }` **without** session cookies; the client
+> then calls `POST /auth/2fa/login` with a TOTP (or recovery) code to get cookies.
 
 ---
 
@@ -98,6 +104,28 @@ returned. Mounted at `/api/connections`. See [modules/import.md](modules/import.
 | POST | `/auth/google` | No | Google OAuth |
 | POST | `/auth/logout` | Yes | Logout, clear cookies |
 | POST | `/auth/refresh` | Refresh cookie | Get new access token |
+| POST | `/auth/verify-email` | No | **Phase 4** — verify email `{ token }` |
+| POST | `/auth/resend-verification` | Yes | **Phase 4** — re-send the verification email |
+| POST | `/auth/2fa/setup` | Yes | **Phase 4** — start 2FA; returns `{ secret, otpauth, qr }` |
+| POST | `/auth/2fa/enable` | Yes | **Phase 4** — confirm `{ code }`, activate; returns one-time `recoveryCodes` |
+| POST | `/auth/2fa/disable` | Yes | **Phase 4** — disable with `{ code }` (TOTP/recovery) or `{ password }` |
+| POST | `/auth/2fa/login` | No | **Phase 4** — exchange `{ mfaToken, code }` for session cookies |
+
+---
+
+## Account & Subscription (Phase 4 — Auth + familyScope)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/account` | Profile + `emailVerified` + `twoFactorEnabled` + current plan |
+| GET | `/account/export` | Full JSON export of the caller's data (GDPR portability; downloads) |
+| DELETE | `/account` | Delete account — anonymize + soft-delete data; `{ password }` (or `{ confirm }` for OAuth users) |
+| POST | `/account/onboarding` | Mark the first-run flow complete (`onboardedAt`) |
+| GET | `/subscription` | Household's current plan + status |
+| GET | `/subscription/plans` | Plan catalog (`free`/`premium` with limits + features) |
+| POST | `/subscription/change` | **Stub** — switch plan `{ plan }` (owner-only; no real billing wired) |
+
+> Plan gating (`middlewares/planGate.js`) returns **402** `{ code: 'PLAN_UPGRADE_REQUIRED' | 'PLAN_LIMIT_REACHED' }` — ready to attach to premium routes / free-tier caps. See [modules/saas-shell.md](modules/saas-shell.md).
 
 ---
 
@@ -128,19 +156,29 @@ returned. Mounted at `/api/connections`. See [modules/import.md](modules/import.
 |--------|------|------|-------------|
 | GET | `/categories` | Yes | List all categories |
 | POST | `/categories` | Yes | Create category |
-| PUT | `/categories/:id` | Yes | Update category |
 | DELETE | `/categories/:id` | Yes | Delete category |
+| POST | `/categories/sync` | Yes | Backfill categories from transactions |
+| GET | `/categories/rules/all` | Yes | List category rules |
+| POST | `/categories/rules` | Yes | Create rule (body `applyToExisting` retro-categorizes; returns `appliedCount`) |
+| POST | `/categories/rules/suggest` | Yes | **Phase 3** — suggest a rule from a txn/description (§5.3); returns `searchString`, `matchCount`, `ruleExists` |
+| POST | `/categories/rules/apply` | Yes | Apply all rules to existing transactions |
+| DELETE | `/categories/rules/:id` | Yes | Delete rule |
 
 ---
 
 ## Budget
 
+Mounted at `/api/budgets` (`requireAuth` + `familyScope`).
+
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/budget` | Yes | Get budgets |
-| POST | `/budget` | Yes | Create budget |
-| PUT | `/budget/:id` | Yes | Update budget |
-| DELETE | `/budget/:id` | Yes | Delete budget |
+| GET | `/budgets?month=&year=` | Yes | Get month budget + actual spending |
+| GET | `/budgets/summary?year=` | Yes | Yearly budget summary |
+| POST | `/budgets` | Yes | Create/update month budget |
+| POST | `/budgets/copy` | Yes | Copy budget between months |
+| POST | `/budgets/rollover` | Yes | **Phase 3** — roll a month forward, optional `carryOver` of unspent balance (§5.4) |
+| POST | `/budgets/check-thresholds?month=&year=` | Yes | **Phase 3** — raise 75/90/100% budget notifications |
+| DELETE | `/budgets/:id` | Yes | Soft-delete budget |
 
 ---
 
@@ -213,10 +251,13 @@ returned. Mounted at `/api/connections`. See [modules/import.md](modules/import.
 | POST | `/projects` | Yes | Create project |
 | PUT | `/projects/:id` | Yes | Update project |
 | DELETE | `/projects/:id` | Yes | Delete project |
-| GET | `/goals` | Yes | List goals |
+| GET | `/goals` | Yes | List goals (refreshes connected goals first) |
 | POST | `/goals` | Yes | Create goal |
 | PUT | `/goals/:id` | Yes | Update goal |
-| DELETE | `/goals/:id` | Yes | Delete goal |
+| DELETE | `/goals/:id` | Yes | Soft-delete goal |
+| POST | `/goals/:id/deposit` | Yes | Add a contribution to a goal |
+| POST | `/goals/:id/recompute` | Yes | **Phase 3** — recompute a connected goal from its linked source (§5.6) |
+| POST | `/goals/recompute-all` | Yes | **Phase 3** — recompute all connected goals |
 | GET | `/child-savings` | Yes | List child savings |
 | POST | `/child-savings` | Yes | Create child savings |
 | PUT | `/child-savings/:id` | Yes | Update |

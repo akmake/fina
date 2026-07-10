@@ -23,6 +23,7 @@ const alertSchema = new mongoose.Schema({
       'savings_tip',            // טיפ חיסכון
       'pension_update',         // עדכון פנסיוני
       'net_worth_change',       // שינוי משמעותי בשווי נקי
+      'bank_sync_failed',       // סנכרון בנק אוטומטי נכשל
       'general',
     ],
   },
@@ -41,6 +42,13 @@ const alertSchema = new mongoose.Schema({
   relatedModel: { type: String, trim: true },       // 'Insurance', 'Budget', 'Loan'...
   relatedId: { type: mongoose.Schema.Types.ObjectId },
 
+  // ערוצי שליחה (Phase 3 — מנוע התראות רב-ערוצי). in-app תמיד; email אופציונלי.
+  channels: { type: [String], enum: ['inapp', 'email'], default: ['inapp'] },
+  emailSentAt: { type: Date },                      // מתי נשלח המייל בפועל (null = לא נשלח)
+
+  // מפתח דה-דופ יציב — מונע יצירת אותה התראה פעמיים בחלון זמן (במקום regex על הכותרת)
+  dedupeKey: { type: String, trim: true, index: true },
+
   // סטטוס
   isRead: { type: Boolean, default: false },
   isDismissed: { type: Boolean, default: false },
@@ -51,6 +59,7 @@ const alertSchema = new mongoose.Schema({
 
 alertSchema.index({ user: 1, isRead: 1, isDismissed: 1 });
 alertSchema.index({ user: 1, createdAt: -1 });
+alertSchema.index({ user: 1, dedupeKey: 1, createdAt: -1 });
 alertSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });  // TTL - נמחק אוטומטית
 
 export default mongoose.model('Alert', alertSchema);

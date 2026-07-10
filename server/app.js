@@ -48,6 +48,8 @@ import familyRoutes from './routes/familyRoutes.js';
 import householdRoutes from './routes/householdRoutes.js';
 import adminUsersRoutes from './routes/adminUsers.js';
 import businessRoutes from './routes/businessRoutes.js';
+import accountRoutes from './routes/accountRoutes.js';
+import subscriptionRoutes from './routes/subscriptionRoutes.js';
 
 // ייבוא מידלוור
 import rateLimiter, { authLimiter, scrapeLimiter } from './middlewares/rateLimiter.js';
@@ -165,6 +167,8 @@ app.use('/api/cal',     scrapeLimiter, calRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/admin/users', adminUsersRoutes);
 app.use('/api/business',    requireAuth, familyScope, businessRoutes);
+app.use('/api/account',       requireAuth, familyScope, accountRoutes);
+app.use('/api/subscription',  requireAuth, familyScope, subscriptionRoutes);
 
 // --- טיפול בשגיאות ---
 

@@ -4,6 +4,9 @@
 
 import { Router } from 'express';
 import { scrapeLimiter } from '../middlewares/rateLimiter.js';
+import { enforceLimit } from '../middlewares/planGate.js';
+import BankConnection from '../models/BankConnection.js';
+import { scopeFilter } from '../utils/scopeFilter.js';
 import {
   listCompanies,
   listConnections,
@@ -17,6 +20,9 @@ import {
 
 const router = Router();
 
+// Free-tier plan cap: count the household's existing (non-deleted) connections.
+const countConnections = (req) => BankConnection.countDocuments(scopeFilter(req));
+
 // Metadata: which credential fields each supported institution needs.
 router.get('/companies', listCompanies);
 
@@ -24,7 +30,8 @@ router.get('/companies', listCompanies);
 router.get('/jobs/:id', getJob);
 
 router.get('/', listConnections);
-router.post('/', createConnection);
+// Plan gate: free tier caps connected accounts (returns 402 when the cap is hit).
+router.post('/', enforceLimit('bankConnections', countConnections), createConnection);
 
 router.get('/:id/jobs', listConnectionJobs);
 // Each sync launches a headless browser — keep it under the scrape rate limiter.

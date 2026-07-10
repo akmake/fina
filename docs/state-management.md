@@ -84,6 +84,23 @@ Data fetching uses **TanStack React Query 5.83** for server state (caching, refe
 
 ---
 
+### `connectionsStore.js`
+**Purpose:** Saved bank connections + unattended sync (Phase 2, Import 2.0). Holds metadata only — credentials are never returned. See [modules/import.md](modules/import.md).
+
+| Field / Action | Type | Description |
+|---------------|------|-------------|
+| `connections` | array | BankConnection metadata list |
+| `companies` | array | Supported institutions + credential fields |
+| `syncing` | object | `{ [connectionId]: jobStatus }` while a sync runs |
+| `fetchConnections()` / `fetchCompanies()` | async action | GET `/api/connections` / `/api/connections/companies` |
+| `createConnection(payload)` | async action | POST `/api/connections` (credentials encrypted server-side) |
+| `updateConnection(id, patch)` / `deleteConnection(id)` | async action | PATCH / DELETE |
+| `syncConnection(id)` | async action | POST `/:id/sync` then polls `GET /api/connections/jobs/:id` to completion |
+
+**Consumers:** `BankConnectionsPage` (routes `/connections`, `/import/connections`)
+
+---
+
 ### `fundStore.js`
 **Purpose:** Mutual funds / ETFs.
 

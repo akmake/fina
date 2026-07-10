@@ -7,6 +7,7 @@ import {
   createRule,
   deleteRule,
   applyRulesToTransactions,
+  suggestRule,
   syncCategoriesFromTransactions
 } from '../controllers/categoryController.js';
 
@@ -27,6 +28,7 @@ router.route('/:id').delete(deleteCategory);
 // נתיבי מנוע החוקים והסנכרון
 router.get('/rules/all', getRules);
 router.post('/rules', createRule);
+router.post('/rules/suggest', suggestRule);
 router.delete('/rules/:id', deleteRule);
 router.post('/rules/apply', applyRulesToTransactions);
 router.post('/sync', syncCategoriesFromTransactions);

@@ -1,14 +1,14 @@
 // server/controllers/alertController.js
 import Alert from '../models/Alert.js';
 import Insurance from '../models/Insurance.js';
-import Budget from '../models/Budget.js';
 import Deposit from '../models/Deposit.js';
 import Goal from '../models/Goal.js';
 import Mortgage from '../models/Mortgage.js';
 import Transaction from '../models/Transaction.js';
 import RecurringTransaction from '../models/RecurringTransaction.js';
-import { subDays, startOfMonth, endOfMonth, addDays } from 'date-fns';
+import { subDays, addDays } from 'date-fns';
 import { scopeFilter } from '../utils/scopeFilter.js';
+import { checkBudgetThresholds } from '../services/budgetCycleService.js';
 
 // GET /api/alerts
 export const getAlerts = async (req, res) => {
@@ -92,57 +92,12 @@ export const generateAlerts = async (req, res) => {
       }
     }
 
-    // ── 2. חריגה מתקציב ────────────────
-    const thisMonth = now.getMonth() + 1;
-    const thisYear = now.getFullYear();
-    const budget = await Budget.findOne({ ...scopeFilter(req), month: thisMonth, year: thisYear });
-    if (budget) {
-      for (const item of budget.items) {
-        const spent = item.spent || 0;
-        const pct = item.limit > 0 ? (spent / item.limit) * 100 : 0;
-        if (pct >= 100) {
-          const exists = await Alert.findOne({
-            user: userId, type: 'budget_exceeded',
-            'title': { $regex: item.category },
-            createdAt: { $gte: startOfMonth(now) },
-          });
-          if (!exists) {
-            newAlerts.push({
-              user: userId,
-              type: 'budget_exceeded',
-              title: `חריגה מתקציב: ${item.category}`,
-              message: `הוצאת ${spent.toLocaleString()} ₪ מתוך ${item.limit.toLocaleString()} ₪ בקטגוריית "${item.category}" (${pct.toFixed(0)}%)`,
-              icon: '🚨',
-              severity: 'danger',
-              actionUrl: '/budget',
-              actionLabel: 'לתקציב',
-              relatedModel: 'Budget',
-              relatedId: budget._id,
-            });
-          }
-        } else if (pct >= 80) {
-          const exists = await Alert.findOne({
-            user: userId, type: 'budget_warning',
-            'title': { $regex: item.category },
-            createdAt: { $gte: startOfMonth(now) },
-          });
-          if (!exists) {
-            newAlerts.push({
-              user: userId,
-              type: 'budget_warning',
-              title: `אזהרת תקציב: ${item.category}`,
-              message: `כבר הוצאת ${pct.toFixed(0)}% מהתקציב בקטגוריית "${item.category}"`,
-              icon: '⚠️',
-              severity: 'warning',
-              actionUrl: '/budget',
-              actionLabel: 'לתקציב',
-              relatedModel: 'Budget',
-              relatedId: budget._id,
-            });
-          }
-        }
-      }
-    }
+    // ── 2. ספי תקציב (75/90/100) — מקור אמת יחיד ב-budgetCycleService ──
+    // מפיק התראות ישירות (עם dedup משלו); נספר בנפרד ל-newAlerts.
+    const budgetResult = await checkBudgetThresholds({
+      filter: scopeFilter(req),
+      ownerId: userId,
+    });
 
     // ── 3. פיקדון מגיע לפדיון (14 יום) ──
     const deposits = await Deposit.find({
@@ -267,7 +222,11 @@ export const generateAlerts = async (req, res) => {
       await Alert.insertMany(newAlerts);
     }
 
-    res.json({ generated: newAlerts.length, alerts: newAlerts });
+    res.json({
+      generated: newAlerts.length + (budgetResult?.raised || 0),
+      alerts: newAlerts,
+      budgetThresholds: budgetResult?.raised || 0,
+    });
   } catch (error) {
     console.error('Error generating alerts:', error);
     res.status(500).json({ message: 'שגיאה ביצירת התראות' });

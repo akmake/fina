@@ -55,5 +55,10 @@ const { default: app } = await import('./app.js');
 const { startImportScheduler } = await import('./services/importScheduler.js');
 startImportScheduler();
 
+// Start the periodic budget-threshold scheduler (75/90/100% alerts fire even
+// when the user isn't in the app — spending grows from unattended sync).
+const { startBudgetScheduler } = await import('./services/budgetScheduler.js');
+startBudgetScheduler();
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));

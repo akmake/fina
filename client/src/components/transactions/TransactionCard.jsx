@@ -17,8 +17,8 @@ export const CategoryIcon = ({ category }) => {
   else if (c.includes('עבודה') || c.includes('משכורת'))                       { Icon = Briefcase; colorClass = 'bg-emerald-100 text-emerald-600'; }
 
   return (
-    <div className={`h-11 w-11 rounded-2xl flex items-center justify-center ${colorClass} shadow-sm transition-transform group-hover:scale-105`}>
-      <Icon className="h-5 w-5" strokeWidth={2.5} />
+    <div className={`h-9 w-9 rounded-xl flex items-center justify-center ${colorClass} flex-shrink-0`}>
+      <Icon className="h-[17px] w-[17px]" strokeWidth={2} />
     </div>
   );
 };
@@ -43,13 +43,13 @@ export const TransactionCard = ({ transaction, onClick, onDelete, onEdit }) => {
   return (
     <div
       onClick={onClick}
-      className={`group relative bg-white/80 backdrop-blur-md p-4 rounded-3xl border shadow-sm hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300 cursor-pointer flex items-center justify-between mb-3 ${isPending ? 'border-amber-200 bg-amber-50/60' : 'border-white/40'}`}
+      className={`group relative px-3.5 py-3 cursor-pointer flex items-center justify-between border-b last:border-b-0 transition-colors ${isPending ? 'border-amber-100 bg-amber-50/60 dark:bg-amber-500/[0.06]' : 'border-slate-100 hover:bg-slate-50/80 dark:border-white/[0.06] dark:hover:bg-white/[0.03]'}`}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex min-w-0 items-center gap-3">
         <CategoryIcon category={transaction.category} />
-        <div className="flex flex-col">
+        <div className="flex min-w-0 flex-col">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-900 text-[15px] tracking-tight group-hover:text-blue-600 transition-colors">
+            <span className="truncate font-semibold text-slate-900 dark:text-slate-100 text-[13px] tracking-tight">
               {transaction.description}
             </span>
             {isPending && (
@@ -58,8 +58,9 @@ export const TransactionCard = ({ transaction, onClick, onDelete, onEdit }) => {
               </span>
             )}
           </div>
-          <span className="text-xs font-medium text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
-            <span className="bg-slate-100 px-2 py-0.5 rounded-md">{transaction.category}</span>
+          <span className="text-[11px] font-medium text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
+            <span>{transaction.category}</span>
+            <span className="h-0.5 w-0.5 rounded-full bg-slate-300" />
             <span>{format(new Date(transaction.date), 'd בMMM', { locale: he })}</span>
             {transaction.cardNumber && (
               <span className="text-slate-400 flex items-center gap-0.5">
@@ -85,20 +86,20 @@ export const TransactionCard = ({ transaction, onClick, onDelete, onEdit }) => {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <span className={`text-[16px] font-bold tracking-tight ${isExpense ? 'text-slate-900' : 'text-emerald-600'}`}>
+      <div className="mr-3 flex flex-shrink-0 items-center gap-1">
+        <span className={`text-[14px] font-bold tracking-tight ${isExpense ? 'text-slate-900 dark:text-slate-100' : 'text-emerald-600'}`}>
           {sign}{formatCurrency(transaction.amount)}
         </span>
         <button
           onClick={handleEdit}
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full hover:bg-blue-50 text-slate-300 hover:text-blue-500"
+          className="opacity-0 focus:opacity-100 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-blue-50 text-slate-300 hover:text-blue-500 dark:hover:bg-blue-500/10"
           title="ערוך עסקה"
         >
           <Pencil className="h-4 w-4" />
         </button>
         <button
           onClick={handleDelete}
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full hover:bg-red-50 text-slate-300 hover:text-red-500"
+          className="opacity-0 focus:opacity-100 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 dark:hover:bg-red-500/10"
           title="מחק עסקה"
         >
           <Trash2 className="h-4 w-4" />

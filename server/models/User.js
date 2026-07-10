@@ -56,6 +56,26 @@ const userSchema = new mongoose.Schema(
       ref: 'Household',
       default: null,
     },
+
+    // ── Phase 4 (SaaS Shell) ──────────────────────────────────────────────
+    // Email verification (§ onboarding). Google-OAuth users are created verified.
+    emailVerified: { type: Boolean, default: false },
+    emailVerifiedAt: { type: Date, default: null },
+    // Only the SHA-256 HASH of the token is stored; the raw token is emailed once.
+    emailVerificationTokenHash: { type: String, select: false, default: null },
+    emailVerificationExpires: { type: Date, select: false, default: null },
+
+    // Onboarding: null until the user finishes the first-run flow.
+    onboardedAt: { type: Date, default: null },
+
+    // Two-factor auth (TOTP). Secrets/recovery codes are select:false + hashed.
+    twoFactorEnabled: { type: Boolean, default: false },
+    twoFactorSecret: { type: String, select: false, default: null },          // active base32 secret
+    twoFactorPendingSecret: { type: String, select: false, default: null },   // during setup, before confirm
+    twoFactorRecoveryHashes: { type: [String], select: false, default: [] },  // SHA-256 of one-time codes
+
+    // Account lifecycle: set when the user self-deletes (anonymize-in-place).
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

@@ -93,6 +93,8 @@ fina/
 | `IMPORT_MAX_CONCURRENCY` | Max simultaneous scrapes (default 2 — each launches Chrome) | `server/services/importRunner.js` | Defaults to 2 |
 | `IMPORT_SCHEDULER_INTERVAL_MS` | How often the auto-sync scheduler checks for due connections (default 30 min) | `server/services/importScheduler.js` | Defaults to 30 min |
 | `IMPORT_SYNC_INTERVAL_MS` | Per-connection sync cadence (default 24 h) | `server/services/importScheduler.js` | Defaults to daily |
+| `EMAIL_ENABLED` | `true` arms the email channel of the notification engine (Phase 3). Unset/false → in-app only, email is logged as a stub | `server/services/emailService.js` | Off by default; no SMTP provider wired yet |
+| `BUDGET_SCHEDULER_INTERVAL_MS` | How often the periodic budget-threshold check runs 75/90/100% alerts per household (default 6 h) | `server/services/budgetScheduler.js` | Defaults to 6 h |
 
 ### Client (`client/.env`)
 

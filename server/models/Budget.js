@@ -25,6 +25,7 @@ const budgetSchema = new mongoose.Schema({
   
   // הגדרות
   alertThreshold: { type: Number, default: 80, min: 0, max: 100 },  // אחוז להתראה
+  carryOverEnabled: { type: Boolean, default: false },              // גלגול יתרות לחודש הבא (§5.4)
   isActive: { type: Boolean, default: true },
   
   // סיכום (מחושב בכל בקשת נתונים)

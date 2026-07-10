@@ -1,4 +1,4 @@
-> Last updated: 2026-07-02
+> Last updated: 2026-07-05
 > Status: DRAFT — מסמך אפיון מחדש. מקור אמת למוצר v2. אינו מחליף את המסמכים הקנוניים הקיימים — הוא מגדיר את היעד שאליו הם יתעדכנו.
 
 # Fina v2 — אפיון מוצר מחדש (SaaS)
@@ -307,9 +307,9 @@ Monorepo (client React+Vite / server Express), MongoDB Atlas, Zustand + React Qu
 |-----|-----|--------|----------------|
 | **0** ✅ | ייצוב ואבטחה | auth על routes ציבוריים, הסרת secrets ברירת-מחדל, envelope אחיד, מחיקת legacy, soft delete, AuditLog בסיסי, בדיקות ל-auth+isolation | אין endpoint לא מאובטח; CI ירוק |
 | **1** ✅ | Household | מודל Household+HouseholdMember, `User.activeHousehold`, מיגרציה (`scripts/migrateToHouseholds.js`), `familyScope` מבוסס-household, הזמנות (email token + invite code), מטריצת הרשאות owner/partner/viewer | ✔ הושלם — שני משתמשים חולקים משק בית ורואים אותם נתונים; viewer חסום מכתיבה (בדיקות ב-`tests/household.test.js`) |
-| **2** | Import 2.0 | BankConnection מוצפן, ImportJob אסינכרוני, תזמון יומי, אשף ייבוא אחד ב-UI, טיפול ב-OTP | סנכרון אוטומטי יומי עובד ללא נוכחות משתמש |
-| **3** | Core Loop | איחוד דשבורד, סיווג מהיר + למידת כללים, מחזור תקציב מלא, מנוע התראות + Notifications, יעדים מחוברים, איחוד תיק נכסים | הלולאה 5.1 שלמה מקצה לקצה |
-| **4** | SaaS Shell | onboarding, אימות email, billing/plans, ייצוא ומחיקת חשבון, back-office אדמין, 2FA | משתמש זר יכול להירשם, לשלם ולהשתמש בלי ליווי |
+| **2** ✅ | Import 2.0 | BankConnection מוצפן (AES-256-GCM), ImportJob אסינכרוני, תזמון יומי (`importScheduler`), עמוד ניהול חיבורים ב-UI, טיפול ב-OTP (One Zero) | ✔ הושלם — סנכרון אוטומטי יומי עובד ללא נוכחות משתמש; פרטי התחברות מוצפנים ולעולם לא מוחזרים ללקוח. ראו [modules/import.md](modules/import.md). *נותר לשלב הבא: מיזוג כל עמודי הייבוא לאשף אחד (נספח)* |
+| **3** ✅ | Core Loop | איחוד דשבורד ✔, סיווג מהיר + למידת כללים ✔, מחזור תקציב מלא (75/90/100 + גלגול) ✔, מנוע התראות רב-ערוצי ✔, יעדים מחוברים ✔, איחוד תיק נכסים ✔ | ✔ הושלם — שכבת השירותים בשרת מומשה ונבדקה (Vitest), חיווט ה-UI הושלם (prompt "צור חוק" אחרי סיווג ידני ב-`MerchantDialog`, כרטיסי התראות בדשבורד), ותזמון תקופתי לבדיקות ספים (`budgetScheduler`). ראו [modules/core-loop.md](modules/core-loop.md) |
+| **4** 🔨 | SaaS Shell | onboarding, אימות email, billing/plans, ייצוא ומחיקת חשבון, back-office אדמין, 2FA | בעבודה — מומש ונבדק (Vitest): אימות email ✔, 2FA (TOTP/otplib) ✔, ייצוא נתונים + מחיקת חשבון ✔, מודל מנוי + שער תוכניות (stub) ✔, חיווט לקוח (באנר אימות, שלב 2FA בכניסה, הגדרות: 2FA/ייצוא/מחיקה/מסלול) ✔. ראו [modules/saas-shell.md](modules/saas-shell.md). *נותר: סליקת תשלום אמיתית (Stripe/Paddle — החלטת Q1), אשף onboarding מלא, הרחבת back-office אדמין (מנוי/אימות), חיבור שערי planGate למסלולים בפועל* |
 | **5** | Advanced | תובנות AI אמיתיות (Claude API), תחזית תזרים, benchmarks, מסלולי משכנתא מתקדמים, role יועץ | — |
 
 ---

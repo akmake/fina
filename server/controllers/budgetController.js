@@ -1,27 +1,11 @@
 // server/controllers/budgetController.js
 import Budget from '../models/Budget.js';
-import Transaction from '../models/Transaction.js';
-import { startOfMonth, endOfMonth } from 'date-fns';
 import { scopeFilter } from '../utils/scopeFilter.js';
 import { audit } from '../utils/audit.js';
+import { computeSpending, checkBudgetThresholds, rolloverToMonth } from '../services/budgetCycleService.js';
 
-// ──────────────────────────────────────────────────
-// חישוב הוצאות בפועל מתוך עסקאות
-// ──────────────────────────────────────────────────
-const calculateActualSpending = async (userFilter, month, year) => {
-  const start = new Date(year, month - 1, 1);
-  const end = endOfMonth(start);
-
-  const spending = await Transaction.aggregate([
-    { $match: { ...userFilter, type: 'הוצאה', date: { $gte: start, $lte: end } } },
-    { $group: { _id: '$category', total: { $sum: '$amount' } } }
-  ]);
-
-  return spending.reduce((map, item) => {
-    map[item._id] = item.total;
-    return map;
-  }, {});
-};
+// חישוב הוצאות בפועל — מקור אמת יחיד ב-budgetCycleService (§5.4)
+const calculateActualSpending = computeSpending;
 
 // ──────────────────────────────────────────────────
 // @desc   קבלת תקציב לחודש מסוים
@@ -227,5 +211,55 @@ export const getBudgetSummary = async (req, res) => {
   } catch (error) {
     console.error('Error getting budget summary:', error);
     res.status(500).json({ message: 'שגיאה בחישוב סיכום שנתי' });
+  }
+};
+
+// ──────────────────────────────────────────────────
+// @desc   גלגול תקציב לחודש הבא (עם carry-over אופציונלי של יתרות)
+// @route  POST /api/budgets/rollover
+// body: { fromMonth?, fromYear?, toMonth?, toYear?, carryOver? }
+// ──────────────────────────────────────────────────
+export const rolloverBudget = async (req, res) => {
+  try {
+    const now = new Date();
+    const toMonth = parseInt(req.body.toMonth) || now.getMonth() + 1;
+    const toYear = parseInt(req.body.toYear) || now.getFullYear();
+
+    // ברירת מחדל: לגלגל מהחודש שקדם לחודש היעד
+    const prev = new Date(toYear, toMonth - 2, 1);
+    const fromMonth = parseInt(req.body.fromMonth) || prev.getMonth() + 1;
+    const fromYear = parseInt(req.body.fromYear) || prev.getFullYear();
+
+    const { rolled, budget } = await rolloverToMonth({
+      ownerUserId: req.user._id,
+      filter: scopeFilter(req),
+      fromMonth, fromYear, toMonth, toYear,
+      carryOver: !!req.body.carryOver,
+    });
+
+    if (!budget) return res.status(404).json({ message: 'אין תקציב מקור לגלגול' });
+    return res.status(rolled ? 201 : 200).json({ rolled, budget });
+  } catch (error) {
+    console.error('Error rolling over budget:', error);
+    res.status(500).json({ message: 'שגיאה בגלגול התקציב' });
+  }
+};
+
+// ──────────────────────────────────────────────────
+// @desc   בדיקת ספי תקציב (75/90/100) והפקת התראות
+// @route  POST /api/budgets/check-thresholds?month=&year=
+// ──────────────────────────────────────────────────
+export const checkThresholds = async (req, res) => {
+  try {
+    const result = await checkBudgetThresholds({
+      filter: scopeFilter(req),
+      ownerId: req.user._id,
+      month: parseInt(req.query.month) || undefined,
+      year: parseInt(req.query.year) || undefined,
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('Error checking budget thresholds:', error);
+    res.status(500).json({ message: 'שגיאה בבדיקת ספי התקציב' });
   }
 };

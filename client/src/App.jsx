@@ -9,19 +9,15 @@ import LoginPage    from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 
 const PrivacyPage = lazy(() => import("@/pages/PrivacyPage"));
+const VerifyEmailPage = lazy(() => import("@/pages/VerifyEmailPage"));
 
 /* All other pages — lazy loaded on demand */
-const HomePage             = lazy(() => import("@/pages/HomePage"));
 const FinanceDashboard     = lazy(() => import("@/pages/FinanceDashboard"));
 const TransactionsTab      = lazy(() => import("@/pages/Transactions_tab"));
-const SmartAnalyticsDashboard = lazy(() => import("@/pages/SmartAnalyticsDashboard"));
 const FinancePage          = lazy(() => import("@/pages/FinancePage"));
-const ImportPage           = lazy(() => import("@/pages/ImportPage"));
+const ImportHubPage        = lazy(() => import("@/pages/ImportHubPage"));
 const ManagementPage       = lazy(() => import("@/pages/ManagementPage"));
-const DiscountImportPage   = lazy(() => import("@/pages/DiscountImportPage"));
-const InvestmentsPage      = lazy(() => import("@/pages/InvestmentsPage"));
-const DepositsPage         = lazy(() => import("@/pages/DepositsPage"));
-const FundsPage            = lazy(() => import("@/pages/FundsPage"));
+const PortfolioHubPage     = lazy(() => import("@/pages/PortfolioHubPage"));
 const MyLoansPage          = lazy(() => import("@/pages/MyLoansPage"));
 const NewLoanPage          = lazy(() => import("@/pages/NewLoanPage"));
 const LoanDetailPage       = lazy(() => import("@/pages/LoanDetailPage"));
@@ -38,24 +34,16 @@ const UserActivityPage     = lazy(() => import("@/pages/UserActivityPage"));
 const BudgetPage           = lazy(() => import("@/pages/BudgetPage"));
 const RecurringPage        = lazy(() => import("@/pages/RecurringPage"));
 const CategoryInsightsPage = lazy(() => import("@/pages/CategoryInsightsPage"));
-const PensionPage          = lazy(() => import("@/pages/PensionPage"));
 const NetWorthPage         = lazy(() => import("@/pages/NetWorthPage"));
-const ExcelImportPage      = lazy(() => import("@/pages/ExcelImportPage"));
 const InsurancePage        = lazy(() => import("@/pages/InsurancePage"));
 const MortgagePage         = lazy(() => import("@/pages/MortgagePage"));
 const GoalsPage            = lazy(() => import("@/pages/GoalsPage"));
 const AlertsPage           = lazy(() => import("@/pages/AlertsPage"));
 const TaxPage              = lazy(() => import("@/pages/TaxPage"));
-const RealEstatePage       = lazy(() => import("@/pages/RealEstatePage"));
 const DebtPage             = lazy(() => import("@/pages/DebtPage"));
 const ChildSavingsPage     = lazy(() => import("@/pages/ChildSavingsPage"));
-const ForeignCurrencyPage  = lazy(() => import("@/pages/ForeignCurrencyPage"));
 const ReportsPage          = lazy(() => import("@/pages/ReportsPage"));
 const MaaserPage           = lazy(() => import("@/pages/MaaserPage"));
-const AutoImportPage       = lazy(() => import("@/pages/AutoImportPage"));
-const BankConnectionsPage  = lazy(() => import("@/pages/BankConnectionsPage"));
-const CalDirectImportPage  = lazy(() => import("@/pages/CalDirectImportPage"));
-const MaxImportPage        = lazy(() => import("@/pages/MaxImportPage"));
 const FamilyPage           = lazy(() => import("@/pages/FamilyPage"));
 const HelpPage             = lazy(() => import("@/pages/HelpPage"));
 const MerchantsPage        = lazy(() => import("@/pages/MerchantsPage"));
@@ -80,6 +68,7 @@ export default function App() {
           <Route path="login"    element={<LoginPage />}    />
           <Route path="register" element={<RegisterPage />} />
           <Route path="privacy"  element={<PrivacyPage />}  />
+          <Route path="verify-email" element={<VerifyEmailPage />} />
 
           {/* ── Protected ──────────────────────────────────────── */}
           <Route element={<ProtectedRoute />}>
@@ -89,7 +78,8 @@ export default function App() {
             {/* Finance */}
             <Route path="finance-dashboard" element={<FinanceDashboard />}        />
             <Route path="portfolio"         element={<TransactionsTab />}          />
-            <Route path="smart-analytics"   element={<SmartAnalyticsDashboard />}  />
+            {/* דשבורד יחיד — smart-analytics מתמזג ל-finance-dashboard (§6.1) */}
+            <Route path="smart-analytics"   element={<Navigate to="/finance-dashboard" replace />} />
             <Route path="finance"           element={<FinancePage />}              />
             <Route path="budget"            element={<BudgetPage />}               />
             <Route path="categories"        element={<CategoryInsightsPage />}     />
@@ -97,21 +87,24 @@ export default function App() {
             <Route path="merchants"         element={<MerchantsPage />}            />
             <Route path="business"          element={<BusinessPage />}             />
             <Route path="net-worth"         element={<NetWorthPage />}             />
-            <Route path="import"            element={<ImportPage />}               />
-            <Route path="import/excel"      element={<ExcelImportPage />}          />
-            <Route path="import/auto"       element={<AutoImportPage />}           />
-            <Route path="import/connections" element={<BankConnectionsPage />}      />
-            <Route path="connections"       element={<BankConnectionsPage />}       />
-            <Route path="import/cal"        element={<CalDirectImportPage />}      />
-            <Route path="import/max"        element={<MaxImportPage />}            />
-            <Route path="management"        element={<ManagementPage />}           />
-            <Route path="/discount-import"  element={<DiscountImportPage />}       />
+            {/* Import/Connections — אשף אחד עם טאבים (ImportHubPage) */}
+            <Route path="connections"        element={<ImportHubPage />} />
+            <Route path="import"             element={<ImportHubPage />} />
+            <Route path="import/connections" element={<ImportHubPage />} />
+            <Route path="import/auto"        element={<ImportHubPage />} />
+            <Route path="import/excel"       element={<ImportHubPage />} />
+            <Route path="import/sqlite"      element={<ImportHubPage />} />
+            <Route path="import/cal"         element={<ImportHubPage />} />
+            <Route path="import/max"         element={<ImportHubPage />} />
+            <Route path="/discount-import"   element={<ImportHubPage />} />
+            <Route path="management"         element={<ManagementPage />} />
 
-            {/* Investments */}
-            <Route path="investments" element={<InvestmentsPage />} />
-            <Route path="deposits"    element={<DepositsPage />}    />
-            <Route path="funds"       element={<FundsPage />}       />
-            <Route path="pension"     element={<PensionPage />}     />
+            {/* תיק נכסים — עמוד אחד עם טאבים (PortfolioHubPage) */}
+            <Route path="assets"      element={<PortfolioHubPage />} />
+            <Route path="investments" element={<PortfolioHubPage />} />
+            <Route path="deposits"    element={<PortfolioHubPage />} />
+            <Route path="funds"       element={<PortfolioHubPage />} />
+            <Route path="pension"     element={<PortfolioHubPage />} />
 
             {/* Loans */}
             <Route path="my-loans"       element={<MyLoansPage />}    />
@@ -138,10 +131,10 @@ export default function App() {
             <Route path="goals"            element={<GoalsPage />}           />
             <Route path="alerts"           element={<AlertsPage />}          />
             <Route path="tax"              element={<TaxPage />}             />
-            <Route path="real-estate"      element={<RealEstatePage />}      />
+            <Route path="real-estate"      element={<PortfolioHubPage />}    />
             <Route path="debts"            element={<DebtPage />}            />
             <Route path="child-savings"    element={<ChildSavingsPage />}    />
-            <Route path="foreign-currency" element={<ForeignCurrencyPage />} />
+            <Route path="foreign-currency" element={<PortfolioHubPage />} />
             <Route path="reports"          element={<ReportsPage />}         />
             <Route path="maaser"           element={<MaaserPage />}          />
 

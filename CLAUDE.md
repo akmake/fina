@@ -46,7 +46,7 @@
 | Backend | Node.js + Express 4.19.2 |
 | Database | MongoDB Atlas (Mongoose 8.4) |
 | Auth | JWT (httpOnly cookies) + Google OAuth |
-| Security | Helmet, CORS, CSRF (custom header), Rate limiting |
+| Security | Helmet, CORS, CSRF (custom header), Rate limiting, AES-256-GCM credential encryption |
 | Bank scraping | israeli-bank-scrapers 6.7.9 |
 | Language / Direction | Hebrew (RTL), `lang="he" dir="rtl"` |
 
@@ -59,7 +59,7 @@
 - Unauthenticated users are redirected to `/login` via `<ProtectedRoute>`
 - Admin-only routes are guarded by `requireAdmin` middleware on the server
 - Server public routes (no auth): `/api/auth/*` (rate limited), `/api/health`, `/api/csrf-token`, `/api/logs/device-ping` (rate limited)
-- Server protected routes: everything else requires `requireAuth` — including `/api/scrape`, `/api/cal`, `/api/import` (also `scrapeLimiter`)
+- Server protected routes: everything else requires `requireAuth` — including `/api/scrape`, `/api/cal`, `/api/import` (also `scrapeLimiter`), and `/api/connections` (`requireAuth` + `familyScope`; its `/:id/sync` adds `scrapeLimiter`)
 - CSRF protection is active on all **mutating** requests (POST/PUT/DELETE) — header `X-Fina-Client: web-app` must be present
 
 ---
@@ -79,7 +79,10 @@
 - Server entry point is `server/server.js` (env validation + DB connect); `server/app.js` only assembles the Express app (exported for tests)
 - Bank scraping routes (`/api/scrape`, `/api/cal`, `/api/import`) require auth + are rate limited — do NOT make them public again
 - JWT secrets have no defaults — the server refuses to start without them (and rejects placeholders in production)
-- Transaction/Budget/Goal/Loan/Account use **soft delete** (`deletedAt`, `server/utils/softDelete.js`) — never hard-delete these; unique indexes are partial (`deletedAt: null`)
+- Transaction/Budget/Goal/Loan/Account/BankConnection use **soft delete** (`deletedAt`, `server/utils/softDelete.js`) — never hard-delete these; unique indexes are partial (`deletedAt: null`)
+- Import 2.0 (Phase 2): saved bank connections (`BankConnection`) store credentials **encrypted** (AES-256-GCM via `server/utils/crypto.js`, key = `FINA_ENCRYPTION_KEY`, 64 hex chars). Secrets are `select:false` + stripped from JSON — NEVER return them. Unattended daily sync runs via `server/services/importScheduler.js` (started in `server.js`), executing `ImportJob`s through `importRunner`. The scrape core is shared in `server/services/scrapeService.js`; persistence in `server/services/transactionPersistence.js`. Missing `FINA_ENCRYPTION_KEY` → fatal in production, auto-sync disabled in dev. See [docs/modules/import.md](docs/modules/import.md)
+- Core Loop (Phase 3): the **`Alert` model IS the in-app notification store** — do NOT add a separate `Notification` model. Raise notifications only via `server/services/notificationService.js` (`notify`/`notifyMany`) so dedup (`dedupeKey`) + channels (in-app always, email when `EMAIL_ENABLED=true` via `server/services/emailService.js`) stay centralized. Budget threshold alerts (75/90/100) come from `server/services/budgetCycleService.js` — `generateAlerts` no longer inlines them. Category rule matching + apply lives in shared `applyOneRule`/`buildRuleFilter` (`categoryController.js`). Connected-goal recompute is `server/services/goalTrackingService.js`. Client: import & asset pages are unified in `ImportHubPage`/`PortfolioHubPage` (tabs resolve from the URL — old deep links still work); `/smart-analytics` redirects to `/finance-dashboard`. See [docs/modules/core-loop.md](docs/modules/core-loop.md)
+- SaaS Shell (Phase 4): **email-verification tokens + 2FA secrets + recovery codes are `select:false` and hashed** — never return them (only the raw verification token leaves once, in the email link, via `server/services/verificationService.js`). 2FA is **otplib v12** (classic `authenticator` API — do NOT upgrade to v13, a different functional API); TOTP logic in `server/services/twoFactorService.js`. With 2FA on, `POST /api/auth/login` returns `{ twoFactorRequired, mfaToken }` (a 5-min `mfa`-claim JWT, **not** a session — `requireAuth` rejects it); the client finishes at `POST /api/auth/2fa/login`. **Account deletion is anonymize-in-place** (`server/services/accountService.js`) — never a hard delete (would orphan Household/AuditLog refs); it scrubs the user with `save({ validateBeforeSave:false })` and soft-deletes business data. `Subscription` is **per-household** (`server/models/Subscription.js`); plan catalog + gating in `server/services/subscriptionService.js` + `server/middlewares/planGate.js` (402 on gate). **No payment provider is wired** — `POST /api/subscription/change` is a stub. See [docs/modules/saas-shell.md](docs/modules/saas-shell.md)
 - Sensitive actions (deletes, role changes) must call `audit()` from `server/utils/audit.js`
 - Tenancy (Phase 1): `Household` + `HouseholdMember` are the tenant layer. `familyScope` (`server/middlewares/familyScope.js`) resolves `req.household`/`req.member` and derives `req.scopeUsers` from active members; data isolation still flows through the per-document `user` field via `utils/scopeFilter.js` (no physical `household` field on business models yet). Viewers are blocked from writes by HTTP method inside `familyScope`. Canonical API is `/api/household`; `/api/family` is a compat shim. New users get a personal household on register (`utils/ensureHousehold.js`); run `npm run migrate:households` for existing data.
 - Vite proxy in `vite.config.js` forwards `/api` to `localhost:4000` in dev — production needs a reverse proxy

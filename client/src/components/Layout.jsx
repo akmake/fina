@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
+import VerifyEmailBanner from './VerifyEmailBanner';
 import { Toaster } from 'react-hot-toast';
 import { useUIStore } from '@/stores/uiStore';
 
@@ -19,13 +20,14 @@ export default function Layout() {
   return (
     <div className="flex flex-col md:flex-row h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100">
       {/* Sidebar placeholder — keeps the flex flow intact while the navbar is fixed */}
-      <aside className="hidden md:block w-64 flex-shrink-0" aria-hidden="true" />
+      <aside className="hidden md:block w-20 flex-shrink-0" aria-hidden="true" />
 
       {/* Fixed sidebar rendered by Navbar */}
       <Navbar />
 
       {/* Main content — pt-14 top bar + pb-16 bottom tab bar on mobile */}
       <main className="flex-1 overflow-y-auto pt-14 pb-14 md:pt-0 md:pb-0 overscroll-contain">
+        <VerifyEmailBanner />
         <Outlet />
       </main>
 

@@ -4,16 +4,16 @@ import { Wallet, ArrowUpRight, ArrowDownLeft, TrendingDown, AlertCircle } from '
 import { formatCurrency } from './utils';
 
 const KpiCard = ({ title, value, icon: Icon, trend }) => (
-  <div className="bg-white/60 backdrop-blur-xl p-4 sm:p-6 rounded-[24px] sm:rounded-[32px] border border-white/50 shadow-sm flex flex-col justify-between h-28 sm:h-36 relative overflow-hidden group hover:bg-white/80 transition-all">
+  <div className="min-w-0 bg-white p-4 sm:p-5 border-b sm:border-b-0 sm:border-l last:border-0 border-slate-100 dark:border-white/[0.07] dark:bg-[#15181f]">
     <div className="flex justify-between items-start z-10">
-      <span className="text-sm font-semibold text-slate-500">{title}</span>
-      <div className="p-2 bg-white rounded-full shadow-sm group-hover:scale-110 transition-transform">
-        <Icon className="h-5 w-5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{title}</span>
+      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 dark:bg-white/[0.06]">
+        <Icon className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
       </div>
     </div>
     <div className="z-10">
-      <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{formatCurrency(value)}</h3>
-      {trend && <p className="text-xs text-slate-400 mt-1 font-medium truncate">{trend}</p>}
+      <h3 className="truncate text-xl font-bold text-slate-950 dark:text-white tracking-tight">{formatCurrency(value)}</h3>
+      {trend && <p className="text-[10px] text-slate-400 mt-1 truncate">{trend}</p>}
     </div>
   </div>
 );
@@ -48,7 +48,7 @@ export default function KpiBar({ transactions, effectiveMonth }) {
   }, [transactions, effectiveMonth]);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6 mb-8 sm:mb-12">
+    <div className="grid grid-cols-2 sm:grid-cols-5 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-white/[0.08] dark:bg-[#15181f] mb-6">
       <KpiCard title="יתרה חודשית"          value={stats.income - stats.expense} icon={Wallet}       trend="מאזן נוכחי" />
       <KpiCard title="הכנסות"               value={stats.income}                 icon={ArrowUpRight}  trend="נכנס לחשבון" />
       <KpiCard title="הוצאות"               value={stats.expense}                icon={ArrowDownLeft} trend="יצא מהחשבון" />

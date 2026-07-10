@@ -63,7 +63,7 @@ All API responses follow this envelope:
 - MongoDB document IDs: `_id` (Mongoose default) — client may receive as `id` (virtuals)
 - User reference field in all models: `user` (ObjectId, always required)
 - Timestamps: `createdAt`, `updatedAt` (Mongoose `timestamps: true`)
-- Soft delete: **not used** — hard delete only
+- Soft delete: **used** on business models (Transaction, Budget, Goal, Loan, Account, BankConnection) via `server/utils/softDelete.js` (`deletedAt`); see [database.md](database.md). Reference/system models are still hard-deleted
 
 ### Routes
 - All API routes prefixed with `/api/`
