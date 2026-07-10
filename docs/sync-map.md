@@ -1,4 +1,4 @@
-> Last updated: 2026-03-12
+> Last updated: 2026-07-05
 
 # Sync Map — Change Coupling Guide
 
@@ -78,6 +78,19 @@
 | `server/utils/crypto.js` | `server/models/BankConnection.js`, `server/services/importRunner.js`, `server/server.js` (env check), `docs/architecture.md` (env table) |
 | `server/services/importRunner.js` / `importScheduler.js` | `server/controllers/bankConnectionController.js`, `server/server.js` (scheduler start), `client/src/stores/connectionsStore.js` (job polling), `docs/modules/import.md` |
 | `client/src/stores/connectionsStore.js` | `client/src/pages/BankConnectionsPage.jsx`, `docs/state-management.md`, `docs/modules/import.md` |
+
+---
+
+## SaaS Shell Coupling (Phase 4)
+
+| If you change... | You must also check... |
+|-----------------|----------------------|
+| `server/controllers/authController.js` (register/login/2FA/verify) | `server/routes/auth.js`, `client/src/pages/LoginPage.jsx` (2FA step), `client/src/stores/authStore.js` (`emailVerified`/`twoFactorEnabled`), `docs/auth-flow.md`, `docs/api-reference.md` |
+| `server/services/verificationService.js` | `server/services/emailService.js`, `server/models/User.js`, `client/src/pages/VerifyEmailPage.jsx`, `client/src/components/VerifyEmailBanner.jsx` |
+| `server/services/twoFactorService.js` | `authController` (2FA handlers), `client/src/components/settings/TwoFactorSection.jsx`, `otplib` version (v12 classic API — not v13) |
+| `server/services/accountService.js` | `server/controllers/accountController.js`, every owned business model listed in `OWNED_COLLECTIONS`, `docs/modules/saas-shell.md` |
+| `server/models/Subscription.js` / `services/subscriptionService.js` | `server/controllers/subscriptionController.js`, `server/middlewares/planGate.js`, `client/src/components/settings/PlanSection.jsx`, `docs/database.md`, `docs/product-spec-v2.md` (§ pricing Q1) |
+| `server/middlewares/planGate.js` | Any route it gates (currently none live — ready to attach), `services/subscriptionService.js` (PLANS) |
 
 ---
 

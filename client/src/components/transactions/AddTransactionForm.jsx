@@ -74,22 +74,22 @@ export default function AddTransactionForm({ categories, onAdd, onCategoryCreate
 
   return (
     <>
-      <div className="bg-white/70 backdrop-blur-xl p-5 sm:p-8 rounded-[28px] sm:rounded-[40px] shadow-sm border border-white/60 lg:sticky lg:top-28">
-        <div className="flex items-center gap-4 mb-8">
-          <div className="h-12 w-12 bg-slate-900 rounded-2xl flex items-center justify-center shadow-xl shadow-slate-900/20">
-            <Plus className="h-6 w-6 text-white" />
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-white/[0.08] dark:bg-[#15181f] lg:sticky lg:top-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="h-9 w-9 bg-blue-600 rounded-xl flex items-center justify-center shadow-sm shadow-blue-600/20">
+            <Plus className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h3 className="font-bold text-xl text-slate-900">פעולה חדשה</h3>
-            <p className="text-sm text-slate-500">הוסף הוצאה או הכנסה</p>
+            <h3 className="font-bold text-[14px] text-slate-950 dark:text-white">עסקה חדשה</h3>
+            <p className="text-[11px] text-slate-500">הוספת הוצאה או הכנסה ידנית</p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-400 mr-2">תיאור</label>
+            <label className="text-[11px] font-semibold text-slate-500">תיאור</label>
             <Input
-              className="h-14 bg-white border-transparent focus:border-slate-200 rounded-3xl shadow-sm text-lg px-6"
+              className="h-10 bg-slate-50 border-slate-200 rounded-lg shadow-none text-sm px-3 dark:bg-white/[0.04] dark:border-white/[0.08]"
               placeholder="מה קנינו?"
               value={form.description}
               onChange={e => handleFormChange('description', e.target.value)}
@@ -97,11 +97,11 @@ export default function AddTransactionForm({ categories, onAdd, onCategoryCreate
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 mr-2">סכום</label>
+              <label className="text-[11px] font-semibold text-slate-500">סכום</label>
               <Input
-                className="h-14 bg-white border-transparent focus:border-slate-200 rounded-3xl shadow-sm text-lg px-6 font-mono"
+                className="h-10 bg-slate-50 border-slate-200 rounded-lg shadow-none text-sm px-3 font-mono dark:bg-white/[0.04] dark:border-white/[0.08]"
                 type="number" placeholder="0.00"
                 value={form.amount}
                 onChange={e => handleFormChange('amount', e.target.value)}
@@ -109,9 +109,9 @@ export default function AddTransactionForm({ categories, onAdd, onCategoryCreate
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 mr-2">תאריך</label>
+              <label className="text-[11px] font-semibold text-slate-500">תאריך</label>
               <Input
-                className="h-14 bg-white border-transparent focus:border-slate-200 rounded-3xl shadow-sm px-4 text-sm"
+                className="h-10 bg-slate-50 border-slate-200 rounded-lg shadow-none px-3 text-xs dark:bg-white/[0.04] dark:border-white/[0.08]"
                 type="date"
                 value={form.date}
                 onChange={e => handleFormChange('date', e.target.value)}
@@ -121,9 +121,9 @@ export default function AddTransactionForm({ categories, onAdd, onCategoryCreate
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-400 mr-2">קטגוריה</label>
+            <label className="text-[11px] font-semibold text-slate-500">קטגוריה</label>
             <Select value={form.category} onValueChange={handleCategoryChange}>
-              <SelectTrigger className="h-14 bg-white border-transparent rounded-3xl shadow-sm px-6 text-slate-600">
+              <SelectTrigger className="h-10 bg-slate-50 border-slate-200 rounded-lg shadow-none px-3 text-xs text-slate-600 dark:bg-white/[0.04] dark:border-white/[0.08]">
                 <SelectValue placeholder="בחר קטגוריה" />
               </SelectTrigger>
               <SelectContent className="rounded-3xl">
@@ -133,16 +133,16 @@ export default function AddTransactionForm({ categories, onAdd, onCategoryCreate
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-2">
+          <div className="grid grid-cols-2 gap-3">
             <Select value={form.type} onValueChange={v => handleFormChange('type', v)}>
-              <SelectTrigger className="h-12 rounded-3xl border-transparent bg-slate-100 shadow-inner"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-xs shadow-none dark:bg-white/[0.04] dark:border-white/[0.08]"><SelectValue /></SelectTrigger>
               <SelectContent className="rounded-2xl">
                 <SelectItem value="הוצאה">הוצאה</SelectItem>
                 <SelectItem value="הכנסה">הכנסה</SelectItem>
               </SelectContent>
             </Select>
             <Select value={form.account} onValueChange={v => handleFormChange('account', v)}>
-              <SelectTrigger className="h-12 rounded-3xl border-transparent bg-slate-100 shadow-inner"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-xs shadow-none dark:bg-white/[0.04] dark:border-white/[0.08]"><SelectValue /></SelectTrigger>
               <SelectContent className="rounded-2xl">
                 <SelectItem value="checking">עו&quot;ש</SelectItem>
                 <SelectItem value="cash">מזומן</SelectItem>
@@ -152,7 +152,7 @@ export default function AddTransactionForm({ categories, onAdd, onCategoryCreate
 
           <Button
             type="submit"
-            className="w-full h-14 rounded-3xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-lg shadow-xl shadow-slate-900/10 mt-4 transition-transform active:scale-95"
+            className="w-full h-10 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm mt-2 transition-colors"
           >
             שמור
           </Button>

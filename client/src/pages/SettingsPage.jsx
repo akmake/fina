@@ -7,14 +7,18 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import {
   Palette, Bell, Database, LogOut,
-  Moon, Sun, Monitor, Trash2, Download,
+  Moon, Sun, Monitor, Trash2, Download, UserX,
 } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/Input';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '@/utils/api';
+import TwoFactorSection from '@/components/settings/TwoFactorSection';
+import PlanSection from '@/components/settings/PlanSection';
 
 // ---------------------------------------------------------------------------
 // Section wrapper
@@ -47,9 +51,38 @@ export default function SettingsPage() {
   const [notifyTransact,   setNotifyTransact]   = useState(true);
   const [notifyMonthly,    setNotifyMonthly]    = useState(true);
   const [notifyAnomalies,  setNotifyAnomalies]  = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [deletePassword,    setDeletePassword]    = useState('');
+  const [deletingAccount,   setDeletingAccount]   = useState(false);
 
-  const handleExportData = () => {
-    toast('ייצוא נתונים יהיה זמין בגרסה הבאה', { icon: '📦' });
+  const handleExportData = async () => {
+    try {
+      const res = await api.get('/account/export', { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fina-export-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success('הנתונים יוצאו בהצלחה');
+    } catch {
+      toast.error('שגיאה בייצוא הנתונים');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeletingAccount(true);
+    try {
+      await api.delete('/account', { data: { password: deletePassword, confirm: true } });
+      toast.success('החשבון נמחק. להתראות!');
+      logout();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'שגיאה במחיקת החשבון');
+    } finally {
+      setDeletingAccount(false);
+    }
   };
 
   const handleDeleteAllTransactions = async () => {
@@ -126,15 +159,21 @@ export default function SettingsPage() {
         </div>
       </Section>
 
+      {/* Plan / subscription (Phase 4) */}
+      <PlanSection />
+
+      {/* Security — 2FA (Phase 4) */}
+      <TwoFactorSection />
+
       {/* Data management */}
       <Section icon={Database} title="ניהול נתונים" description="ייצוא, גיבוי ומחיקת הנתונים שלך">
         <div className="space-y-3">
           <Button variant="outline" className="w-full justify-start gap-2" onClick={handleExportData}>
             <Download className="h-4 w-4" />
-            ייצוא כל הנתונים (CSV)
+            ייצוא כל הנתונים (JSON)
           </Button>
           <p className="text-xs text-gray-400">
-            ייצוא כולל: עסקאות, קטגוריות, מניות, פקדונות והלוואות.
+            ייצוא כולל את כל הנתונים שלך: עסקאות, קטגוריות, תקציבים, יעדים, נכסים והלוואות.
           </p>
           <Separator />
           <Button
@@ -163,13 +202,25 @@ export default function SettingsPage() {
             <LogOut className="h-4 w-4" />
             התנתק מכל המכשירים
           </Button>
+          <Separator />
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-2 text-red-700 border-red-300 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30"
+            onClick={() => setDeleteAccountOpen(true)}
+          >
+            <UserX className="h-4 w-4" />
+            מחיקת החשבון לצמיתות
+          </Button>
+          <p className="text-xs text-red-400">
+            מוחק את החשבון ומנתק אותך. הנתונים העסקיים נמחקים והזהות מונגשת. מומלץ לייצא נתונים לפני כן.
+          </p>
         </div>
       </Section>
 
       {/* Version badge */}
       <div className="text-center text-xs text-gray-400 dark:text-slate-600 pb-4">
         <p>Fina · גרסה 1.0.0</p>
-        <p className="mt-1">נבנה עם ❤️ לניהול פיננסי חכם</p>
+        <p className="mt-1">נבנה ע"י DahanWeb </p>
       </div>
 
       {/* Confirm logout */}
@@ -191,6 +242,38 @@ export default function SettingsPage() {
         confirmLabel="מחק הכל"
         onConfirm={handleDeleteAllTransactions}
       />
+
+      {/* Delete account (requires password confirmation) */}
+      <Dialog open={deleteAccountOpen} onOpenChange={setDeleteAccountOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>מחיקת החשבון לצמיתות</DialogTitle>
+            <DialogDescription>
+              פעולה זו תמחק את הנתונים העסקיים שלך, תנטרל את הזהות ותנתק אותך. להמשך, הזן/י את הסיסמה שלך.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              type="password"
+              value={deletePassword}
+              onChange={e => setDeletePassword(e.target.value)}
+              placeholder="הסיסמה שלך"
+              autoComplete="current-password"
+              style={{ direction: 'ltr' }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setDeleteAccountOpen(false); setDeletePassword(''); }}>ביטול</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white gap-2"
+              onClick={handleDeleteAccount}
+              disabled={deletingAccount || !deletePassword}
+            >
+              {deletingAccount ? 'מוחק…' : 'מחק את החשבון'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

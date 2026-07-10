@@ -12,6 +12,9 @@ export default function LoginPage() {
   const [error,        setError]        = useState('');
   const [loading,      setLoading]      = useState(false);
   const [gLoading,     setGLoading]     = useState(false);
+  // Phase 4 — 2FA second step
+  const [mfaToken,     setMfaToken]     = useState('');
+  const [mfaCode,      setMfaCode]      = useState('');
 
   const loginAction = useAuthStore((s) => s.login);
   const navigate    = useNavigate();
@@ -24,10 +27,24 @@ export default function LoginPage() {
     setLoading(true); setError('');
     try {
       const { data } = await api.post('/auth/login', { email, password });
+      if (data?.twoFactorRequired) { setMfaToken(data.mfaToken); return; } // show 2FA step
       if (data?.user) finish(data.user);
       else throw new Error();
     } catch (err) {
       setError(err.response?.data?.message || 'שם משתמש או סיסמה שגויים');
+    } finally { setLoading(false); }
+  };
+
+  const handleVerify2FA = async (e) => {
+    e.preventDefault();
+    if (loading) return;
+    setLoading(true); setError('');
+    try {
+      const { data } = await api.post('/auth/2fa/login', { mfaToken, code: mfaCode });
+      if (data?.user) finish(data.user);
+      else throw new Error();
+    } catch (err) {
+      setError(err.response?.data?.message || 'קוד אימות שגוי');
     } finally { setLoading(false); }
   };
 
@@ -78,6 +95,34 @@ export default function LoginPage() {
             </div>
           )}
 
+          {mfaToken ? (
+          /* ── Phase 4: 2FA second step ── */
+          <form onSubmit={handleVerify2FA} className="space-y-4">
+            <p className="text-sm text-slate-500 text-center">הזן/י את הקוד בן 6 הספרות מאפליקציית האימות</p>
+            <input
+              inputMode="numeric"
+              autoFocus
+              maxLength={10}
+              value={mfaCode}
+              onChange={e => setMfaCode(e.target.value)}
+              placeholder="123456"
+              className="w-full h-12 text-center tracking-[0.4em] rounded-xl border border-slate-200 bg-slate-50 text-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 focus:bg-white transition-all"
+              style={{ direction: 'ltr' }}
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-12 rounded-xl bg-gradient-to-l from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold shadow-md shadow-blue-200 transition-all active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'אמת והתחבר'}
+            </button>
+            <div className="flex items-center justify-between">
+              <button type="button" onClick={() => { setMfaToken(''); setMfaCode(''); setError(''); }} className="text-sm text-slate-400 hover:text-slate-600 transition-colors">חזרה</button>
+              <span className="text-xs text-slate-400">אפשר גם קוד שחזור</span>
+            </div>
+          </form>
+          ) : (
+          <>
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
 
@@ -177,6 +222,8 @@ export default function LoginPage() {
               הירשם עכשיו
             </Link>
           </p>
+          </>
+          )}
         </div>
 
         {/* Bottom note */}

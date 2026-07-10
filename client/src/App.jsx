@@ -9,6 +9,7 @@ import LoginPage    from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 
 const PrivacyPage = lazy(() => import("@/pages/PrivacyPage"));
+const VerifyEmailPage = lazy(() => import("@/pages/VerifyEmailPage"));
 
 /* All other pages — lazy loaded on demand */
 const FinanceDashboard     = lazy(() => import("@/pages/FinanceDashboard"));
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="login"    element={<LoginPage />}    />
           <Route path="register" element={<RegisterPage />} />
           <Route path="privacy"  element={<PrivacyPage />}  />
+          <Route path="verify-email" element={<VerifyEmailPage />} />
 
           {/* ── Protected ──────────────────────────────────────── */}
           <Route element={<ProtectedRoute />}>

@@ -1,5 +1,5 @@
 > Last updated: 2026-07-05
-> Status: Phase 3 (Core Loop) — in progress
+> Status: Phase 3 (Core Loop) — complete (server services + UI wiring + periodic scheduler)
 
 # Module: Core Loop — notifications, budget cycle, rule learning, connected goals
 
@@ -21,8 +21,11 @@ Related canonical docs (do not duplicate): [database.md](../database.md) (schema
 | `server/services/notificationService.js` | `notify` / `notifyMany` — single entry point to raise a notification, with stable-key **de-dup** + multi-channel delivery |
 | `server/services/emailService.js` | Pluggable, dependency-free email adapter. Logs in dev; real transport plugged later. `EMAIL_ENABLED=true` to arm |
 | `server/services/budgetCycleService.js` | `computeSpending` (shared with controller), `checkBudgetThresholds` (75/90/100), `rolloverToMonth` (carry-over) |
+| `server/services/budgetScheduler.js` | Periodic in-process scheduler that runs `checkBudgetThresholds` per household for the current month, so 75/90/100% alerts fire even when the user isn't in the app. Started in `server.js`. |
 | `server/services/goalTrackingService.js` | `recomputeGoal` / `recomputeAllGoals` — goal `currentAmount` from linked category txns or deposit/fund balance |
 | `server/controllers/categoryController.js` | Rule learning: `suggestRule`, `applyOneRule`/`buildRuleFilter`, `createRule` (`applyToExisting`) |
+| `client/src/components/transactions/MerchantDialog.jsx` | After a manual category change, calls `rules/suggest` and shows the "צור חוק?" prompt → `createRule` with `applyToExisting` (§5.3 UI) |
+| `client/src/pages/FinanceDashboard.jsx` | Severity-aware **alert cards** (icon/title/message + action link) in the budget block |
 | `client/src/pages/ImportHubPage.jsx` | One tabbed import/connections hub (§6.1) |
 | `client/src/pages/PortfolioHubPage.jsx` | One tabbed "תיק נכסים" (§6.1) |
 
@@ -55,6 +58,11 @@ engine instead of its old inline 80/100 block.
   limits into the target month; with `carryOver`, each category's unspent
   balance is added to the new limit. No-op if the target month already exists.
   Endpoint: `POST /api/budgets/rollover`. `Budget.carryOverEnabled` stores the pref.
+- **Periodic checks** — `budgetScheduler` (started in `server.js`) wakes every
+  `BUDGET_SCHEDULER_INTERVAL_MS` (default 6h), finds each household with a
+  current-month budget, and runs `checkBudgetThresholds` once per household.
+  Notification de-dup keeps repeated ticks from re-alerting. This closes the loop
+  for spending that grows via unattended sync while the user is away.
 
 ## Rule learning (§5.3)
 

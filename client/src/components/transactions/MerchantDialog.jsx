@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { Edit3, X, Check, Tag, Save, Loader2, CreditCard, Pencil } from 'lucide-react';
+import { Edit3, X, Check, Tag, Save, Loader2, CreditCard, Pencil, Wand2 } from 'lucide-react';
 import api from '@/utils/api';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/Button';
@@ -26,6 +26,9 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cli
   const [editingTrx, setEditingTrx]             = useState(null); // { _id, date, amount, type, category }
   const [savingTrx, setSavingTrx]               = useState(false);
   const [savedCategory, setSavedCategory]       = useState(null); // overrides clickedCategory after a save
+  // §5.3 — "לסווג כך את כל התנועות הדומות?" — הצעת חוק אחרי סיווג ידני
+  const [ruleSuggestion, setRuleSuggestion]     = useState(null); // { searchString, matchType, matchCount, categoryId, categoryName }
+  const [creatingRule, setCreatingRule]         = useState(false);
 
   // Fetch ALL transactions for this merchant from server
   useEffect(() => {
@@ -86,6 +89,7 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cli
     if (!finalCat) return alert('נא לבחור קטגוריה');
 
     let catName = finalCat;
+    let catId = isCustom ? null : finalCat; // for non-custom, selectedNewCategory is the _id
     if (!isCustom) {
       const found = categories.find(c => c._id === finalCat);
       if (found) catName = found.name;
@@ -94,7 +98,13 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cli
     setUpdatingCategory(true);
     try {
       if (isCustom) {
-        try { await api.post('/categories', { name: catName, type: 'הוצאה' }); } catch { /* duplicate ok */ }
+        try {
+          const { data } = await api.post('/categories', { name: catName, type: 'הוצאה' });
+          catId = data?._id || null;
+        } catch {
+          // duplicate — reuse the existing category's id if we already know it
+          catId = categories.find(c => c.name === catName)?._id || null;
+        }
       }
       await api.post('/transactions/merchant-bulk', { originalName: merchantName, newCategory: catName });
       setEditCategoryMode(false);
@@ -108,6 +118,18 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cli
         setMerchantHistory(data || []);
       } catch { /* ignore - will show stale data */ }
       await onRefresh();
+
+      // §5.3 — הצע ללמוד חוק שיסווג עסקאות דומות אוטומטית בעתיד (best-effort)
+      if (catId) {
+        try {
+          const { data: sug } = await api.post('/categories/rules/suggest', {
+            description: merchantName, category: catName,
+          });
+          if (sug?.searchString && !sug.ruleExists) {
+            setRuleSuggestion({ ...sug, categoryId: catId, categoryName: catName });
+          }
+        } catch { /* suggestion is non-critical — ignore */ }
+      }
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'שגיאה לא ידועה';
       alert('שגיאה בעדכון הקטגוריה: ' + msg);
@@ -140,6 +162,24 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cli
     finally { setSavingTrx(false); }
   };
 
+  const handleCreateRule = async () => {
+    if (!ruleSuggestion?.categoryId) { setRuleSuggestion(null); return; }
+    setCreatingRule(true);
+    try {
+      await api.post('/categories/rules', {
+        searchString: ruleSuggestion.searchString,
+        matchType: ruleSuggestion.matchType || 'contains',
+        categoryId: ruleSuggestion.categoryId,
+        applyToExisting: true,
+      });
+      setRuleSuggestion(null);
+      await onRefresh();
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'שגיאה לא ידועה';
+      alert('שגיאה ביצירת החוק: ' + msg);
+    } finally { setCreatingRule(false); }
+  };
+
   const handleClose = () => {
     setEditCategoryMode(false);
     setEditNameMode(false);
@@ -147,6 +187,7 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cli
     setCustomCategory('');
     setEditingTrx(null);
     setSavedCategory(null);
+    setRuleSuggestion(null);
     onOpenChange(false);
   };
 
@@ -270,6 +311,43 @@ export default function MerchantDialog({ isOpen, onOpenChange, merchantName, cli
             </div>
           )}
         </div>
+
+        {/* §5.3 — הצעת חוק אוטומטי אחרי סיווג ידני */}
+        {ruleSuggestion && (
+          <div className="px-5 py-3 bg-gradient-to-l from-blue-50 to-indigo-50 border-b border-blue-100 shrink-0">
+            <div className="flex items-start gap-2.5">
+              <div className="h-7 w-7 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0 mt-0.5">
+                <Wand2 className="h-3.5 w-3.5 text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-slate-800 leading-snug">
+                  לסווג אוטומטית עסקאות של "{ruleSuggestion.searchString}" כ־"{ruleSuggestion.categoryName}"?
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  החוק יחול על עסקאות עתידיות{ruleSuggestion.matchCount > 0 ? ` ועל ${ruleSuggestion.matchCount} עסקאות קיימות` : ''}.
+                </p>
+                <div className="flex items-center gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    onClick={handleCreateRule}
+                    disabled={creatingRule}
+                    className="h-7 text-xs rounded-full bg-blue-600 hover:bg-blue-700 px-3"
+                  >
+                    {creatingRule ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 me-1" />}
+                    כן, צור חוק
+                  </Button>
+                  <button
+                    onClick={() => setRuleSuggestion(null)}
+                    disabled={creatingRule}
+                    className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded-full transition-colors disabled:opacity-50"
+                  >
+                    לא עכשיו
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Transaction list */}
         <div className="overflow-y-auto flex-1 bg-white">

@@ -20,7 +20,8 @@ Located in `server/models/`.
 
 | Model | File | Key Fields |
 |-------|------|-----------|
-| `User` | `User.js` | `email`, `passwordHash`, `name`, `googleId`, `role` (`user`/`admin` — system-level), `activeHousehold`→`Household`, `familyGroup` (legacy), `tokenVersion`, `createdAt` |
+| `User` | `User.js` | `email`, `passwordHash`, `name`, `googleId`, `role` (`user`/`admin` — system-level), `activeHousehold`→`Household`, `familyGroup` (legacy), `tokenVersion`, `createdAt`. **Phase 4:** `emailVerified`/`emailVerifiedAt`, `emailVerificationTokenHash`/`emailVerificationExpires` (select:false), `onboardedAt`, `twoFactorEnabled`, `twoFactorSecret`/`twoFactorPendingSecret`/`twoFactorRecoveryHashes` (select:false, hashed), `deletedAt` (anonymize-in-place) |
+| `Subscription` | `Subscription.js` | **Phase 4** — one per `household` (unique). `plan` (`free`/`premium`), `status` (`trialing`/`active`/`past_due`/`cancelled`), `provider` (`stub`/`manual`/`stripe`/`paddle`), `providerCustomerId`/`providerSubscriptionId`, `periodEnd`, `canceledAt`. Plan catalog + gating live in `services/subscriptionService.js` |
 
 ### Tenancy (v2 — Households)
 

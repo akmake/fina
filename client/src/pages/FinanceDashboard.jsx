@@ -19,6 +19,14 @@ import { Panel, SectionTitle, EmptyState, useChartTheme, CHART_COLORS } from '@/
 const COLORS = CHART_COLORS;
 const fmt = formatCurrency;
 
+// severity → card styling for the dashboard alert cards (mirrors AlertsPage)
+const ALERT_SEVERITY = {
+  info:    { dot: 'bg-blue-500',    box: 'bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/40',       text: 'text-blue-700 dark:text-blue-200' },
+  warning: { dot: 'bg-amber-500',   box: 'bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/40',   text: 'text-amber-800 dark:text-amber-200' },
+  danger:  { dot: 'bg-red-500',     box: 'bg-red-50 dark:bg-red-950/30 border-red-100 dark:border-red-900/40',           text: 'text-red-700 dark:text-red-200' },
+  success: { dot: 'bg-emerald-500', box: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/40', text: 'text-emerald-700 dark:text-emerald-200' },
+};
+
 // ─── UI Helpers ─────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, positive, icon: Icon }) {
   return (
@@ -206,7 +214,8 @@ export default function FinanceDashboard() {
   const expense = monthly?.thisMonth?.expense ?? 0;
   const netFlow = income - expense;
   const savingsRate = income > 0 ? Math.round((netFlow / income) * 100) : null;
-  const activeAlerts = (alerts || []).filter(a => !a.read).slice(0, 5);
+  // The alerts endpoint already excludes dismissed/expired alerts (newest first).
+  const activeAlerts = (alerts || []).slice(0, 5);
 
   // Formatting for Category Comparison
   const catMap = {};
@@ -404,14 +413,32 @@ export default function FinanceDashboard() {
             </div>
             {activeAlerts.length > 0 && (
               <div className="pt-4 border-t border-slate-100 dark:border-white/[0.06]">
-                <div className="flex items-center gap-2 mb-3">
-                  <AlertCircle className="h-4 w-4 text-red-500" />
-                  <span className="text-sm font-bold text-slate-800 dark:text-slate-100">התראות פעילות</span>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                    <span className="text-sm font-bold text-slate-800 dark:text-slate-100">התראות פעילות</span>
+                  </div>
+                  <Link to="/alerts" className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">הכל</Link>
                 </div>
                 <div className="space-y-2">
-                  {activeAlerts.slice(0, 2).map((a, i) => (
-                    <p key={i} className="text-sm text-slate-700 dark:text-red-200 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/40 p-2.5 rounded-lg">{a.message ?? a.title}</p>
-                  ))}
+                  {activeAlerts.slice(0, 3).map((a, i) => {
+                    const sev = ALERT_SEVERITY[a.severity] || ALERT_SEVERITY.info;
+                    const card = (
+                      <div className={`flex items-start gap-2.5 p-2.5 rounded-lg border ${sev.box}`}>
+                        <span className="text-base leading-none mt-0.5 shrink-0">{a.icon || '🔔'}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-xs font-bold ${sev.text} leading-snug`}>{a.title}</p>
+                          {a.message && a.message !== a.title && (
+                            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-snug mt-0.5 line-clamp-2">{a.message}</p>
+                          )}
+                        </div>
+                        {!a.isRead && <div className={`h-2 w-2 rounded-full ${sev.dot} shrink-0 mt-1`} />}
+                      </div>
+                    );
+                    return a.actionUrl
+                      ? <Link key={a._id || i} to={a.actionUrl} className="block hover:opacity-90 transition-opacity">{card}</Link>
+                      : <div key={a._id || i}>{card}</div>;
+                  })}
                 </div>
               </div>
             )}

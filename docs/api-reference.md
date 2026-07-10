@@ -21,9 +21,15 @@ All protected routes require:
 | POST | `/auth/google` | Google OAuth `{ credential: id_token }` |
 | POST | `/auth/logout` | Clears JWT cookies |
 | POST | `/auth/refresh` | Refresh access token using refresh cookie |
+| POST | `/auth/verify-email` | Verify email `{ token }` (Phase 4 — from the email link) |
+| POST | `/auth/2fa/login` | Second login step for 2FA users `{ mfaToken, code }` → sets JWT cookies |
 | POST | `/logs/device-ping` | Device analytics ping (public by design — sent before login; rate limited) |
 
 > `/auth/*` routes are rate limited (20 requests / 15 min in production) to block brute-force.
+>
+> **Login with 2FA (Phase 4):** if the user has 2FA on, `POST /auth/login` returns
+> `{ twoFactorRequired: true, mfaToken }` **without** session cookies; the client
+> then calls `POST /auth/2fa/login` with a TOTP (or recovery) code to get cookies.
 
 ---
 
@@ -98,6 +104,28 @@ returned. Mounted at `/api/connections`. See [modules/import.md](modules/import.
 | POST | `/auth/google` | No | Google OAuth |
 | POST | `/auth/logout` | Yes | Logout, clear cookies |
 | POST | `/auth/refresh` | Refresh cookie | Get new access token |
+| POST | `/auth/verify-email` | No | **Phase 4** — verify email `{ token }` |
+| POST | `/auth/resend-verification` | Yes | **Phase 4** — re-send the verification email |
+| POST | `/auth/2fa/setup` | Yes | **Phase 4** — start 2FA; returns `{ secret, otpauth, qr }` |
+| POST | `/auth/2fa/enable` | Yes | **Phase 4** — confirm `{ code }`, activate; returns one-time `recoveryCodes` |
+| POST | `/auth/2fa/disable` | Yes | **Phase 4** — disable with `{ code }` (TOTP/recovery) or `{ password }` |
+| POST | `/auth/2fa/login` | No | **Phase 4** — exchange `{ mfaToken, code }` for session cookies |
+
+---
+
+## Account & Subscription (Phase 4 — Auth + familyScope)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/account` | Profile + `emailVerified` + `twoFactorEnabled` + current plan |
+| GET | `/account/export` | Full JSON export of the caller's data (GDPR portability; downloads) |
+| DELETE | `/account` | Delete account — anonymize + soft-delete data; `{ password }` (or `{ confirm }` for OAuth users) |
+| POST | `/account/onboarding` | Mark the first-run flow complete (`onboardedAt`) |
+| GET | `/subscription` | Household's current plan + status |
+| GET | `/subscription/plans` | Plan catalog (`free`/`premium` with limits + features) |
+| POST | `/subscription/change` | **Stub** — switch plan `{ plan }` (owner-only; no real billing wired) |
+
+> Plan gating (`middlewares/planGate.js`) returns **402** `{ code: 'PLAN_UPGRADE_REQUIRED' | 'PLAN_LIMIT_REACHED' }` — ready to attach to premium routes / free-tier caps. See [modules/saas-shell.md](modules/saas-shell.md).
 
 ---
 

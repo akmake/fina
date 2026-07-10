@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { format, isSameMonth, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { Upload, Search, ChevronDown, Loader2, X, Save, Zap } from 'lucide-react';
+import { Upload, Search, ChevronDown, Loader2, X, Save, Zap, Plus, Receipt } from 'lucide-react';
 
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '@/utils/api';
@@ -34,6 +34,7 @@ export default function TransactionsPage() {
   const [filterType,     setFilterType]     = useState('all');
   const [searchQuery,    setSearchQuery]    = useState('');
   const [filterCategory, setFilterCategory] = useState(() => searchParams.get('category') ?? '');
+  const [isAddOpen, setIsAddOpen] = useState(false);
 
   // ─── Scroll sentinel ─────────────────────────────────────────
   const sentinelRef = useRef(null);
@@ -308,21 +309,32 @@ export default function TransactionsPage() {
 
   // ─── Render ──────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#F2F4F8] font-sans text-slate-900 pb-20">
+    <div className="min-h-screen bg-[#f7f8fa] font-sans text-slate-900 dark:bg-[#0b0d11] dark:text-slate-100 pb-20">
 
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-white/50 px-4 sm:px-8 py-4 sm:py-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-sm">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">הארנק שלי</h1>
+      <header className="border-b border-slate-200/80 bg-white dark:border-white/[0.07] dark:bg-[#111318]">
+        <div className="mx-auto flex max-w-[1320px] flex-col items-start justify-between gap-4 px-4 py-6 sm:flex-row sm:items-center sm:px-6">
+        <div>
+          <p className="mb-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400">ניהול פיננסי</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950 dark:text-white">עסקאות</h1>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">כל ההכנסות וההוצאות במקום אחד</p>
+        </div>
         <div className="flex gap-2 w-full sm:w-auto">
           <Button
+            onClick={() => setIsAddOpen(true)}
+            className="rounded-lg h-9 sm:h-10 px-4 bg-slate-950 hover:bg-slate-800 text-white shadow-sm transition-colors flex-1 sm:flex-none text-xs font-semibold flex items-center gap-2 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+          >
+            <Plus className="h-4 w-4" /> עסקה חדשה
+          </Button>
+          <Button
             onClick={() => navigate('/import/auto')}
-            className="rounded-full h-9 sm:h-10 px-4 sm:px-5 bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all flex-1 sm:flex-none text-sm font-semibold flex items-center gap-2"
+            className="rounded-lg h-9 sm:h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-colors flex-1 sm:flex-none text-xs font-semibold flex items-center gap-2"
           >
             <Zap className="h-4 w-4" /> ייבוא אוטומטי
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="rounded-full h-9 sm:h-10 px-4 sm:px-6 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:shadow-md transition-all flex-1 sm:flex-none text-sm font-semibold">
+              <Button variant="outline" className="rounded-lg h-9 sm:h-10 px-4 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors flex-1 sm:flex-none text-xs font-semibold dark:bg-white/[0.04] dark:border-white/[0.09] dark:text-slate-200 dark:hover:bg-white/[0.07]">
                 <Upload className="ml-2 h-4 w-4" /> ייבוא אשראי <ChevronDown className="mr-2 h-4 w-4 text-slate-400" />
               </Button>
             </DropdownMenuTrigger>
@@ -335,22 +347,23 @@ export default function TransactionsPage() {
           <input type="file" ref={fileInputRef} accept=".xlsx,.xls,.csv" className="hidden"
             onChange={e => { const f = e.target.files?.[0]; if (f) analyzeFile(f, importerType); }} />
         </div>
+        </div>
       </header>
 
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      <div className="max-w-[1320px] mx-auto px-4 sm:px-6 py-6">
 
         {/* KPI bar */}
         <KpiBar transactions={transactions} effectiveMonth={effectiveMonth} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12">
+        <div>
 
           {/* Main feed */}
-          <main className="lg:col-span-8">
+          <main className="min-w-0">
 
             {/* Search + filters */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8 gap-4">
+            <div className="mb-3 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
               <div className="flex items-center gap-3 shrink-0">
-                <h2 className="text-lg sm:text-xl font-bold text-slate-900">פעילות</h2>
+                <h2 className="text-base font-bold text-slate-950 dark:text-white">תנועות אחרונות</h2>
                 {filterCategory && (
                   <span className="inline-flex items-center gap-1.5 text-xs font-semibold bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full">
                     {filterCategory}
@@ -361,22 +374,22 @@ export default function TransactionsPage() {
                 )}
               </div>
               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                <div className="relative w-full sm:w-64">
+                <div className="relative w-full sm:w-72">
                   <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     placeholder="חיפוש לפי תיאור או קטגוריה..."
-                    className="h-10 pl-4 pr-9 rounded-full bg-white/60 backdrop-blur-sm border-white/50 shadow-sm text-sm w-full"
+                    className="h-9 pl-4 pr-9 rounded-lg bg-white border-slate-200 shadow-none text-xs w-full dark:bg-[#15181f] dark:border-white/[0.08]"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <div className="flex gap-1 sm:gap-2 bg-white/60 p-1 rounded-full border border-white/50 shadow-sm w-fit">
+                <div className="flex gap-1 bg-slate-100 p-1 rounded-lg dark:bg-white/[0.05] w-fit">
                   {[['all', 'הכל'], ['expense', 'הוצאות'], ['income', 'הכנסות']].map(([val, label]) => (
                     <Badge
                       key={val}
                       onClick={() => setFilterType(val)}
-                      className={`cursor-pointer px-3 sm:px-4 py-1 sm:py-1.5 rounded-full font-medium text-xs sm:text-sm transition-colors ${
-                        filterType === val ? 'bg-white hover:bg-slate-50 text-slate-900 shadow-sm' : 'text-slate-500 hover:bg-white/50'
+                      className={`cursor-pointer px-3 py-1.5 rounded-md font-medium text-[11px] transition-colors ${
+                        filterType === val ? 'bg-white hover:bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'bg-transparent text-slate-500 hover:bg-white/50'
                       }`}
                     >
                       {label}
@@ -391,16 +404,44 @@ export default function TransactionsPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
               </div>
             ) : groupedByMonth.length === 0 ? (
-              <div className="text-center py-16 bg-white/40 rounded-3xl border border-white/50">
-                <Search className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-slate-700">לא נמצאו עסקאות</h3>
-                <p className="text-sm text-slate-500">נסה לשנות את הסינון</p>
+              <div className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center dark:border-white/[0.12] dark:bg-[#15181f]">
+                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                  <Receipt className="h-6 w-6" strokeWidth={1.8} />
+                </div>
+                <h3 className="text-lg font-bold text-slate-950 dark:text-white">
+                  {searchQuery || filterCategory || filterType !== 'all' ? 'לא נמצאו עסקאות' : 'העסקה הראשונה שלך מתחילה כאן'}
+                </h3>
+                <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  {searchQuery || filterCategory || filterType !== 'all'
+                    ? 'אפשר לנקות את החיפוש או לשנות את מסנני התצוגה.'
+                    : 'אפשר להוסיף עסקה ידנית או לייבא את הפעילות מהבנק ומחברות האשראי.'}
+                </p>
+                <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                  {searchQuery || filterCategory || filterType !== 'all' ? (
+                    <Button
+                      onClick={() => { setSearchQuery(''); setFilterCategory(''); setFilterType('all'); setSearchParams({}); }}
+                      variant="outline"
+                      className="h-10 rounded-lg px-5 text-xs font-semibold"
+                    >
+                      ניקוי מסננים
+                    </Button>
+                  ) : (
+                    <>
+                      <Button onClick={() => setIsAddOpen(true)} className="h-10 rounded-lg bg-blue-600 px-5 text-xs font-semibold text-white hover:bg-blue-700">
+                        <Plus className="ml-2 h-4 w-4" /> הוספת עסקה
+                      </Button>
+                      <Button onClick={() => navigate('/import/auto')} variant="outline" className="h-10 rounded-lg border-slate-200 bg-white px-5 text-xs font-semibold dark:border-white/[0.09] dark:bg-white/[0.04]">
+                        <Zap className="ml-2 h-4 w-4" /> חיבור חשבון
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
             ) : (
               <>
                 {groupedByMonth.map(([monthLabel, { date, txns }]) => (
-                  <div key={monthLabel} className="mb-10">
-                    <div className="sticky top-20 z-20 backdrop-blur-md bg-[#F2F4F8]/80 py-2 mb-4 px-2 flex items-center justify-between">
+                  <div key={monthLabel} className="mb-6 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-white/[0.08] dark:bg-[#15181f]">
+                    <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-4 py-3 dark:border-white/[0.07] dark:bg-white/[0.025]">
                       <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">
                         {monthLabel}
                         {isSameMonth(date, new Date()) && (
@@ -409,7 +450,7 @@ export default function TransactionsPage() {
                       </h3>
                       <span className="text-xs text-slate-400">{txns.length} עסקאות</span>
                     </div>
-                    <div className="space-y-2">
+                    <div>
                       {txns.map(t => (
                         <TransactionCard
                           key={t._id}
@@ -437,18 +478,38 @@ export default function TransactionsPage() {
             )}
           </main>
 
-          {/* Sidebar */}
-          <aside className="lg:col-span-4 space-y-8">
+        </div>
+      </div>
+
+      {/* Add transaction drawer */}
+      {isAddOpen && (
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-950/30 backdrop-blur-[2px]"
+            onClick={() => setIsAddOpen(false)}
+            aria-label="סגירת טופס"
+          />
+          <aside className="absolute inset-y-0 left-0 w-full max-w-[420px] overflow-y-auto border-r border-slate-200 bg-[#f7f8fa] p-4 shadow-2xl dark:border-white/[0.08] dark:bg-[#0f1116] sm:p-6">
+            <div className="mb-4 flex items-center justify-between px-1">
+              <div>
+                <p className="text-sm font-bold text-slate-950 dark:text-white">עסקה חדשה</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">הפרטים יופיעו מיד ברשימת העסקאות</p>
+              </div>
+              <button onClick={() => setIsAddOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 dark:hover:bg-white/[0.07] dark:hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
             <AddTransactionForm
               categories={categories}
-              onAdd={refresh}
+              onAdd={() => { refresh(); setIsAddOpen(false); }}
               onCategoryCreated={cat =>
                 setCategories(prev => [...prev, cat].sort((a, b) => a.name.localeCompare(b.name)))
               }
             />
           </aside>
         </div>
-      </div>
+      )}
 
       {/* Edit dialog */}
       {editingTrx && (

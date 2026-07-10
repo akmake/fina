@@ -65,6 +65,38 @@ Axios response interceptor (client/src/utils/api.js)
 If refresh also fails → redirect to /login
 ```
 
+## Two-Factor Auth (2FA) Login Flow — Phase 4
+
+TOTP via **otplib v12** (`server/services/twoFactorService.js`). When a user has
+2FA enabled, the password step does not create a session:
+
+```
+POST /api/auth/login  { email, password }
+      │  (password OK, user.twoFactorEnabled)
+      ▼
+200 { twoFactorRequired: true, mfaToken }      ← NO jwt/refresh cookies yet
+      │   mfaToken = 5-min JWT with { mfa:true } claim (requireAuth rejects it)
+      ▼
+Client shows the 6-digit code step (LoginPage)
+      │
+POST /api/auth/2fa/login  { mfaToken, code }   ← TOTP code, or a one-time recovery code
+      │  (verified)
+      ▼
+Server issues jwt + refresh cookies → normal session
+```
+
+Setup (from Settings → `TwoFactorSection`): `POST /2fa/setup` (returns secret +
+QR) → `POST /2fa/enable { code }` (activates, returns one-time recovery codes) →
+`POST /2fa/disable { code|password }`. Secrets + recovery-code hashes are
+`select:false` on `User`.
+
+## Email Verification Flow — Phase 4
+
+Register issues a token (hash stored, raw emailed as `${CLIENT_URL}/verify-email?token=…`
+via `verificationService`). The public `POST /api/auth/verify-email { token }` marks
+`emailVerified`. **Non-blocking**: a dismissible `VerifyEmailBanner` nags but never
+locks the user out; Google-OAuth users are created already-verified.
+
 ## CSRF Flow
 
 ```
