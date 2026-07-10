@@ -1,6 +1,6 @@
 import { createScraper, CompanyTypes } from 'israeli-bank-scrapers';
 import puppeteer from 'puppeteer';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { parseTransactions } from '../utils/excelParser.js';
 import AppError from '../utils/AppError.js';
@@ -61,6 +61,19 @@ export const resolveBrowserArgs = () => {
     return process.env.PUPPETEER_ARGS.split(/\s+/).filter(Boolean);
   }
   return process.env.RENDER ? RENDER_CHROME_ARGS : undefined;
+};
+
+// Diagnostic: when SCRAPER_DEBUG_SCREENSHOTS is set, the scraper writes a
+// full-page PNG of the browser at the moment a scrape FAILS — the fastest way to
+// see what a bank actually showed (e.g. an UNKNOWN_ERROR "unrecognized landing
+// page"). Files land under LOG_DIR/scrape-failures. Returns undefined (feature
+// off) unless the env flag is present, so it is inert in normal operation.
+export const failureScreenshotPath = (company) => {
+  if (!process.env.SCRAPER_DEBUG_SCREENSHOTS) return undefined;
+  const dir = `${process.env.LOG_DIR || './logs'}/scrape-failures`;
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `${dir}/${company}-${stamp}.png`;
 };
 
 // Extra scraped fields — passed as underscore-prefixed keys through the Excel parser pipeline
@@ -366,6 +379,7 @@ export const runScrape = async ({ company, credentials, startDate, incomesOnly, 
     // by the waitForRedirect wrapper at the top of this file.
     defaultTimeout: 90000,
     navigationRetryCount: 2,
+    storeFailureScreenShotPath: failureScreenshotPath(company),
   });
 
   const result = await scraper.scrape(credentials);
