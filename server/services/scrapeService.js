@@ -1,7 +1,9 @@
 import { createScraper, CompanyTypes } from 'israeli-bank-scrapers';
 import puppeteer from 'puppeteer';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { join } from 'node:path';
+import os from 'node:os';
 import { parseTransactions } from '../utils/excelParser.js';
 import AppError from '../utils/AppError.js';
 
@@ -40,9 +42,62 @@ const RENDER_CHROME_ARGS = [
   '--disable-gpu',
 ];
 
+const findSystemChrome = () => {
+  const candidates = process.platform === 'win32'
+    ? [
+        join(process.env.PROGRAMFILES || 'C:\\Program Files', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        join(process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        join(process.env.PROGRAMFILES || 'C:\\Program Files', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+        join(process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+      ]
+    : process.platform === 'darwin'
+      ? [
+          '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+          '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+        ]
+      : [
+          '/usr/bin/google-chrome',
+          '/usr/bin/google-chrome-stable',
+          '/usr/bin/chromium',
+          '/usr/bin/chromium-browser',
+          '/usr/bin/microsoft-edge',
+      ];
+
+  return candidates.find((candidate) => candidate && existsSync(candidate));
+};
+
+const findInstalledChrome = () => {
+  const cacheDir = process.env.PUPPETEER_CACHE_DIR || join(os.homedir(), '.cache', 'puppeteer');
+  const chromeDir = join(cacheDir, 'chrome');
+  if (!existsSync(chromeDir)) return undefined;
+
+  try {
+    return readdirSync(chromeDir)
+      .filter((entry) => entry.startsWith('win64-') || entry.startsWith('linux-') || entry.startsWith('mac-'))
+      .sort()
+      .reverse()
+      .map((entry) => {
+        const base = join(chromeDir, entry);
+        return [
+          join(base, 'chrome-win64', 'chrome.exe'),
+          join(base, 'chrome-linux64', 'chrome'),
+          join(base, 'chrome-mac-x64', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
+          join(base, 'chrome-mac-arm64', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
+        ].find((candidate) => existsSync(candidate));
+      })
+      .find(Boolean);
+  } catch {
+    return undefined;
+  }
+};
+
 export const resolveExecutablePath = () => {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
   if (process.env.CHROME_BIN) return process.env.CHROME_BIN;
+
+  const systemChrome = findSystemChrome();
+  if (systemChrome) return systemChrome;
 
   try {
     // executablePath() derives a path from install metadata WITHOUT checking the
@@ -50,10 +105,12 @@ export const resolveExecutablePath = () => {
     // folder present but chrome.exe missing, so this returns a path that makes the
     // launcher throw "Browser was not found". Only hand back a path that exists.
     const resolved = puppeteer.executablePath();
-    return resolved && existsSync(resolved) ? resolved : undefined;
+    if (resolved && existsSync(resolved)) return resolved;
   } catch {
-    return undefined;
+    // Continue to cache fallback below.
   }
+
+  return findInstalledChrome();
 };
 
 export const resolveBrowserArgs = () => {

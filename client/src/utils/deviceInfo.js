@@ -677,13 +677,8 @@ export const initDeviceInfo = async () => {
     if (!_pingDone) {
       _pingDone = true;
       try {
-        const baseURL = import.meta.env?.VITE_API_URL || '/api';
-        await fetch(`${baseURL}/logs/device-ping`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(info),
-        });
+        const { default: api } = await import('./api.js');
+        await api.post('/logs/device-ping', info);
       } catch { /* non-critical */ }
     }
 

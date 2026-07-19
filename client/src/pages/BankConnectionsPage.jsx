@@ -129,34 +129,56 @@ export default function BankConnectionsPage() {
   };
 
   const canSaveStandard = company && !isOneZero && (config?.fields || []).every((f) => fields[f.name]);
+  const activeCount = connections.filter((c) => c.status === 'active').length;
+  const autoSyncCount = connections.filter((c) => c.autoSync).length;
+  const attentionCount = connections.filter((c) => c.status === 'error' || c.status === 'needs_otp' || c.lastSyncStatus === 'error').length;
 
   return (
-    <div className="container mx-auto p-4 md:p-8 max-w-3xl">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-            <Building2 className="h-7 w-7 text-blue-600" />
-            חיבורי בנקים
-          </h1>
-          <p className="text-slate-500 mt-1">חבר חשבון פעם אחת — Fina תסנכרן את העסקאות אוטומטית מדי יום.</p>
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-white/[0.08] dark:bg-[#0f1117] sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-slate-50">
+              <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              חיבורי בנקים
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+              חבר חשבון פעם אחת, בדוק את סטטוס הסנכרון, והפעל משיכה ידנית כשצריך.
+            </p>
+          </div>
+          {!showAdd && (
+            <Button onClick={() => { setShowAdd(true); resetForm(); }} className="w-full sm:w-auto">
+              <Plus className="ml-1 h-4 w-4" /> הוסף חיבור
+            </Button>
+          )}
         </div>
-        {!showAdd && (
-          <Button onClick={() => { setShowAdd(true); resetForm(); }}>
-            <Plus className="ml-1 h-4 w-4" /> הוסף חיבור
-          </Button>
-        )}
+
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="rounded-md bg-slate-50 p-3 dark:bg-white/[0.04]">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">חיבורים</p>
+            <p className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-50">{connections.length}</p>
+          </div>
+          <div className="rounded-md bg-emerald-50 p-3 dark:bg-emerald-500/10">
+            <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">פעילים</p>
+            <p className="mt-1 text-lg font-bold text-emerald-800 dark:text-emerald-200">{activeCount}</p>
+          </div>
+          <div className="rounded-md bg-amber-50 p-3 dark:bg-amber-500/10">
+            <p className="text-xs font-medium text-amber-700 dark:text-amber-300">דורשים טיפול</p>
+            <p className="mt-1 text-lg font-bold text-amber-800 dark:text-amber-200">{attentionCount}</p>
+          </div>
+        </div>
       </div>
 
       {/* ── Add-connection wizard ─────────────────────────────── */}
       {showAdd && (
-        <Card className="mb-6 border-blue-200 shadow-sm">
+        <Card className="mb-5 rounded-lg border-blue-200 shadow-sm dark:border-blue-500/30">
           <CardHeader>
             <CardTitle className="text-xl">חיבור חדש</CardTitle>
             <CardDescription>הפרטים נשמרים מוצפנים (AES-256) ומשמשים אך ורק לסנכרון האוטומטי.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">בנק / חברת אשראי</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">בנק / חברת אשראי</label>
               <Select value={company} onValueChange={onSelectCompany}>
                 <SelectTrigger><SelectValue placeholder="בחר חברה" /></SelectTrigger>
                 <SelectContent>
@@ -174,7 +196,7 @@ export default function BankConnectionsPage() {
               <>
                 {(config.fields || []).map((f) => (
                   <div key={f.name}>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">{f.label}</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">{f.label}</label>
                     <Input
                       type={f.type} inputMode={f.inputMode}
                       value={fields[f.name] || ''}
@@ -185,22 +207,22 @@ export default function BankConnectionsPage() {
                 ))}
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">שם תצוגה (אופציונלי)</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">שם תצוגה (אופציונלי)</label>
                   <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={config.label} />
                 </div>
 
                 {isBank && (
-                  <label className="flex items-center gap-3 p-3 rounded-md border bg-slate-50 cursor-pointer select-none">
+                  <label className="flex items-center gap-3 p-3 rounded-md border bg-slate-50 cursor-pointer select-none dark:bg-white/[0.04] dark:border-white/[0.08]">
                     <input type="checkbox" checked={incomesOnly} onChange={(e) => setIncomesOnly(e.target.checked)} className="h-4 w-4 accent-blue-600" />
-                    <span className="text-sm font-medium text-slate-700">הכנסות בלבד
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">הכנסות בלבד
                       <span className="block text-xs font-normal text-slate-400">ייבא רק זיכויים (משכורת, העברות נכנסות)</span>
                     </span>
                   </label>
                 )}
 
-                <label className="flex items-center gap-3 p-3 rounded-md border bg-slate-50 cursor-pointer select-none">
+                <label className="flex items-center gap-3 p-3 rounded-md border bg-slate-50 cursor-pointer select-none dark:bg-white/[0.04] dark:border-white/[0.08]">
                   <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} className="h-4 w-4 accent-blue-600" />
-                  <span className="text-sm font-medium text-slate-700">סנכרון אוטומטי יומי</span>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">סנכרון אוטומטי יומי</span>
                 </label>
               </>
             )}
@@ -225,7 +247,7 @@ export default function BankConnectionsPage() {
               </div>
             )}
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
               <Button variant="ghost" onClick={() => { setShowAdd(false); resetForm(); }}>ביטול</Button>
 
               {isOneZero ? (
@@ -253,29 +275,34 @@ export default function BankConnectionsPage() {
 
       {/* ── Connections list ──────────────────────────────────── */}
       {loading ? (
-        <div className="text-center py-16 text-slate-400"><Loader2 className="mx-auto h-8 w-8 animate-spin" /></div>
+        <div className="rounded-lg border border-slate-200 bg-white py-16 text-center text-slate-400 shadow-sm dark:border-white/[0.08] dark:bg-[#0f1117]"><Loader2 className="mx-auto h-8 w-8 animate-spin" /></div>
       ) : connections.length === 0 ? (
         !showAdd && (
-          <Card><CardContent className="py-16 text-center text-slate-500">
-            <Building2 className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-            אין עדיין חיבורים. לחץ על "הוסף חיבור" כדי להתחיל בסנכרון אוטומטי.
+          <Card className="rounded-lg shadow-sm"><CardContent className="py-16 text-center text-slate-500">
+            <Building2 className="mx-auto mb-3 h-12 w-12 text-slate-300 dark:text-slate-600" />
+            <p className="font-semibold text-slate-700 dark:text-slate-200">אין עדיין חיבורים</p>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500 dark:text-slate-400">הוסף חיבור כדי להתחיל בסנכרון אוטומטי יומי.</p>
           </CardContent></Card>
         )
       ) : (
         <div className="space-y-3">
+          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+            <span>{autoSyncCount} מתוך {connections.length} בסנכרון אוטומטי</span>
+            <span>עודכן לפי הנתונים האחרונים במערכת</span>
+          </div>
           {connections.map((c) => {
             const isSyncing = !!syncing[c._id];
             const label = companies.find((x) => x.value === c.company)?.label || c.company;
             return (
-              <Card key={c._id} className="shadow-sm">
-                <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+              <Card key={c._id} className="rounded-lg shadow-sm transition-shadow hover:shadow-md">
+                <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-slate-800 truncate">{c.displayName || label}</span>
+                      <span className="truncate font-semibold text-slate-800 dark:text-slate-100">{c.displayName || label}</span>
                       <span className="text-xs text-slate-400">{label}</span>
                       <StatusBadge status={c.status} />
                     </div>
-                    <div className="text-xs text-slate-500 mt-1 flex items-center gap-1 flex-wrap">
+                    <div className="mt-1 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
                       {c.lastSyncStatus === 'success'
                         ? <CheckCircle className="h-3 w-3 text-green-500" />
                         : c.lastSyncStatus === 'error'
@@ -287,8 +314,8 @@ export default function BankConnectionsPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none" title="סנכרון אוטומטי יומי">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-nowrap">
+                    <label className="flex min-h-8 items-center gap-1.5 rounded-md border border-slate-200 px-2.5 text-xs text-slate-600 cursor-pointer select-none dark:border-white/[0.08] dark:text-slate-300" title="סנכרון אוטומטי יומי">
                       <input
                         type="checkbox" className="h-3.5 w-3.5 accent-blue-600"
                         checked={c.autoSync}

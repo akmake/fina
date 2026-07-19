@@ -1,7 +1,6 @@
 import { lazy, Suspense, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Link2, DownloadCloud, FileSpreadsheet, Database } from 'lucide-react';
-import { Panel } from '@/components/dashboard/kit';
+import { Link2, DownloadCloud, FileSpreadsheet, Database, Loader2 } from 'lucide-react';
 
 /*
  * ImportHubPage — אשף ייבוא/חיבורים אחד (Phase 3, §6.1).
@@ -44,42 +43,56 @@ export default function ImportHubPage() {
   const active = useMemo(() => pathToTab(location.pathname), [location.pathname]);
   const activeTab = TABS.find((t) => t.key === active) || TABS[0];
   const ActiveComponent = activeTab.Component;
+  const ActiveIcon = activeTab.icon;
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6" dir="rtl">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">חיבורים וייבוא</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{activeTab.hint}</p>
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-7" dir="rtl">
+      <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 shadow-sm dark:border-white/[0.08] dark:bg-[#0f1117] dark:text-slate-400">
+            <ActiveIcon className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+            {activeTab.label}
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">חיבורים וייבוא</h1>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">{activeTab.hint}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-white/[0.08] dark:bg-[#0f1117] sm:flex" role="tablist">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = tab.key === active;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => navigate(tab.path)}
+                className={`flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/[0.06]'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="truncate">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </header>
 
-      <div className="flex flex-wrap gap-2 mb-6" role="tablist">
-        {TABS.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = tab.key === active;
-          return (
-            <button
-              key={tab.key}
-              role="tab"
-              aria-selected={isActive}
-              onClick={() => navigate(tab.path)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-white dark:bg-[#0f1117] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/[0.06] hover:bg-slate-50 dark:hover:bg-white/[0.04]'
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <Panel className="p-0 overflow-hidden">
-        <Suspense fallback={<div className="p-10 text-center text-slate-400">טוען…</div>}>
+      <main className="min-h-[520px]">
+        <Suspense
+          fallback={(
+            <div className="flex min-h-[360px] items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 shadow-sm dark:border-white/[0.08] dark:bg-[#0f1117]">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          )}
+        >
           <ActiveComponent />
         </Suspense>
-      </Panel>
+      </main>
     </div>
   );
 }

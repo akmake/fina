@@ -1,12 +1,39 @@
 import { execSync } from 'node:child_process';
-import { existsSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import os from 'node:os';
 
 const env = { ...process.env };
 
+const findSystemChrome = () => {
+  const candidates = process.platform === 'win32'
+    ? [
+        join(env.PROGRAMFILES || 'C:\\Program Files', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        join(env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        join(env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        join(env.PROGRAMFILES || 'C:\\Program Files', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+        join(env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+      ]
+    : process.platform === 'darwin'
+      ? [
+          '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+          '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+        ]
+      : [];
+
+  return candidates.find((candidate) => candidate && existsSync(candidate));
+};
+
 if (env.RENDER && !env.PUPPETEER_CACHE_DIR) {
   env.PUPPETEER_CACHE_DIR = '/opt/render/project/.cache/puppeteer';
+}
+
+if (!env.RENDER && !env.PUPPETEER_FORCE_DOWNLOAD) {
+  const systemChrome = findSystemChrome();
+  if (systemChrome) {
+    console.log(`[installChrome] System Chrome/Edge found, skipping Puppeteer browser download: ${systemChrome}`);
+    process.exit(0);
+  }
 }
 
 // Self-heal: an interrupted `browsers install` leaves the version folder present but
@@ -20,6 +47,7 @@ try {
   if (existsSync(chromeDir)) {
     for (const entry of readdirSync(chromeDir)) {
       const base = join(chromeDir, entry);
+      if (!statSync(base).isDirectory()) continue;
       const hasBinary =
         existsSync(join(base, 'chrome-win64', 'chrome.exe')) ||
         existsSync(join(base, 'chrome-linux64', 'chrome')) ||
