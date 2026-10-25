@@ -9,6 +9,7 @@
 - **Rule 3** — If a doc is found to be outdated, update it immediately, even if it was not part of the task.
 - **Rule 4** — Every new route, model, env var, store, or module must be documented before the task is complete.
 - **Rule 5** — Never duplicate canonical information across documents. Cross-reference only.
+- **Rule 6** — **Never create branches** (no `git branch`, `git checkout -b`, `git switch -c`, worktree branches, or PR branches). All work is committed directly on `main`. If a task seems to need a branch, ask the user first.
 
 ---
 
