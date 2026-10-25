@@ -4,29 +4,29 @@
 
 @layer base {
   :root {
-    --background: 0 0% 97%; --foreground: 0 0% 8%;
-    --card: 0 0% 100%; --card-foreground: 30 7% 12%;
-    --popover: 0 0% 100%; --popover-foreground: 30 7% 12%;
-    --primary: 0 0% 7%; --primary-foreground: 0 0% 100%;
-    --secondary: 40 15% 92%; --secondary-foreground: 30 7% 18%;
-    --muted: 40 15% 92%; --muted-foreground: 30 5% 44%;
-    --accent: 348 75% 96%; --accent-foreground: 348 68% 44%;
-    --destructive: 3 72% 52%; --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 90%; --input: 0 0% 86%; --ring: 348 68% 44%;
-    --chart-1: 224 82% 67%; --chart-2: 153 43% 48%; --chart-3: 39 82% 58%;
-    --chart-4: 260 60% 62%; --chart-5: 348 68% 52%; --radius: 1rem;
+    --background: 230 50% 97%; --foreground: 232 40% 12%;
+    --card: 0 0% 100%; --card-foreground: 232 40% 12%;
+    --popover: 0 0% 100%; --popover-foreground: 232 40% 12%;
+    --primary: 252 86% 57%; --primary-foreground: 0 0% 100%;
+    --secondary: 230 45% 95%; --secondary-foreground: 232 30% 22%;
+    --muted: 230 45% 95%; --muted-foreground: 230 14% 44%;
+    --accent: 252 100% 96%; --accent-foreground: 252 70% 46%;
+    --destructive: 0 84% 60%; --destructive-foreground: 0 0% 100%;
+    --border: 230 30% 91%; --input: 230 25% 86%; --ring: 252 86% 57%;
+    --chart-1: 252 86% 62%; --chart-2: 164 80% 40%; --chart-3: 40 100% 55%;
+    --chart-4: 200 100% 59%; --chart-5: 350 100% 68%; --radius: 1rem;
   }
 
   .dark {
-    --background: 222 47% 6%; --foreground: 216 33% 96%;
-    --card: 222 36% 9%; --card-foreground: 216 33% 96%;
-    --popover: 222 36% 9%; --popover-foreground: 216 33% 96%;
-    --primary: 0 0% 100%; --primary-foreground: 0 0% 7%;
-    --secondary: 220 25% 15%; --secondary-foreground: 216 33% 96%;
-    --muted: 220 25% 15%; --muted-foreground: 216 12% 65%;
-    --accent: 348 24% 17%; --accent-foreground: 348 90% 76%;
-    --destructive: 3 65% 48%; --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 20%; --input: 0 0% 26%; --ring: 348 68% 52%;
+    --background: 236 38% 7%; --foreground: 230 40% 96%;
+    --card: 236 30% 11%; --card-foreground: 230 40% 96%;
+    --popover: 236 30% 11%; --popover-foreground: 230 40% 96%;
+    --primary: 252 100% 70%; --primary-foreground: 236 38% 8%;
+    --secondary: 236 26% 16%; --secondary-foreground: 230 40% 96%;
+    --muted: 236 26% 16%; --muted-foreground: 230 14% 66%;
+    --accent: 252 40% 20%; --accent-foreground: 252 100% 82%;
+    --destructive: 0 70% 55%; --destructive-foreground: 0 0% 100%;
+    --border: 236 22% 20%; --input: 236 22% 26%; --ring: 252 100% 70%;
   }
 
   * { @apply border-border; }
@@ -37,41 +37,45 @@
     font-feature-settings: "kern", "liga", "tnum"; -webkit-font-smoothing: antialiased;
   }
   h1, h2, h3 { text-wrap: balance; }
-  ::selection { background: #f9dce3; color: #151515; }
+  ::selection { background: #d0c7ff; color: #171a2c; }
   :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 }
 
 @layer components {
-  .app-shell { @apply bg-[#f7f7f6] dark:bg-slate-950; }
+  .app-shell { @apply bg-background; }
   .app-main { position: relative; isolation: isolate; }
   .app-main::before {
-    content: ''; position: fixed; inset: 0 13rem auto 0; height: 1px;
-    @apply bg-slate-200/70 dark:bg-white/[0.06]; pointer-events: none;
+    content: ''; position: fixed; inset: 0 0 auto 0; height: 220px; z-index: -1; pointer-events: none;
+    background: radial-gradient(60% 100% at 85% 0%, rgba(95,61,240,.10), transparent 70%), radial-gradient(40% 80% at 10% 0%, rgba(20,184,138,.07), transparent 70%);
   }
-  .surface-panel { @apply rounded-2xl border border-black/[.035] bg-white text-slate-950 dark:border-white/[0.07] dark:bg-slate-900 dark:text-white; box-shadow: 0 2px 10px rgba(17,17,17,.055); }
-  .surface-panel:hover { @apply border-black/[.07] dark:border-white/[0.11]; }
-  .section-icon { @apply flex h-8 w-8 items-center justify-center rounded-full bg-[#f1f3f5] text-slate-600 dark:bg-white/[.08] dark:text-slate-300; }
-  .page-title { @apply font-display text-[1.75rem] font-semibold tracking-[-0.035em] text-[#111] dark:text-white md:text-[2rem]; }
-  .eyebrow { @apply mb-1 text-[10px] font-semibold tracking-[0.08em] text-[#c92f4c] dark:text-[#ff8098]; }
+  .dark .app-main::before { background: radial-gradient(60% 100% at 85% 0%, rgba(143,120,255,.14), transparent 70%); }
+  .surface-panel { @apply rounded-3xl border border-slate-200/70 bg-white text-slate-900 transition-shadow dark:border-white/[0.07] dark:bg-slate-900 dark:text-white; box-shadow: 0 1px 2px rgba(23,26,44,.04), 0 8px 24px -12px rgba(63,40,168,.14); }
+  .surface-panel:hover { box-shadow: 0 1px 2px rgba(23,26,44,.05), 0 14px 32px -14px rgba(63,40,168,.24); }
+  .section-icon { @apply flex h-9 w-9 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300; }
+  .page-title { @apply font-display text-[1.75rem] font-bold tracking-[-0.03em] text-slate-900 dark:text-white md:text-[2rem]; }
+  .eyebrow { @apply mb-1 text-[11px] font-semibold tracking-[0.04em] text-blue-600 dark:text-blue-300; }
   .page-shell { @apply mx-auto w-full max-w-[1320px] px-4 py-5 sm:px-7 lg:px-8 lg:py-7; }
   .page-header { @apply mb-6 flex flex-col gap-4 pb-2 sm:flex-row sm:items-end sm:justify-between; }
   .page-description { @apply mt-1.5 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400; }
-  .toolbar { @apply flex flex-wrap items-center gap-2 rounded-2xl border border-black/[.04] bg-white p-2 shadow-sm dark:border-white/[0.07] dark:bg-slate-900; }
-  .auth-canvas { @apply bg-[#f7f7f6]; }
-  .workspace-card { @apply rounded-2xl border border-black/[.035] bg-white shadow-[0_2px_10px_rgba(17,17,17,.055)] dark:border-white/[0.07] dark:bg-slate-900; }
-  .workspace-table { @apply w-full text-[12px]; }
-  .workspace-table thead { @apply bg-[#f6f6f5] text-[10px] font-semibold text-slate-500; }
+  .toolbar { @apply flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/70 bg-white p-2 shadow-sm dark:border-white/[0.07] dark:bg-slate-900; }
+  .auth-canvas { @apply bg-background; }
+  .workspace-card { @apply rounded-3xl border border-slate-200/70 bg-white dark:border-white/[0.07] dark:bg-slate-900; box-shadow: 0 1px 2px rgba(23,26,44,.04), 0 8px 24px -12px rgba(63,40,168,.14); }
+  .workspace-table { @apply w-full text-[13px]; }
+  .workspace-table thead { @apply bg-slate-50 text-[11px] font-semibold text-slate-500 dark:bg-white/[.04]; }
   .workspace-table th { @apply h-10 px-4 text-right; }
-  .workspace-table td { @apply border-t border-[#eeeeec] px-4 py-3 dark:border-white/[0.05]; }
+  .workspace-table td { @apply border-t border-slate-100 px-4 py-3 dark:border-white/[0.05]; }
+  /* Brand gradient — hero cards, primary CTAs */
+  .brand-gradient { background: linear-gradient(135deg, #7456f9 0%, #5f3df0 45%, #3f28a8 100%); }
+  .brand-gradient-soft { background: linear-gradient(135deg, #f3f0ff 0%, #e8f9f4 100%); }
+  .chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold; }
 }
 
 @layer utilities {
-  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #c7cdd5 transparent; }
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #c8cddd transparent; }
   .scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }
   .scrollbar-thin::-webkit-scrollbar-thumb { @apply rounded-full bg-slate-300; }
 }
 
-@media (max-width: 767px) { .app-main::before { inset-inline: 0; } }
 @media (max-width: 640px) {
   button, a, [role="button"] { min-height: 40px; }
   input, select, textarea { font-size: 16px !important; }
@@ -82,55 +86,3 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
-
-/* The authenticated product uses one strict visual grammar on every route. */
-.app-main-system > :first-child {
-  background-color: transparent !important;
-  color: #171717;
-}
-.app-main-system .rounded-2xl,
-.app-main-system .rounded-3xl { border-radius: 1rem !important; }
-.app-main-system .shadow-sm,
-.app-main-system .shadow-md,
-.app-main-system .shadow-lg,
-.app-main-system .shadow-xl,
-.app-main-system .shadow-2xl {
-  box-shadow: none !important;
-}
-.app-main-system table {
-  font-size: .75rem;
-}
-.app-main-system thead {
-  color: #746f68;
-}
-.app-main-system tbody tr {
-  border-color: #eeeeec;
-}
-.app-main-system input,
-.app-main-system select,
-.app-main-system textarea {
-  border-radius: .75rem;
-  border-color: #dededb;
-  background: #fff;
-}
-.dark .app-main-system > :first-child { color: #efede8; }
-
-/* Rocket Money product grammar: quiet white surfaces, dark actions, raspberry state. */
-.app-main-system button[class*="bg-blue-"],
-.app-main-system a[class*="bg-blue-"] {
-  background-color: #171717 !important;
-}
-.app-main-system button[class*="text-blue-"],
-.app-main-system a[class*="text-blue-"] {
-  color: #c92f4c;
-}
-.app-main-system .text-blue-500,
-.app-main-system .text-blue-600,
-.app-main-system .text-blue-700 { color: #c92f4c !important; }
-.app-main-system .bg-blue-50,
-.app-main-system .bg-blue-100 { background-color: #fff2f5 !important; }
-.app-main-system .border-blue-200,
-.app-main-system .border-blue-300 { border-color: #f2c8d2 !important; }
-.app-main-system [class*="hover:bg-blue-"]:hover { background-color: #0a0a0a !important; }
-.app-main-system .card,
-.app-main-system [data-slot="card"] { background: #fff; }

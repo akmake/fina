@@ -229,14 +229,14 @@ export default function RecurringPage() {
           <Button variant="outline" onClick={openDetect}>
             <Search className="h-4 w-4 me-2" /> זיהוי אוטומטי
           </Button>
-          <Button onClick={openAddDialog} className="rounded-full bg-[#171717] px-5 text-white hover:bg-black">
+          <Button onClick={openAddDialog} className="rounded-full bg-blue-600 px-5 text-white hover:bg-black">
             <Plus className="h-4 w-4 me-2" /> הוסף חדש
           </Button>
         </div>
       </div>
 
       <div className="mb-5 flex items-center gap-6 border-b border-black/[.06] text-sm font-medium">
-        <button className="border-b-2 border-[#c92f4c] px-1 pb-3 text-[#171717]">הכל</button>
+        <button className="border-b-2 border-[#5f3df0] px-1 pb-3 text-slate-900">הכל</button>
         <button className="px-1 pb-3 text-slate-400">קרובים</button>
         <button className="px-1 pb-3 text-slate-400">לוח שנה</button>
       </div>

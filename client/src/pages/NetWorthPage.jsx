@@ -123,7 +123,7 @@ export default function NetWorthPage() {
         </div>
       </div>
       <div className="mb-5 flex items-center gap-6 border-b border-black/[.06] text-sm font-medium">
-        <button className="border-b-2 border-[#c92f4c] px-1 pb-3 text-[#171717]">סיכום</button>
+        <button className="border-b-2 border-[#5f3df0] px-1 pb-3 text-slate-900">סיכום</button>
         <button className="px-1 pb-3 text-slate-400">נכסים</button>
         <button className="px-1 pb-3 text-slate-400">חובות</button>
       </div>
@@ -133,7 +133,7 @@ export default function NetWorthPage() {
           {/* שווי נקי */}
           <motion.div
             className="mb-6">
-            <Card className="border border-black/[.04] bg-white text-[#171717]">
+            <Card className="border border-black/[.04] bg-white text-slate-900">
               <CardContent className="py-8">
                 <div className="text-center">
                   <p className="text-slate-500 text-sm font-medium mb-1">שווי נקי כולל</p>

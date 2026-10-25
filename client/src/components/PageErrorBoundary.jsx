@@ -41,7 +41,7 @@ export default class PageErrorBoundary extends Component {
             <button
               type="button"
               onClick={() => (isChunkError ? window.location.reload() : this.setState({ error: null }))}
-              className="rounded-lg bg-[#171717] px-4 py-2 text-sm font-semibold text-white hover:bg-black"
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-black"
             >
               {isChunkError ? 'טעינה מחדש' : 'ניסיון נוסף'}
             </button>

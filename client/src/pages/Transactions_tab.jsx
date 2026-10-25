@@ -440,7 +440,7 @@ export default function TransactionsPage() {
               </div>
             ) : (
               <>
-                <div className="hidden grid-cols-[minmax(260px,1.5fr)_minmax(130px,.7fr)_minmax(110px,.5fr)_120px] rounded-t-2xl border border-b-0 border-black/[.04] bg-[#f6f6f5] px-4 py-3 text-[10px] font-semibold text-slate-500 md:grid">
+                <div className="hidden grid-cols-[minmax(260px,1.5fr)_minmax(130px,.7fr)_minmax(110px,.5fr)_120px] rounded-t-2xl border border-b-0 border-black/[.04] bg-[#f6f7fb] px-4 py-3 text-[10px] font-semibold text-slate-500 md:grid">
                   <span>בית עסק</span><span>קטגוריה</span><span>תאריך</span><span className="text-left">סכום</span>
                 </div>
                 {groupedByMonth.map(([monthLabel, { date, txns }]) => (

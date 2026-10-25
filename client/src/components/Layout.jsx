@@ -30,7 +30,7 @@ export default function Layout() {
   return (
     <div className="app-shell flex h-screen flex-col text-slate-800 dark:text-slate-100 md:flex-row">
       {/* Sidebar placeholder — keeps the flex flow intact while the navbar is fixed */}
-      {!isPublicCanvas && <aside className="hidden w-52 flex-shrink-0 md:block" aria-hidden="true" />}
+      {!isPublicCanvas && <aside className="hidden w-60 flex-shrink-0 md:block" aria-hidden="true" />}
 
       {/* Fixed sidebar rendered by Navbar */}
       {!isPublicCanvas && <Navbar />}

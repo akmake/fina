@@ -79,25 +79,27 @@ export default function LoginPage() {
   return (
     <div className="auth-canvas min-h-screen flex items-center justify-center p-4 sm:p-8" dir="rtl">
 
-      <div className="relative grid w-full max-w-5xl overflow-hidden rounded-[24px] border border-black/[.06] bg-white shadow-[0_24px_70px_-40px_rgba(17,17,17,.35)] lg:grid-cols-[1fr_430px]">
+      <div className="relative grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-slate-200/70 bg-white shadow-[0_30px_80px_-40px_rgba(63,40,168,.45)] lg:grid-cols-[1fr_430px]">
 
-        <section className="hidden bg-[#f1f1ef] p-12 text-[#171717] lg:block">
+        <section className="brand-gradient relative hidden overflow-hidden p-12 text-white lg:block">
+          <div className="pointer-events-none absolute -left-20 -top-24 h-72 w-72 rounded-full bg-white/10 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-28 right-0 h-64 w-64 rounded-full bg-emerald-300/25 blur-3xl" />
           <div className="mb-10 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#c92f4c] text-sm font-bold text-white">F</div>
-            <span className="font-display text-2xl font-semibold text-[#171717]">fina</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-sm font-black text-blue-600 shadow-lg">F</div>
+            <span className="font-display text-2xl font-extrabold text-white">fina</span>
           </div>
-          <p className="mb-2 text-xs font-medium text-[#c92f4c]">הכסף שלך, ברור יותר</p>
-          <h2 className="font-display text-4xl font-semibold leading-[1.2] tracking-[-0.04em] text-[#171717]">
+          <p className="mb-2 text-xs font-semibold text-white/80">הכסף שלך, ברור יותר</p>
+          <h2 className="font-display text-4xl font-semibold leading-[1.2] tracking-[-0.04em] text-white">
             תמונה פיננסית אחת.<br />החלטות טובות יותר.
           </h2>
-          <p className="mt-5 max-w-lg text-base leading-7 text-slate-500">
+          <p className="mt-5 max-w-lg text-base leading-7 text-white/75">
             חשבונות, הוצאות, תקציבים ונכסים במרחב עבודה אחד, מאובטח וברור.
           </p>
           <div className="mt-10 grid grid-cols-3 gap-3">
             {[{ icon: WalletCards, text: 'כל החשבונות' }, { icon: TrendingUp, text: 'מגמות ברורות' }, { icon: ShieldCheck, text: 'מידע מוגן' }].map(({ icon: Icon, text }) => (
-              <div key={text} className="rounded-2xl border border-black/[.05] bg-white p-4 shadow-sm">
-                <Icon className="mb-4 h-5 w-5 text-[#c92f4c]" />
-                <p className="text-sm font-medium text-slate-700">{text}</p>
+              <div key={text} className="rounded-2xl border border-white/20 bg-white/15 p-4 backdrop-blur">
+                <Icon className="mb-4 h-5 w-5 text-white" />
+                <p className="text-sm font-semibold text-white">{text}</p>
               </div>
             ))}
           </div>
@@ -108,7 +110,7 @@ export default function LoginPage() {
 
           {/* Logo / Brand */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#c92f4c] shadow-sm mb-4">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl brand-gradient shadow-lg shadow-blue-600/30 mb-4">
               <svg viewBox="0 0 24 24" className="w-7 h-7 text-white fill-current">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
               </svg>
@@ -148,7 +150,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-11 rounded-full bg-[#171717] hover:bg-black text-white text-sm font-semibold shadow-sm transition-colors active:translate-y-px disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-lg shadow-blue-600/25 transition-colors active:translate-y-px disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'אמת והתחבר'}
             </button>
@@ -186,7 +188,7 @@ export default function LoginPage() {
                 <label className="text-xs font-semibold text-slate-500">סיסמה</label>
                 <button
                   type="button"
-                  className="text-xs text-[#c92f4c] hover:text-[#a8243d] font-medium transition-colors"
+                  className="text-xs text-[#5f3df0] hover:text-[#4e2fd2] font-medium transition-colors"
                   onClick={() => setError('איפוס סיסמה בפיתוח — התחבר עם Google או צור חשבון חדש')}
                 >
                   שכחת סיסמה?
@@ -218,7 +220,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading || gLoading}
-              className="w-full h-11 rounded-full bg-[#171717] hover:bg-black text-white text-sm font-semibold shadow-sm transition-colors active:translate-y-px disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
+              className="w-full h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-lg shadow-blue-600/25 transition-colors active:translate-y-px disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'התחבר'}
             </button>
@@ -254,7 +256,7 @@ export default function LoginPage() {
           {/* Register link */}
           <p className="text-center text-sm text-slate-400 mt-6">
             עדיין אין גישה?{' '}
-            <Link to="/register" className="font-semibold text-[#c92f4c] hover:text-[#a8243d] transition-colors">
+            <Link to="/register" className="font-semibold text-[#5f3df0] hover:text-[#4e2fd2] transition-colors">
               שליחת בקשת הצטרפות
             </Link>
           </p>

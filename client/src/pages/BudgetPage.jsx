@@ -319,7 +319,7 @@ export default function BudgetPage() {
                     <YAxis tick={{ fontSize: 12 }} />
                     <Tooltip formatter={(v) => formatCurrency(v)} />
                     <Legend />
-                    <Bar dataKey="planned" name="תקציב" fill="#f45d26" radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="planned" name="תקציב" fill="#5f3df0" radius={[2, 2, 0, 0]} />
                     <Bar dataKey="actual" name="בפועל" fill="#ef4444" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>

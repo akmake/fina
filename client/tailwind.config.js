@@ -21,14 +21,17 @@ export default {
   		},
 		colors: {
 			slate: {
-				50: '#f7f6f3', 100: '#efede8', 200: '#e2dfd8', 300: '#cbc6bd',
-				400: '#9d978e', 500: '#746f68', 600: '#58534d', 700: '#413d38',
-				800: '#2d2a27', 900: '#201e1c', 950: '#151412'
+				50: '#f6f7fb', 100: '#eef0f7', 200: '#e1e4ef', 300: '#c8cddd',
+				400: '#98a0b8', 500: '#6b7391', 600: '#4f5673', 700: '#3a405a',
+				800: '#262a40', 900: '#171a2c', 950: '#0d0f1c'
 			},
+			// "blue" is the legacy class name for the brand colour (violet) — pages use bg-blue-600 etc.
 			blue: {
-				50: '#fff4ee', 100: '#ffe5d7', 200: '#ffc8ac', 300: '#ffa174',
-				400: '#fb7845', 500: '#f45d26', 600: '#dd4315', 700: '#b83212',
-				800: '#922b16', 900: '#762617', 950: '#401008'
+				50: '#f3f0ff', 100: '#e7e2ff', 200: '#d0c7ff', 300: '#b2a2ff', 400: '#9078ff',
+				500: '#7456f9', 600: '#5f3df0', 700: '#4e2fd2', 800: '#3f28a8', 900: '#342784', 950: '#1f1652'
+			},
+			brand: {
+				DEFAULT: '#5f3df0', soft: '#f3f0ff', mint: '#14b88a', coral: '#ff6b6b', sun: '#ffb020', sky: '#2fa8ff'
 			},
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',

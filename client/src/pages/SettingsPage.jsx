@@ -111,7 +111,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid items-start gap-0 overflow-hidden rounded-[22px] border border-black/[.06] bg-white shadow-[0_18px_60px_rgba(17,17,17,.12)] lg:grid-cols-[220px_minmax(0,1fr)]">
-      <aside className="sticky top-0 hidden min-h-[680px] border-l border-slate-100 bg-[#f6f6f5] p-4 lg:block dark:border-white/[0.07] dark:bg-slate-900">
+      <aside className="sticky top-0 hidden min-h-[680px] border-l border-slate-100 bg-[#f6f7fb] p-4 lg:block dark:border-white/[0.07] dark:bg-slate-900">
         {['כללי', 'התראות', 'תוכנית וחיוב', 'אבטחה', 'ניהול נתונים'].map((item, index) => (
           <div key={item} className={`rounded-md px-3 py-2 text-[12px] font-medium ${index === 0 ? 'bg-slate-100 text-slate-950' : 'text-slate-500'}`}>{item}</div>
         ))}

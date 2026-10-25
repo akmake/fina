@@ -185,3 +185,12 @@ React Query is used for server state with caching. Key conventions:
 - `NODE_ENV=development`: detailed error messages, relaxed cookie flags
 - `NODE_ENV=production`: sanitized errors, `secure: true` on cookies, HTTPS required
 - Never rely on `NODE_ENV` to skip security checks — use it only for error verbosity
+
+---
+
+## Visual design system (2026-10 redesign)
+
+- Brand = violet (`brand`/legacy `blue-*` scale in `client/tailwind.config.js`; `bg-blue-600` IS the brand colour — do not remap it again). Neutrals = cool `slate-*`. Accents: emerald (income/positive), rose (expense/negative), amber, sky.
+- Tokens live in `client/src/index.css` (`:root` / `.dark` HSL vars) — no per-page colour overrides. Shared classes: `surface-panel`, `workspace-card`, `section-icon`, `chip`, `brand-gradient`.
+- Dashboard primitives: `client/src/components/dashboard/kit.jsx` (`Panel`, `SectionTitle`, `CHART_COLORS`, `useChartTheme`). The net-worth hero card + tinted `StatCard`s are in `FinanceDashboard.jsx`.
+- Rounded-3xl cards, soft violet shadows, pill primary buttons. Sidebar width `w-60` is coupled between `Navbar.jsx` and the placeholder in `Layout.jsx`.

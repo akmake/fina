@@ -53,7 +53,7 @@ export function EmptyState({ icon: Icon, title, description, actionLabel, action
       {actionLabel && actionTo && (
         <Link
           to={actionTo}
-          className="mt-1 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+          className="mt-1 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-full shadow-md shadow-blue-600/25 transition-colors"
         >
           {actionLabel}
         </Link>
@@ -61,7 +61,7 @@ export function EmptyState({ icon: Icon, title, description, actionLabel, action
       {actionLabel && onAction && !actionTo && (
         <button
           onClick={onAction}
-          className="mt-1 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+          className="mt-1 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-full shadow-md shadow-blue-600/25 transition-colors"
         >
           {actionLabel}
         </button>
@@ -78,13 +78,13 @@ export function useChartTheme() {
   const isDark = useUIStore((s) => s.isDark);
   return {
     isDark,
-    grid: isDark ? '#1e293b' : '#f1f5f9',
-    axis: isDark ? '#94a3b8' : '#64748b',
+    grid: isDark ? '#262a40' : '#eef0f7',
+    axis: isDark ? '#98a0b8' : '#6b7391',
     tooltip: isDark
-      ? { backgroundColor: '#0f1117', borderColor: '#1e293b', borderRadius: '8px', color: '#e2e8f0' }
-      : { backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' },
+      ? { backgroundColor: '#171a2c', borderColor: '#262a40', borderRadius: '14px', color: '#e1e4ef' }
+      : { backgroundColor: '#ffffff', borderColor: '#e1e4ef', borderRadius: '14px', boxShadow: '0 12px 28px -10px rgba(63,40,168,.25)' },
   };
 }
 
 /** פלטת סדרות משותפת לגרפים */
-export const CHART_COLORS = ['#f45d26', '#2c9c73', '#e7a93f', '#6d8d9f', '#d95555', '#9b7e63', '#7d6b91', '#7b9b62'];
+export const CHART_COLORS = ['#5f3df0', '#14b88a', '#ffb020', '#2fa8ff', '#ff6b6b', '#b2a2ff', '#0e8f6c', '#e0529c'];

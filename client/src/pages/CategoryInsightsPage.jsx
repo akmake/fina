@@ -163,7 +163,7 @@ export default function CategoryInsightsPage() {
                                         onClick={() => setSelectedCategory(isSelected ? null : cat)}
                                         className={`bg-white rounded-2xl p-4 cursor-pointer border transition-colors ${
                                             isSelected
-                                                ? 'border-[#c92f4c] ring-2 ring-[#c92f4c]/10'
+                                                ? 'border-[#5f3df0] ring-2 ring-[#5f3df0]/10'
                                                 : 'border-black/[.04] hover:border-black/[.12]'
                                         }`}
                                     >
@@ -212,7 +212,7 @@ export default function CategoryInsightsPage() {
                     {selectedCategory && (
                         <div className="flex-1 space-y-4 min-w-0">
                             {/* Header card */}
-                            <div className="rounded-2xl border border-black/[.04] bg-white p-5 text-[#171717] shadow-[0_2px_10px_rgba(17,17,17,.055)]">
+                            <div className="rounded-2xl border border-black/[.04] bg-white p-5 text-slate-900 shadow-[0_2px_10px_rgba(17,17,17,.055)]">
                                 <div className="flex items-start justify-between">
                                     <div>
                                         <p className="text-slate-400 text-sm mb-1">

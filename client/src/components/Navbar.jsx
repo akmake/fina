@@ -126,7 +126,7 @@ export default function Navbar() {
   return (
     <>
       {/* ════════════════ DESKTOP SIDEBAR ════════════════ */}
-      <div className="hidden md:fixed md:inset-y-0 md:right-0 md:z-40 md:flex md:w-52 md:flex-col">
+      <div className="hidden md:fixed md:inset-y-0 md:right-0 md:z-40 md:flex md:w-60 md:flex-col">
         <RocketSidebar groups={groups} user={user} isAuthenticated={isAuthenticated} logout={logout} />
       </div>
 
@@ -833,19 +833,19 @@ function RocketSidebar({ groups, user, isAuthenticated, logout }) {
   const [moreOpen, setMoreOpen] = useState(() => extras.some(item => isPathActive(item.to, location.pathname)));
 
   return (
-    <aside className="flex h-full flex-col border-l border-black/[.055] bg-white text-[#171717] dark:border-white/[.07] dark:bg-slate-950 dark:text-white">
+    <aside className="flex h-full flex-col border-l border-black/[.055] bg-white text-slate-900 dark:border-white/[.07] dark:bg-slate-950 dark:text-white">
       <div className="px-5 pb-4 pt-6">
-        <Link to="/finance-dashboard" className="flex items-center gap-2.5 text-[#c92f4c]">
-          <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#c92f4c] text-xs font-black text-white">F</span>
-          <span className="text-[18px] font-bold tracking-[-.035em]">fina</span>
+        <Link to="/finance-dashboard" className="flex items-center gap-2.5 text-slate-900 dark:text-white">
+          <span className="brand-gradient grid h-9 w-9 place-items-center rounded-2xl text-sm font-black text-white shadow-lg shadow-blue-600/30">F</span>
+          <span className="text-[20px] font-extrabold tracking-[-.04em]">fina</span>
         </Link>
       </div>
 
       <div className="flex items-center gap-3 px-5 py-3">
-        <div className="grid h-8 w-8 place-items-center rounded-full bg-[#f1f1f0] text-[11px] font-semibold text-slate-700">{initials(user?.name)}</div>
+        <div className="grid h-8 w-8 place-items-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700">{initials(user?.name)}</div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[12px] font-semibold">היי, {user?.name?.split(' ')[0] || 'משתמש'}</p>
-          <p className="mt-0.5 text-[9px] text-slate-400">החשבון הפיננסי שלך</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">החשבון הפיננסי שלך</p>
         </div>
         <Link to="/settings" className="grid h-8 w-8 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Settings className="h-4 w-4" /></Link>
       </div>
@@ -853,22 +853,22 @@ function RocketSidebar({ groups, user, isAuthenticated, logout }) {
       <nav className="scrollbar-thin flex-1 overflow-y-auto px-3 py-3">
         <div className="space-y-1">
           {core.map(item => (
-            <NavLink key={item.to} to={item.to} className={({ isActive }) => `flex h-10 items-center gap-3 rounded-xl px-3 text-[12px] font-medium transition-colors ${isActive ? 'bg-[#faeef1] text-[#bf2946]' : 'text-slate-600 hover:bg-[#f6f6f5] hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-white'}`}>
+            <NavLink key={item.to} to={item.to} className={({ isActive }) => `flex h-11 items-center gap-3 rounded-2xl px-3.5 text-[13px] font-semibold transition-colors ${isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25' : 'text-slate-600 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-white'}`}>
               <item.icon className="h-4 w-4" strokeWidth={1.8} />{item.label}
             </NavLink>
           ))}
         </div>
 
-        <button onClick={() => setMoreOpen(value => !value)} className="mt-3 flex h-9 w-full items-center gap-3 rounded-xl px-3 text-[11px] font-medium text-slate-400 hover:bg-[#f6f6f5] hover:text-slate-700">
+        <button onClick={() => setMoreOpen(value => !value)} className="mt-3 flex h-9 w-full items-center gap-3 rounded-xl px-3 text-[12px] font-medium text-slate-400 hover:bg-slate-50 hover:text-slate-700">
           <Layers className="h-4 w-4" />כלים נוספים<ChevronDown className={`mr-auto h-3.5 w-3.5 transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
         </button>
         {moreOpen && <div className="mt-1 grid grid-cols-2 gap-1 px-1">
-          {extras.map(item => <NavLink key={item.to} to={item.to} title={item.label} className={({ isActive }) => `flex min-h-9 items-center gap-2 rounded-lg px-2 text-[10px] ${isActive ? 'bg-[#faeef1] text-[#bf2946]' : 'text-slate-500 hover:bg-[#f6f6f5] hover:text-slate-800'}`}><item.icon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{item.label}</span></NavLink>)}
+          {extras.map(item => <NavLink key={item.to} to={item.to} title={item.label} className={({ isActive }) => `flex min-h-9 items-center gap-2 rounded-lg px-2 text-[10px] ${isActive ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}><item.icon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{item.label}</span></NavLink>)}
         </div>}
       </nav>
 
       <div className="border-t border-black/[.05] p-3">
-        {isAuthenticated ? <DesktopUserNav user={user} logout={logout} /> : <Link to="/login" className="flex h-10 items-center justify-center rounded-full bg-[#171717] text-xs font-semibold text-white">התחברות</Link>}
+        {isAuthenticated ? <DesktopUserNav user={user} logout={logout} /> : <Link to="/login" className="flex h-10 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">התחברות</Link>}
       </div>
     </aside>
   );
@@ -882,7 +882,7 @@ function DesktopUserNav({ user, logout, onClose }) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-start transition-colors hover:bg-slate-100 dark:hover:bg-white/[.06]">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#faeef1] text-[11px] font-bold text-[#bf2946]">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700">
             {initials(user?.name)}
           </div>
           <div className="flex-1 min-w-0">

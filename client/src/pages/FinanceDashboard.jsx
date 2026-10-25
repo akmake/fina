@@ -30,21 +30,28 @@ const ALERT_SEVERITY = {
 };
 
 // ─── UI Helpers ─────────────────────────────────────────────────────────────
-function StatCard({ label, value, sub, positive, icon: Icon }) {
+const TONES = {
+  mint:   'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300',
+  coral:  'bg-rose-50 text-rose-500 dark:bg-rose-500/15 dark:text-rose-300',
+  violet: 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
+  sun:    'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300',
+};
+
+function StatCard({ label, value, sub, positive, icon: Icon, tone = 'violet' }) {
   return (
-    <Panel className="group flex h-28 flex-col justify-between p-4 transition-colors">
-      <div className="flex justify-between items-start">
-        <span className="text-[10px] font-semibold tracking-[.08em] text-slate-500 dark:text-slate-400">{label}</span>
+    <Panel className="flex min-h-[8.5rem] flex-col justify-between p-5">
+      <div className="flex items-center justify-between">
+        <span className="text-[12px] font-semibold text-slate-500 dark:text-slate-400">{label}</span>
         {Icon && (
-          <div className="section-icon">
-            <Icon className="h-4 w-4" />
+          <div className={`flex h-9 w-9 items-center justify-center rounded-2xl ${TONES[tone]}`}>
+            <Icon className="h-[18px] w-[18px]" />
           </div>
         )}
       </div>
-      <div className="mt-2">
-        <p className="text-xl font-semibold tracking-[-0.035em] text-[#111] dark:text-white lg:text-[1.45rem]">{value}</p>
+      <div className="mt-3">
+        <p className="text-[1.6rem] font-bold leading-none tracking-[-0.03em] text-slate-900 dark:text-white">{value}</p>
         {sub && (
-          <p className={`text-xs font-semibold flex items-center gap-1 mt-1.5 ${positive === true ? 'text-emerald-600 dark:text-emerald-400' : positive === false ? 'text-red-500 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
+          <p className={`chip mt-2.5 ${positive === true ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' : positive === false ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300' : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'}`}>
             {positive === true && <ArrowUpRight className="h-3 w-3" />}
             {positive === false && <ArrowDownRight className="h-3 w-3" />}
             {sub}
@@ -52,6 +59,35 @@ function StatCard({ label, value, sub, positive, icon: Icon }) {
         )}
       </div>
     </Panel>
+  );
+}
+
+/** Hero net-worth card — the one gradient surface on the dashboard. */
+function HeroCard({ value, sub, history }) {
+  const trend = (history || []).slice(-8);
+  return (
+    <div className="brand-gradient relative flex min-h-[17.5rem] flex-col justify-between overflow-hidden rounded-3xl p-6 text-white shadow-xl shadow-blue-700/30 sm:col-span-2 xl:row-span-2">
+      <div className="pointer-events-none absolute -left-16 -top-20 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
+      <div className="pointer-events-none absolute -bottom-24 right-4 h-56 w-56 rounded-full bg-emerald-300/20 blur-3xl" />
+      <div className="relative flex items-center justify-between">
+        <span className="text-sm font-semibold text-white/80">שווי נקי כולל</span>
+        <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-white/15 backdrop-blur"><Home className="h-[18px] w-[18px]" /></span>
+      </div>
+      <div className="relative">
+        <p className="text-[2.6rem] font-extrabold leading-none tracking-[-0.04em] sm:text-[3rem]">{value}</p>
+        {sub && <p className="chip mt-3 bg-white/15 text-white backdrop-blur">{sub}</p>}
+      </div>
+      {trend.length > 1 && (
+        <div className="relative -mx-2 -mb-2 h-20">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={trend} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+              <defs><linearGradient id="heroFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#fff" stopOpacity={0.35} /><stop offset="100%" stopColor="#fff" stopOpacity={0} /></linearGradient></defs>
+              <Area type="monotone" dataKey="שווי" stroke="#fff" strokeWidth={2.5} fill="url(#heroFill)" isAnimationActive={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -272,27 +308,31 @@ export default function FinanceDashboard() {
         {/* ─── Morning brief: what's new, live sync state, alerts ─── */}
         <UpdatesBrief onSynced={onSynced} />
 
-        {/* ─── Row 1: Key Performance Indicators (KPIs) ─── */}
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {/* ─── Row 1: hero net worth + KPIs ─── */}
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+          <HeroCard
+            value={fmt(netWorthTotal)}
+            sub={healthScore ? `דירוג בריאות פיננסית: ${healthScore.grade}` : null}
+            history={histData}
+          />
           <StatCard
-            label="שווי נקי כולל" value={fmt(netWorthTotal)}
-            sub={healthScore ? `דירוג בריאות: ${healthScore.grade}` : null}
-            positive={netWorthTotal >= 0} icon={Home}
+            label="הכנסות החודש" value={fmt(income)} tone="mint"
+            sub={monthly?.prevMonth ? `חודש קודם: ${fmt(monthly.prevMonth.income)}` : null}
+            positive={income >= (monthly?.prevMonth?.income ?? 0)} icon={TrendingUp}
           />
-          <StatCard 
-            label="הכנסות החודש" value={fmt(income)} 
-            sub={monthly?.prevMonth ? `חודש קודם: ${fmt(monthly.prevMonth.income)}` : null} 
-            positive={income >= (monthly?.prevMonth?.income ?? 0)} icon={TrendingUp} 
+          <StatCard
+            label="הוצאות החודש" value={fmt(expense)} tone="coral"
+            sub={monthly?.prevMonth ? `חודש קודם: ${fmt(monthly.prevMonth.expense)}` : null}
+            positive={expense <= (monthly?.prevMonth?.expense ?? 0)} icon={TrendingDown}
           />
-          <StatCard 
-            label="הוצאות החודש" value={fmt(expense)} 
-            sub={monthly?.prevMonth ? `חודש קודם: ${fmt(monthly.prevMonth.expense)}` : null} 
-            positive={expense <= (monthly?.prevMonth?.expense ?? 0)} icon={TrendingDown} 
+          <StatCard
+            label="חיסכון נטו" value={fmt(netFlow)} tone="violet"
+            sub={null} positive={netFlow >= 0} icon={Wallet}
           />
-          <StatCard 
-            label="חיסכון נטו" value={fmt(netFlow)} 
-            sub={savingsRate != null ? `שיעור חיסכון: ${savingsRate}%` : null} 
-            positive={netFlow >= 0} icon={Wallet} 
+          <StatCard
+            label="שיעור חיסכון" value={savingsRate != null ? `${savingsRate}%` : '—'} tone="sun"
+            sub={savingsRate != null ? (savingsRate >= 20 ? 'מעל היעד המומלץ' : 'מתחת ליעד של 20%') : null}
+            positive={savingsRate != null ? savingsRate >= 20 : null} icon={PiggyBank}
           />
         </div>
 
@@ -306,16 +346,16 @@ export default function FinanceDashboard() {
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={trendChart} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="colorInc" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
-                    <linearGradient id="colorExp" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.2}/><stop offset="95%" stopColor="#ef4444" stopOpacity={0}/></linearGradient>
+                    <linearGradient id="colorInc" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#14b88a" stopOpacity={0.2}/><stop offset="95%" stopColor="#14b88a" stopOpacity={0}/></linearGradient>
+                    <linearGradient id="colorExp" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ff6b6b" stopOpacity={0.2}/><stop offset="95%" stopColor="#ff6b6b" stopOpacity={0}/></linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.grid} />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: chartTheme.axis }} dy={10} />
                   <YAxis axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}k`} tick={{ fontSize: 12, fill: chartTheme.axis }} width={45} />
                   <Tooltip contentStyle={chartTheme.tooltip} formatter={v => fmt(v)} />
                   <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                  <Area type="monotone" dataKey="הכנסות" stroke="#10b981" fill="url(#colorInc)" strokeWidth={2} />
-                  <Area type="monotone" dataKey="הוצאות" stroke="#ef4444" fill="url(#colorExp)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="הכנסות" stroke="#14b88a" fill="url(#colorInc)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="הוצאות" stroke="#ff6b6b" fill="url(#colorExp)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -389,13 +429,13 @@ export default function FinanceDashboard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={histData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                     <defs>
-                      <linearGradient id="nwColor" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f45d26" stopOpacity={0.18}/><stop offset="95%" stopColor="#f45d26" stopOpacity={0}/></linearGradient>
+                      <linearGradient id="nwColor" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#5f3df0" stopOpacity={0.18}/><stop offset="95%" stopColor="#5f3df0" stopOpacity={0}/></linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.grid} />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: chartTheme.axis }} dy={10} />
                     <YAxis axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}k`} tick={{ fontSize: 12, fill: chartTheme.axis }} width={50} />
                     <Tooltip contentStyle={chartTheme.tooltip} formatter={v => fmt(v)} />
-                    <Area type="monotone" dataKey="שווי" stroke="#f45d26" fill="url(#nwColor)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="שווי" stroke="#5f3df0" fill="url(#nwColor)" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
