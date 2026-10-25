@@ -120,3 +120,7 @@ location ~ ^/\.well-known/(oauth-|openid-configuration) {
 }
 ```
 (Leave `/.well-known/acme-challenge` alone.)
+
+**PWA:** the service worker's navigation fallback must skip `/api/`, `/.well-known/` and `/uploads/`
+(`navigateFallbackDenylist` in `client/vite.config.js`); otherwise the browser's visit to
+`/api/oauth/authorize` is answered with the cached SPA shell → the app's 404 page.

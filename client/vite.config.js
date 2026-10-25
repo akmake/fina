@@ -31,6 +31,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Browser navigations to server URLs (OAuth authorize for ChatGPT/Claude.ai,
+        // discovery, uploads) must reach nginx/Express — not the cached SPA shell.
+        navigateFallbackDenylist: [/^\/api\//, /^\/\.well-known\//, /^\/uploads\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
