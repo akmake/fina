@@ -45,7 +45,10 @@ submit an SMS code but can never read data. Revoked devices and inactive owners 
 `Authorization: Bearer fk_<…>` — created in Settings (shown once), stored as SHA-256,
 revocable. `middlewares/apiKeyAuth.js` accepts it only on `/api/ai/*`; writes need the
 `categorize` scope (`requireAiScope`, else 405/403) and are limited to renaming merchants
-and categories; owners must be active. See [modules/ai-mcp.md](modules/ai-mcp.md).
+and categories; owners must be active. It is also accepted on the remote MCP (`/api/mcp`).
+ChatGPT / Claude.ai connectors obtain one through OAuth (consent page `/oauth/consent`, 1 h access
+token + rotating refresh, `expiresAt` enforced by `apiKeyAuth`). Login honours a same-site `?next=` path
+(`ProtectedRoute` sets it). See [modules/ai-mcp.md](modules/ai-mcp.md) § OAuth.
 
 ---
 

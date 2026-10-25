@@ -1,4 +1,4 @@
-> Last updated: 2026-10-25
+> Last updated: 2026-10-26
 > Status: implemented — read; optional write scope for merchant names + categories
 
 # Module: AI assistant access (MCP)
@@ -75,7 +75,48 @@ through `apiKeyAuth` + `resolveHousehold`. Tools call the same `aiController` ha
 (same scoping, validation, audit); write tools need the `categorize` scope. Rate limit: `mcpLimiter` (600/h per key).
 Settings → "חיבור לעוזר AI" shows the ready connector URL once, at key creation.
 
-- No OAuth: in ChatGPT use *Developer mode* → Authentication **None**.
-- **nginx must return 404 for `/.well-known/oauth*`** (`location /.well-known/oauth { return 404; }` in the
-  site config). Otherwise the SPA fallback answers `200 text/html` and ChatGPT fails while probing OAuth
-  discovery. Applied on production 2026-10-26.
+Two ways to connect:
+- **OAuth (recommended):** connector URL `https://<fina>/api/mcp`, Authentication **OAuth** — see § OAuth.
+- **Secret URL:** `https://<fina>/api/mcp/<fk_ key>`, Authentication **None** (shown once at key creation).
+
+## OAuth (ChatGPT / Claude.ai "OAuth" connectors)
+
+`server/controllers/oauthController.js` + `routes/oauthRoutes.js`; models `OAuthClient`, `OAuthCode`.
+OAuth 2.1 authorization code + PKCE (S256 only), dynamic client registration, rotating refresh tokens.
+
+Flow:
+1. `POST /api/mcp` without a token → `401` + `WWW-Authenticate: Bearer resource_metadata="<base>/api/oauth/protected-resource"`.
+2. Protected-resource metadata → issuer `<base>/api/oauth`; AS metadata is served at
+   `/.well-known/oauth-authorization-server[/api/oauth]`, `/.well-known/openid-configuration[/api/oauth]`
+   and `/api/oauth/.well-known/{oauth-authorization-server,openid-configuration}`.
+3. `POST /api/oauth/register` (RFC 7591). `redirect_uris` must be https on an allow-listed assistant host
+   (`OAUTH_REDIRECT_HOSTS`, default `chatgpt.com,chat.openai.com,claude.ai,claude.com`; http://localhost
+   outside production). `token_endpoint_auth_method` `none` (default) or a client secret (stored hashed).
+4. `GET /api/oauth/authorize` validates client + exact redirect URI + PKCE, then redirects the browser to
+   `<CLIENT_URL>/oauth/consent?<same params>` (`OAuthConsentPage`, protected route → login with `?next=`).
+5. The page reads `GET /api/oauth/consent` and posts `POST /api/oauth/consent { params, approve, allowCategorize }`
+   (session + CSRF) → `{ redirectTo }` with a one-time code (10 min, hashed) or `error=access_denied`. Audited
+   `aiKey.oauth.approve`. Rename/category writes are **off unless the user ticks the box**, whatever the client asked.
+6. `POST /api/oauth/token` — `authorization_code` (single use, PKCE checked) creates an **`ApiKey`**
+   (`oauthClient` = client id, `expiresAt` +1 h, hashed `refreshHash`); reconnecting the same app revokes the
+   previous grant. `refresh_token` rotates access + refresh on the same ApiKey (old refresh dies).
+7. The grant is listed in Settings ("מחובר דרך OAuth"); revoking it (`DELETE /api/ai-keys/:id`) cuts the
+   assistant off at once (`401 invalid_token`). OAuth grants don't count toward the 5 manual keys.
+
+Rate limit: `oauthLimiter` (300/h; registration per IP, token per client). `PUBLIC_URL` (e.g.
+`https://ziporiteem.com`) fixes the URLs in the metadata; without it they come from the request (needs
+`X-Forwarded-Proto` from the proxy).
+
+**nginx:** `/.well-known/oauth-*` and `/.well-known/openid-configuration*` must be **proxied to Node**
+(not the SPA fallback, which answers `200 text/html` and breaks discovery). Replace the earlier
+`location /.well-known/oauth { return 404; }` with:
+
+```nginx
+location ~ ^/\.well-known/(oauth-|openid-configuration) {
+    proxy_pass http://127.0.0.1:4000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+```
+(Leave `/.well-known/acme-challenge` alone.)

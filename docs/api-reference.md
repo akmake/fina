@@ -385,6 +385,19 @@ See [modules/ai-mcp.md](modules/ai-mcp.md). Data routes need `Authorization: Bea
 | POST | `/ai-keys` | Session | Create `{ name?, allowCategorize? }` → `201 { key, token }` (token shown once; max 5) |
 | DELETE | `/ai-keys/:id` | Session | Revoke (immediate) |
 
+### OAuth for the remote MCP (`/api/oauth`, `/.well-known`) — see [modules/ai-mcp.md](modules/ai-mcp.md) § OAuth
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/oauth/protected-resource`, `/.well-known/oauth-protected-resource[/api/mcp]` | — | RFC 9728 metadata for `/api/mcp` |
+| GET | `/.well-known/oauth-authorization-server[/api/oauth]`, `/.well-known/openid-configuration[/api/oauth]`, `/api/oauth/.well-known/*` | — | RFC 8414 metadata |
+| POST | `/api/oauth/register` | — (no CSRF) | Dynamic client registration; redirect hosts allow-listed |
+| GET | `/api/oauth/authorize` | — | Validates, redirects to the consent page |
+| GET | `/api/oauth/consent` | Session | Consent info `{ clientName, redirectHost, requestsCategorize }` |
+| POST | `/api/oauth/consent` | Session + CSRF | `{ params, approve, allowCategorize }` → `{ redirectTo }` |
+| POST | `/api/oauth/token` | Client (no CSRF) | `authorization_code` (PKCE) / `refresh_token` → `{ access_token (fk_), refresh_token, expires_in: 3600 }` |
+| POST | `/api/mcp` | Bearer (OAuth or AI key) | Remote MCP; `401` carries `WWW-Authenticate … resource_metadata` |
+
 ---
 
 ## Management

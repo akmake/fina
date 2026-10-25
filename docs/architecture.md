@@ -95,6 +95,8 @@ fina/
 | ~~`IMPORT_SYNC_INTERVAL_MS`~~ | Removed 2026-10-25 — each connection now syncs daily at its own Israel-local `syncHour` | — | — |
 | `ALLOW_LOCAL_DEV_ORIGINS` | `true` lets any `http://localhost:<port>` / `127.0.0.1` origin through CORS (Vite moves to 5174+ when 5173 is busy). **Never set in production** | `server/app.js` | Off by default — only the exact allow-list is accepted |
 | `EMAIL_ENABLED` | `true` arms the email channel of the notification engine (Phase 3). Unset/false → in-app only, email is logged as a stub | `server/services/emailService.js` | Off by default; no SMTP provider wired yet |
+| `PUBLIC_URL` | Public origin used in OAuth/MCP discovery URLs (e.g. `https://ziporiteem.com`) | `server/controllers/oauthController.js` | Derived from the request (needs `X-Forwarded-Proto`) |
+| `OAUTH_REDIRECT_HOSTS` | Comma list of hosts allowed as OAuth redirect URIs for MCP connectors (default `chatgpt.com,chat.openai.com,claude.ai,claude.com`) | `server/controllers/oauthController.js` | Defaults used |
 | `BUDGET_SCHEDULER_INTERVAL_MS` | How often the periodic budget-threshold check runs 75/90/100% alerts per household (default 6 h) | `server/services/budgetScheduler.js` | Defaults to 6 h |
 
 ### Client (`client/.env`)
@@ -120,7 +122,7 @@ fina/
 | Auth | JWT in httpOnly cookies; 2FA `mfaToken`s are rejected as sessions | `server/middlewares/authMiddleware.js`, `server/middlewares/requireAuth.js` |
 | Access approval | Sign-up = request; no session until a platform admin approves (`User.approvalStatus`) | `server/controllers/authController.js`, `server/controllers/admin/userAdminController.js` |
 | Device tokens | Paired phones use a hashed, revocable, least-privilege token (OTP relay only) |
-| AI keys | Personal hashed, revocable, **GET-only** key for the MCP server (`/api/ai/*` only) | `server/middlewares/apiKeyAuth.js`, `server/models/ApiKey.js` | `server/middlewares/deviceAuth.js`, `server/models/Device.js` |
+| AI keys | Personal hashed, revocable key for the MCP server (`/api/ai/*`, `/api/mcp`); also issued via OAuth to ChatGPT/Claude.ai connectors (1 h access + rotating refresh) | `server/middlewares/apiKeyAuth.js`, `server/models/ApiKey.js` | `server/middlewares/deviceAuth.js`, `server/models/Device.js` |
 | Rate limiting | `publicLimiter` (100/10min), `authLimiter` (20/15min), `scrapeLimiter` (10/hour) — prod only | `server/middlewares/rateLimiter.js` |
 | Audit log | Append-only `AuditLog` for deletes + role changes | `server/models/AuditLog.js`, `server/utils/audit.js` |
 | Soft delete | `deletedAt` on Transaction/Budget/Goal/Loan/Account | `server/utils/softDelete.js` |
