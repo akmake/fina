@@ -144,7 +144,7 @@ export const useConnectionsStore = create((set, get) => ({
         const { data } = await api.get(`/connections/jobs/${jobId}`);
         set((s) => ({
           syncing: { ...s.syncing, [connId]: data.status },
-          jobInfo: { ...s.jobInfo, [connId]: { maskedPhone: data.maskedPhone, otpExpiresAt: data.otpExpiresAt } },
+          jobInfo: { ...s.jobInfo, [connId]: { maskedPhone: data.maskedPhone, otpExpiresAt: data.otpExpiresAt, runsOn: data.runsOn, deviceStage: data.deviceStage } },
         }));
         if (TERMINAL.includes(data.status)) return data;
       } catch {

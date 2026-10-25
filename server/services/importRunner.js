@@ -1,8 +1,9 @@
 import BankConnection from '../models/BankConnection.js';
 import ImportJob from '../models/ImportJob.js';
-import { decrypt, decryptJSON, encrypt } from '../utils/crypto.js';
+import { decrypt, decryptJSON } from '../utils/crypto.js';
 import { runScrape, scrapeOneZeroWithToken, getCompanyConfig } from './scrapeService.js';
-import { requestCalOtp, verifyCalOtp, fetchCalAccounts, calAccountsToRows, CAL_OTP_TTL_MS } from './calService.js';
+import Device from '../models/Device.js';
+import { verifyCalOtp, fetchCalAccounts, calAccountsToRows } from './calService.js';
 import { parseTransactions } from '../utils/excelParser.js';
 import { persistTransactions } from './transactionPersistence.js';
 import { notify } from './notificationService.js';
@@ -18,9 +19,11 @@ import logger from '../utils/logger.js';
  * unattended sync produces the exact same result as a user-triggered one.
  *
  * Device-OTP providers (CAL, `deviceOtp` in COMPANY_CONFIG) run in two phases:
- *   1. runImportJob asks the provider to SMS a code → job `awaiting_otp`;
- *   2. submitJobOtp (code relayed by the paired phone, or typed on the web)
- *      finishes the login, fetches and persists. Unanswered jobs expire.
+ *   CAL rejects requests from the server's IP, so the whole CAL session runs on the
+ *   paired phone: runImportJob parks the job (`awaiting_otp`, runsOn 'device') and the
+ *   phone drives it step by step via services/calDeviceSync.js. submitJobOtp below is
+ *   the older server-run path (code relayed to the server), kept for jobs already
+ *   waiting that way. Unanswered jobs expire.
  */
 
 // ── Concurrency limiter ─────────────────────────────────────────────────────
@@ -51,6 +54,9 @@ const MAX_BACKFILL_MS = 365 * 24 * 60 * 60 * 1000;
 const MAX_OTP_ATTEMPTS = 3;
 // A job still queued/running after this long died with its process (restart/crash).
 const STUCK_JOB_MS = 45 * 60 * 1000;
+// A phone-run sync waits this long for the phone to pick it up (it checks in every
+// ~15 min, later in deep sleep) before the day's run is given up.
+export const DEVICE_PICKUP_MS = 3 * 60 * 60 * 1000;
 
 /** Next daily slot for a connection (Israel-local syncHour). */
 export const nextDailySlot = (conn, from = new Date()) => nextIsraelHour(from, conn.syncHour ?? 6);
@@ -98,7 +104,7 @@ const scrapeConnection = async (conn) => {
 
 // ── Outcome bookkeeping (shared by both phases) ─────────────────────────────
 
-const markSuccess = async (job, conn, { inserted, skipped, received, accounts, balances }) => {
+export const markSuccess = async (job, conn, { inserted, skipped, received, accounts, balances }) => {
   const finishedAt = new Date();
   job.status = 'success';
   job.finishedAt = finishedAt;
@@ -123,7 +129,7 @@ const markSuccess = async (job, conn, { inserted, skipped, received, accounts, b
   logger.info(`[importRunner] job ${job._id} (${conn.company}) success: +${inserted} / skip ${skipped}`);
 };
 
-const markFailure = async (job, err) => {
+export const markFailure = async (job, err) => {
   const finishedAt = new Date();
   job.status = 'error';
   job.finishedAt = finishedAt;
@@ -214,23 +220,20 @@ export const runImportJob = async (jobId) => {
     return job;
   }
 
-  // Device-OTP: ask the provider to send the SMS and park the job. No Chrome is
-  // involved, so no concurrency slot is held while waiting for the phone.
+  // Device-OTP (CAL): park the job for the paired phone, which runs the CAL session
+  // itself (services/calDeviceSync.js). No Chrome, so no concurrency slot is held.
   if (getCompanyConfig(conn.company).deviceOtp) {
-    try {
-      const { id, last4 } = decryptJSON(conn.credentials);
-      const { uuid, maskedPhone } = await requestCalOtp({ id, last4 });
-      const now = new Date();
-      job.status = 'awaiting_otp';
-      job.otpRequestedAt = now;
-      job.otpExpiresAt = new Date(now.getTime() + CAL_OTP_TTL_MS);
-      job.maskedPhone = maskedPhone;
-      job.otpSession = encrypt(uuid);
-      await job.save();
-      logger.info(`[importRunner] job ${job._id} (${conn.company}) awaiting SMS code`);
-    } catch (err) {
-      await markFailure(job, err);
+    const hasPhone = await Device.exists({ user: conn.user, revokedAt: null });
+    if (!hasPhone) {
+      await markFailure(job, Object.assign(new AppError('אין טלפון מצומד — צמד את אפליקציית Fina SMS בעמוד החיבורים', 412), { transient: true }));
+      return job;
     }
+    job.status = 'awaiting_otp';
+    job.runsOn = 'device';
+    job.deviceStage = 'waiting_phone';
+    job.otpExpiresAt = new Date(Date.now() + DEVICE_PICKUP_MS);
+    await job.save();
+    logger.info(`[importRunner] job ${job._id} (${conn.company}) waiting for the phone`);
     return job;
   }
 
@@ -277,7 +280,7 @@ export const submitJobOtp = async (jobId, rawCode) => {
 
   // Atomically claim the job so the phone and the web can't both use one code.
   const job = await ImportJob.findOneAndUpdate(
-    { _id: jobId, status: 'awaiting_otp' },
+    { _id: jobId, status: 'awaiting_otp', runsOn: { $ne: 'device' } }, // phone-run jobs get the code on the phone
     { $set: { status: 'running' }, $inc: { otpAttempts: 1 } },
     { new: true },
   ).select('+otpSession');
@@ -340,8 +343,11 @@ export const expireStaleOtpJobs = async (now = new Date()) => {
       { new: true },
     );
     if (!claimed) continue;
+    const message = claimed.deviceStage === 'waiting_phone'
+      ? 'הטלפון לא התחבר בזמן — ודא שאפליקציית Fina SMS מותקנת ויש לה אינטרנט. ננסה שוב במועד הבא'
+      : 'לא התקבל קוד SMS מכאל בזמן — ננסה שוב במועד הבא';
     await markFailure(claimed, Object.assign(
-      new AppError('לא התקבל קוד SMS מהטלפון בזמן — ננסה שוב במועד הבא', 408),
+      new AppError(message, 408),
       { transient: true },
     ));
   }

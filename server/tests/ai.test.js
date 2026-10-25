@@ -127,6 +127,28 @@ describe('MCP — API קריאה בלבד עם מפתח AI', () => {
     expect(cats.body.map((c) => c.name)).toEqual(expect.arrayContaining(['מנויים דיגיטליים', 'פנאי']));
   });
 
+  it('MCP מרוחק (ChatGPT): מפתח בכתובת → אתחול, רשימת כלים, קריאה; בלי מפתח תקין → 401', async () => {
+    const { token } = await userWithKey('ai-mcp@test.com');
+    const rpc = (body, key = token) => request(app).post(`/api/mcp/${key}`)
+      .set('Accept', 'application/json, text/event-stream').send({ jsonrpc: '2.0', id: 1, ...body });
+
+    const init = await rpc({ method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '1' } } });
+    expect(init.status).toBe(200);
+    expect(init.body.result.serverInfo.name).toBe('fina');
+
+    const list = await rpc({ method: 'tools/list', params: {} });
+    expect(list.body.result.tools.map((t) => t.name)).toEqual(expect.arrayContaining(['get_month_overview', 'rename_merchant']));
+
+    const call = await rpc({ method: 'tools/call', params: { name: 'get_month_overview', arguments: {} } });
+    expect(JSON.parse(call.body.result.content[0].text)).toHaveProperty('income');
+
+    // A read-only key can't rename (tool error, not a crash).
+    const denied = await rpc({ method: 'tools/call', params: { name: 'rename_merchant', arguments: { currentName: 'a', newName: 'b' } } });
+    expect(denied.body.result.isError).toBe(true);
+
+    expect((await rpc({ method: 'tools/list', params: {} }, 'fk_wrong')).status).toBe(401);
+  });
+
   it('חיבורים והתראות זמינים לעוזר', async () => {
     const { agent, token } = await userWithKey('ai2@test.com');
     await agent.post('/api/connections').set(CSRF).send({ company: 'leumi', username: 'u', password: 'p', syncHour: 8 });

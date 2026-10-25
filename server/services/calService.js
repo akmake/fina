@@ -28,6 +28,37 @@ const CAL_HEADERS = {
 /** CAL codes are valid for a few minutes; we wait this long for the phone. */
 export const CAL_OTP_TTL_MS = 10 * 60 * 1000;
 
+/**
+ * The CAL HTTP requests, as plain data. The phone-run sync (services/calDeviceSync.js)
+ * hands these to the paired phone, which executes them from its own (Israeli mobile) IP —
+ * CAL rejects the same requests from the server. Hosts are always *.cal-online.co.il.
+ */
+const authed = (authToken) => ({ ...CAL_HEADERS, Authorization: `CALAuthScheme ${authToken}` });
+export const calRequests = {
+  otp: ({ id, last4 }) => ({
+    method: 'PUT', url: `${CONNECT_URL}/col-rest/calconnect/authentication/otp`, headers: CAL_HEADERS,
+    body: { userId: id, last4Digits: last4, bankAccountNum: last4, sMSTemplate: null, recaptcha: '' },
+  }),
+  verify: ({ id, otp, uuid }) => ({
+    method: 'POST', url: `${CONNECT_URL}/col-rest/calconnect/authentication/otp`, headers: CAL_HEADERS,
+    body: { custID: id, password: otp, token: uuid },
+  }),
+  init: (authToken) => ({
+    method: 'POST', url: `${BASE_URL}/Authentication/api/account/init`, headers: authed(authToken), body: {},
+  }),
+  transactions: (authToken, initData, start) => ({
+    method: 'POST', url: `${BASE_URL}/Transactions/api/filteredTransactions/getFilteredTransactions`,
+    headers: authed(authToken), body: calTransactionsRequest(initData, start),
+  }),
+  pending: (authToken, cardUniqueId) => ({
+    method: 'POST', url: `${BASE_URL}/Transactions/api/approvals/getClearanceRequests`,
+    headers: authed(authToken), body: { cardUniqueIDArray: [cardUniqueId] },
+  }),
+};
+
+/** Card ids from an init response (the phone fetches pending charges per card). */
+export const calCardIds = (initData) => extractCards(initData).map((c) => c.cardUniqueId);
+
 /** Step 1 — ask CAL to SMS a code. Returns the session uuid needed for step 2. */
 export const requestCalOtp = async ({ id, last4 }) => {
   if (!id || !last4) throw new AppError('חסרים פרטי זיהוי', 400);
@@ -52,7 +83,7 @@ export const requestCalOtp = async ({ id, last4 }) => {
  * blocked the request (e.g. a server IP) — transient, not the user's details.
  * The raw status + a body snippet are logged so the real cause is visible.
  */
-const calOtpRequestError = (err) => {
+export const calOtpRequestError = (err) => {
   const s = err.response?.status;
   const data = err.response?.data;
   const json = data && typeof data === 'object';
@@ -100,25 +131,55 @@ export const fetchCalAccounts = async (authToken, startDate) => {
     { headers: authHeaders, timeout: 15000 }
   );
   const allCards = extractCards(initData);
-  const bankAccountUniqueID = initData?.result?.bankAccounts?.[0]?.bankAccountUniqueID || '';
-
   const start = startDate ? new Date(startDate) : (() => { const d = new Date(); d.setMonth(d.getMonth() - 2); return d; })();
 
   const { data: txnData } = await axios.post(
     `${BASE_URL}/Transactions/api/filteredTransactions/getFilteredTransactions`,
-    {
-      bankAccountUniqueID,
-      caller: 'dashboard',
-      cards: allCards.map((c) => ({ cardUniqueID: c.cardUniqueId })),
-      fromTransDate: start.toISOString(),
-      toTransDate: new Date().toISOString(),
-      fromTrnAmt: 0, toTrnAmt: 0,
-      merchantHebCity: '', merchantHebName: '',
-      transCardPresentInd: 0, transactionsOrigin: 0, trnType: 0, walletTranInd: 0,
-    },
+    calTransactionsRequest(initData, start),
     { headers: authHeaders, timeout: 30000 }
   );
-  const transArr = txnData?.result?.transArr || [];
+
+  // Pending (not yet cleared) charges
+  const pending = [];
+  await Promise.allSettled(allCards.map(async (card) => {
+    try {
+      const { data } = await axios.post(
+        `${BASE_URL}/Transactions/api/approvals/getClearanceRequests`,
+        { cardUniqueIDArray: [card.cardUniqueId] },
+        { headers: authHeaders, timeout: 15000 }
+      );
+      pending.push({ cardUniqueId: card.cardUniqueId, response: data });
+    } catch (err) {
+      console.warn(`[cal] pending card ...${card.last4Digits}:`, err.message);
+    }
+  }));
+
+  return buildCalAccounts({ init: initData, transactions: txnData, pending });
+};
+
+/**
+ * Body of getFilteredTransactions for a given init response. Also sent to the paired
+ * phone (calAuto runs the CAL calls on the phone), so both paths ask CAL the same thing.
+ */
+export const calTransactionsRequest = (initData, start, end = new Date()) => ({
+  bankAccountUniqueID: initData?.result?.bankAccounts?.[0]?.bankAccountUniqueID || '',
+  caller: 'dashboard',
+  cards: extractCards(initData).map((c) => ({ cardUniqueID: c.cardUniqueId })),
+  fromTransDate: new Date(start).toISOString(),
+  toTransDate: new Date(end).toISOString(),
+  fromTrnAmt: 0, toTrnAmt: 0,
+  merchantHebCity: '', merchantHebName: '',
+  transCardPresentInd: 0, transactionsOrigin: 0, trnType: 0, walletTranInd: 0,
+});
+
+/**
+ * Raw CAL responses → accounts. Shared by the server fetch above and the phone-run
+ * sync, which uploads exactly these three responses (POST /api/devices/cal/:jobId/result).
+ * @param {{init:object, transactions:object, pending?:{cardUniqueId:string, response:object}[]}} raw
+ */
+export const buildCalAccounts = ({ init, transactions, pending = [] }) => {
+  const allCards = extractCards(init);
+  const transArr = transactions?.result?.transArr || [];
 
   // Group by card (init cards first so cards without transactions still appear)
   const cardMap = new Map();
@@ -134,19 +195,10 @@ export const fetchCalAccounts = async (authToken, startDate) => {
     cardMap.get(uid).txns.push(convertTransaction(t));
   }
 
-  // Pending (not yet cleared) charges
-  await Promise.allSettled(allCards.map(async (card) => {
-    try {
-      const { data: pendingData } = await axios.post(
-        `${BASE_URL}/Transactions/api/approvals/getClearanceRequests`,
-        { cardUniqueIDArray: [card.cardUniqueId] },
-        { headers: authHeaders, timeout: 15000 }
-      );
-      cardMap.get(card.cardUniqueId)?.txns.push(...parsePendingTransactions(pendingData));
-    } catch (err) {
-      console.warn(`[cal] pending card ...${card.last4Digits}:`, err.message);
-    }
-  }));
+  // Pending (not yet cleared) charges — one getClearanceRequests response per card.
+  for (const { cardUniqueId, response } of pending) {
+    cardMap.get(cardUniqueId)?.txns.push(...parsePendingTransactions(response));
+  }
 
   return Array.from(cardMap.values());
 };

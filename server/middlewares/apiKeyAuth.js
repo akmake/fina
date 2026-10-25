@@ -37,7 +37,8 @@ export default async function apiKeyAuth(req, res, next) {
     }
 
     // Writes only with an explicit scope; checked again per route by requireAiScope.
-    if (req.method !== 'GET' && !(key.scopes || []).length) {
+    // (The remote MCP endpoint always POSTs JSON-RPC; its write tools check the scope themselves.)
+    if (req.method !== 'GET' && !req.isMcp && !(key.scopes || []).length) {
       return res.status(405).json({ message: 'מפתח AI הוא לקריאה בלבד' });
     }
 

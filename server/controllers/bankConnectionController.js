@@ -45,7 +45,7 @@ export const listConnections = async (req, res, next) => {
       connection: { $in: connections.map((c) => c._id) },
       status: 'awaiting_otp',
       otpExpiresAt: { $gt: new Date() },
-    }).select('_id connection otpExpiresAt maskedPhone').lean();
+    }).select('_id connection otpExpiresAt maskedPhone runsOn deviceStage').lean();
     const byConn = new Map(waiting.map((j) => [String(j.connection), j]));
 
     res.json(connections.map((c) => ({ ...c, pendingOtpJob: byConn.get(String(c._id)) || null })));
@@ -214,6 +214,7 @@ export const submitOtp = async (req, res, next) => {
   try {
     const job = await ImportJob.findOne({ _id: req.params.id, ...scopeFilter(req) }).lean();
     if (!job) return next(new AppError('משימת הייבוא לא נמצאה', 404));
+    if (job.runsOn === 'device') return next(new AppError('הסנכרון הזה רץ דרך הטלפון — הקוד יטופל שם אוטומטית', 409));
 
     const finished = await submitJobOtp(job._id, req.body?.code);
     await audit(req, 'bankConnection.otp', 'BankConnection', { entityId: job.connection });

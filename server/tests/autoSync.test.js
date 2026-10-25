@@ -64,6 +64,16 @@ const startScheduledJob = async (connId) => {
   return ImportJob.findById(job._id);
 };
 
+// A sync already waiting the old way (server-run, code relayed to the server).
+const legacyServerJob = async (connId) => {
+  const { encrypt } = await import('../utils/crypto.js');
+  const conn = await BankConnection.findById(connId);
+  return ImportJob.create({
+    user: conn.user, connection: conn._id, company: conn.company, trigger: 'scheduled', status: 'awaiting_otp',
+    otpRequestedAt: new Date(), otpExpiresAt: new Date(Date.now() + 600000), otpSession: encrypt('cal-session-uuid'),
+  });
+};
+
 beforeEach(() => { __resetScrapeResult(); vi.clearAllMocks(); });
 
 describe('תזמון יומי לפי שעון ישראל', () => {
@@ -88,84 +98,119 @@ describe('תזמון יומי לפי שעון ישראל', () => {
   });
 });
 
-describe('כאל — קוד SMS שמגיע מהטלפון', () => {
-  it('סנכרון מתוזמן ממתין לקוד; הטלפון שולח את ה-SMS והעסקאות נשמרות', async () => {
+describe('כאל — הסנכרון רץ דרך הטלפון (כאל חוסמת את כתובת השרת)', () => {
+  const step = (token, body = {}) => request(app).post('/api/devices/cal/step').set('Authorization', 'Bearer ' + token).send(body);
+  const answer = (prev, status, json) => ({ jobId: prev.jobId, seq: prev.seq, response: { status, body: typeof json === 'string' ? json : JSON.stringify(json) } });
+  const INIT = { result: { cards: [{ cardUniqueId: 'card-1', last4Digits: '1234', companyDescription: 'כאל' }], bankAccounts: [{ bankAccountUniqueID: 'ba-1' }] } };
+  const TXNS = { result: { transArr: [{ cardUniqueId: 'card-1', trnAmt: 18, trnPurchaseDate: '2026-10-20T10:00:00', merchantName: 'קפה הבדיקה', trnTypeCode: '5', trnIntId: 991 }] } };
+  const PENDING = { result: { cardsList: [{ authDetalisList: [{ trnAmt: 30, trnPurchaseDate: '2026-10-24T09:00:00', merchantName: 'עסקה ממתינה' }] }] } };
+
+  it('מסלול מלא: הטלפון מבקש קוד, מקבל SMS, נכנס לכאל ומעביר את הנתונים — העסקאות נשמרות', async () => {
     const { agent } = await userAgent('cal1@test.com');
     const conn = await createCalAuto(agent);
     const token = await pairDevice(agent);
 
     const job = await startScheduledJob(conn.body._id);
-    expect(job.status).toBe('awaiting_otp');
-    expect(job.maskedPhone).toBe('05*-***-1234');
-    expect(calService.requestCalOtp).toHaveBeenCalledWith({ id: '123456789', last4: '1234' });
+    expect(job).toMatchObject({ status: 'awaiting_otp', runsOn: 'device', deviceStage: 'waiting_phone' });
+    expect(calService.requestCalOtp).not.toHaveBeenCalled(); // the server never calls CAL
+    expect((await request(app).post('/api/devices/heartbeat').set('Authorization', 'Bearer ' + token)).body.calTask).toBe(true);
 
-    const hb = await request(app).post('/api/devices/heartbeat').set(CSRF).set('Authorization', `Device ${token}`);
-    expect(hb.body.awaitingOtp).toBe(true);
+    const otp = (await step(token)).body;
+    expect(otp.action).toBe('http');
+    expect(otp.request).toMatchObject({ method: 'PUT', body: { userId: '123456789', last4Digits: '1234' } });
+    expect(new URL(otp.request.url).hostname).toMatch(/\.cal-online\.co\.il$/);
 
-    const res = await request(app).post('/api/devices/otp').set(CSRF)
-      .set('Authorization', `Device ${token}`).send({ message: SMS, sender: 'CAL' });
-    expect(res.status).toBe(200);
-    expect(res.body.matched).toBe(true);
-    expect(res.body.status).toBe('success');
-    expect(res.body.stats.inserted).toBe(1);
+    const wait = (await step(token, answer(otp, 200, { token: 'cal-uuid', phoneNumber: '05*-***-1234' }))).body;
+    expect(wait.action).toBe('wait_sms');
+    const listed = (await agent.get('/api/connections')).body.find((c) => c._id === conn.body._id);
+    expect(listed.pendingOtpJob).toMatchObject({ runsOn: 'device', deviceStage: 'waiting_sms', maskedPhone: '05*-***-1234' });
 
-    const txns = await agent.get('/api/transactions');
-    expect(txns.body.some((t) => t.description === 'קפה הבדיקה')).toBe(true);
-    const saved = await BankConnection.findById(conn.body._id);
-    expect(saved.lastSuccessAt).toBeTruthy();
-    expect(israelParts(saved.nextSyncAt).hour).toBe(7);
+    // The code is used on the phone — never server-side (relay / web box).
+    expect((await request(app).post('/api/devices/sms').set('Authorization', 'Bearer ' + token).send({ from: 'CalLogin', body: SMS })).body.reason).toBe('no-sync-waiting');
+    expect((await agent.post(`/api/connections/jobs/${job._id}/otp`).set(CSRF).send({ code: '482913' })).status).toBe(409);
+
+    // A wrong code (CAL 401) → wait for the next SMS.
+    let verify = (await step(token, { jobId: wait.jobId, seq: wait.seq, code: SMS })).body;
+    expect(verify.request.body).toMatchObject({ custID: '123456789', password: '482913', token: 'cal-uuid' });
+    const again = (await step(token, answer(verify, 401, { message: 'bad' }))).body;
+    expect(again.action).toBe('wait_sms');
+    verify = (await step(token, { jobId: again.jobId, seq: again.seq, code: '482913' })).body;
+
+    const init = (await step(token, answer(verify, 200, { token: 'auth-1' }))).body;
+    expect(init.request.headers.Authorization).toBe('CALAuthScheme auth-1');
+    const txns = (await step(token, answer(init, 200, INIT))).body;
+    expect(txns.request.body.cards).toEqual([{ cardUniqueID: 'card-1' }]);
+    const pending = (await step(token, answer(txns, 200, TXNS))).body;
+    expect(pending.request.body).toEqual({ cardUniqueIDArray: ['card-1'] });
+    const done = (await step(token, answer(pending, 200, PENDING))).body;
+    expect(done).toMatchObject({ action: 'done', ok: true });
+
+    const saved = await ImportJob.findById(job._id).select('+deviceState');
+    expect(saved.status).toBe('success');
+    expect(saved.stats.inserted).toBe(2);
+    expect(saved.deviceState).toBeUndefined();
+    const all = (await agent.get('/api/transactions')).body.map((t) => t.description);
+    expect(all).toEqual(expect.arrayContaining(['קפה הבדיקה', 'עסקה ממתינה']));
+    expect((await BankConnection.findById(conn.body._id)).lastSuccessAt).toBeTruthy();
+
+    // A replayed (stale) answer is refused; nothing more to pick up.
+    expect((await step(token, answer(pending, 200, PENDING))).status).toBe(409);
+    expect((await step(token)).body).toEqual({ action: 'none' });
   });
 
-  it('קוד שגוי לא סוגר את הסנכרון — אפשר לנסות שוב מהאתר', async () => {
+  it('כאל דוחה את הפרטים (JSON 400) → החיבור במצב שגיאה; חסימה (HTML 403) → זמני, החיבור נשאר פעיל', async () => {
     const { agent } = await userAgent('cal2@test.com');
     const conn = await createCalAuto(agent);
-    const job = await startScheduledJob(conn.body._id);
+    const token = await pairDevice(agent);
 
-    const wrong = await agent.post(`/api/connections/jobs/${job._id}/otp`).set(CSRF).send({ code: '111111' });
-    expect(wrong.status).toBe(422);
-    expect((await ImportJob.findById(job._id)).status).toBe('awaiting_otp');
+    await startScheduledJob(conn.body._id);
+    const blocked = (await step(token, answer((await step(token)).body, 403, '<html>Access denied</html>'))).body;
+    expect(blocked).toMatchObject({ action: 'done', ok: false });
+    expect(blocked.message).toMatch(/לא בעיה בפרטים/);
+    expect((await BankConnection.findById(conn.body._id)).status).toBe('active');
 
-    const right = await agent.post(`/api/connections/jobs/${job._id}/otp`).set(CSRF).send({ code: '482913' });
-    expect(right.status).toBe(200);
-    expect(right.body.status).toBe('success');
-    expect(right.body.otpSession).toBeUndefined();
+    await startScheduledJob(conn.body._id);
+    const wrong = (await step(token, answer((await step(token)).body, 400, { message: 'פרטים שגויים' }))).body;
+    expect(wrong).toMatchObject({ action: 'done', ok: false, message: 'פרטים שגויים' });
+    expect((await BankConnection.findById(conn.body._id)).status).toBe('error');
   });
 
-  it('קוד שלא הגיע בזמן — הסנכרון פג, החיבור נשאר פעיל, והמשתמש מקבל התראה', async () => {
-    const { agent, user } = await userAgent('cal3@test.com');
+  it('בלי טלפון מצומד — הסנכרון נכשל עם הסבר והחיבור נשאר פעיל', async () => {
+    const { agent } = await userAgent('cal3@test.com');
     const conn = await createCalAuto(agent);
+    const job = await startScheduledJob(conn.body._id);
+    expect(job.status).toBe('error');
+    expect(job.error).toMatch(/אין טלפון מצומד/);
+    expect((await BankConnection.findById(conn.body._id)).status).toBe('active');
+  });
+
+  it('הטלפון לא התחבר בזמן — הסנכרון פג, החיבור נשאר פעיל, והמשתמש מקבל התראה', async () => {
+    const { agent, user } = await userAgent('cal4@test.com');
+    const conn = await createCalAuto(agent);
+    await pairDevice(agent);
     const job = await startScheduledJob(conn.body._id);
     await ImportJob.updateOne({ _id: job._id }, { $set: { otpExpiresAt: new Date(Date.now() - 1000) } });
 
     expect(await expireStaleOtpJobs()).toBe(1);
-    expect((await ImportJob.findById(job._id)).status).toBe('error');
+    const expired = await ImportJob.findById(job._id);
+    expect(expired.status).toBe('error');
+    expect(expired.error).toMatch(/הטלפון לא התחבר/);
     const saved = await BankConnection.findById(conn.body._id);
     expect(saved.status).toBe('active');
     expect(israelParts(saved.nextSyncAt).hour).toBe(7);
     expect(await Alert.exists({ user: user._id, type: 'bank_sync_failed' })).toBeTruthy();
   });
 
-  it('לחיצה כפולה על "סנכרן" לא שולחת SMS שני', async () => {
-    const { agent } = await userAgent('cal4@test.com');
+  it('לחיצה כפולה על "סנכרן" לא פותחת סנכרון שני', async () => {
+    const { agent } = await userAgent('cal5@test.com');
     const conn = await createCalAuto(agent);
+    await pairDevice(agent);
     const first = await agent.post(`/api/connections/${conn.body._id}/sync`).set(CSRF);
     expect(first.status).toBe(202);
+    await new Promise((r) => setTimeout(r, 50));
     const second = await agent.post(`/api/connections/${conn.body._id}/sync`).set(CSRF);
     expect(second.status).toBe(409);
     expect(String(second.body.jobId)).toBe(String(first.body.jobId));
-  });
-
-  it('אחרי 3 קודים שגויים הסנכרון נעצר (לא נועלים את חשבון כאל)', async () => {
-    const { agent } = await userAgent('cal5@test.com');
-    const conn = await createCalAuto(agent);
-    const job = await startScheduledJob(conn.body._id);
-
-    expect((await agent.post(`/api/connections/jobs/${job._id}/otp`).set(CSRF).send({ code: '111111' })).status).toBe(422);
-    expect((await agent.post(`/api/connections/jobs/${job._id}/otp`).set(CSRF).send({ code: '222222' })).status).toBe(422);
-    const third = await agent.post(`/api/connections/jobs/${job._id}/otp`).set(CSRF).send({ code: '333333' });
-    expect(third.status).toBe(429);
-    expect((await ImportJob.findById(job._id)).status).toBe('error');
-    expect(calService.verifyCalOtp).toHaveBeenCalledTimes(3);
   });
 
   it('job שנתקע ב-running (קריסת שרת) נסגר ולא חוסם סנכרון חדש', async () => {
@@ -182,7 +227,7 @@ describe('כאל — קוד SMS שמגיע מהטלפון', () => {
     const { agent } = await userAgent('relay1@test.com');
     const conn = await createCalAuto(agent);
     const token = await pairDevice(agent);
-    const job = await startScheduledJob(conn.body._id);
+    const job = await legacyServerJob(conn.body._id);
     const sms = (body) => request(app).post('/api/devices/sms').set('Authorization', 'Bearer ' + token)
       .send({ id: '1', from: 'CAL', body, receivedAt: Date.now(), platform: 'android' });
 

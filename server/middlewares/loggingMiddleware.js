@@ -21,7 +21,7 @@ const geoCache = new Map();
 const GEO_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // נתיבים שלא נרשום לעולם
-const SKIP_PREFIXES = ['/api/logs', '/api/csrf-token', '/uploads', '/favicon', '/opo.png'];
+const SKIP_PREFIXES = ['/api/logs', '/api/mcp', '/api/csrf-token', '/uploads', '/favicon', '/opo.png'];
 
 // ★ Cache של הגדרת loggingEnabled — כדי לא לפנות ל-DB בכל request
 let loggingEnabledCache = false;

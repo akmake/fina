@@ -63,7 +63,7 @@ export const getUpdates = async (req, res, next) => {
       connection: { $in: connections.map((c) => c._id) },
       status: { $in: ['queued', 'running', 'awaiting_otp'] },
       createdAt: { $gte: new Date(now.getTime() - 60 * 60 * 1000) },
-    }).select('_id connection status otpExpiresAt maskedPhone').sort({ createdAt: -1 }).lean();
+    }).select('_id connection status otpExpiresAt maskedPhone runsOn deviceStage').sort({ createdAt: -1 }).lean();
     const jobByConn = new Map();
     for (const j of waiting) if (!jobByConn.has(String(j.connection))) jobByConn.set(String(j.connection), j);
 

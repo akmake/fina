@@ -43,6 +43,11 @@ const isBusy = (c) => c.activeJob && ['queued', 'running', 'awaiting_otp'].inclu
 
 // One connection → its live state, in words the user understands.
 function connectionState(c) {
+  if (c.activeJob?.status === 'awaiting_otp' && c.activeJob.runsOn === 'device') {
+    return c.activeJob.deviceStage === 'waiting_phone'
+      ? { tone: 'waiting', Icon: MessageSquareText, text: 'ממתין לטלפון', to: '/connections' }
+      : { tone: 'busy', Icon: Loader2, text: 'מסנכרן דרך הטלפון', spin: true };
+  }
   if (c.activeJob?.status === 'awaiting_otp') {
     return { tone: 'waiting', Icon: MessageSquareText, text: 'ממתין לקוד SMS', to: '/connections' };
   }

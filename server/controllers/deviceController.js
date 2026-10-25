@@ -8,6 +8,7 @@ import { submitJobOtp, extractOtp } from '../services/importRunner.js';
 import logger from '../utils/logger.js';
 import { qrDataUrl } from '../services/twoFactorService.js';
 import { notify } from '../services/notificationService.js';
+import { deviceCalStep, deviceTaskPending } from '../services/calDeviceSync.js';
 import { COMPANY_CONFIG } from '../services/scrapeService.js';
 
 /**
@@ -85,7 +86,10 @@ export const revokeDevice = async (req, res, next) => {
 
 // ── Device side (phone app, `Authorization: Device <token>`) ──────────────
 
-/** POST /api/devices/heartbeat — the app is alive; reports whether a code is awaited. */
+/**
+ * POST /api/devices/heartbeat — the app is alive; reports whether a code is awaited
+ * and whether a phone-run CAL sync is waiting to be picked up (`calTask`).
+ */
 export const heartbeat = async (req, res, next) => {
   try {
     req.device.lastSeenAt = new Date();
@@ -96,7 +100,25 @@ export const heartbeat = async (req, res, next) => {
       status: 'awaiting_otp',
       otpExpiresAt: { $gt: new Date() },
     });
-    res.json({ ok: true, awaitingOtp: !!waiting, deviceName: req.device.name, serverTime: new Date().toISOString() });
+    const calTask = await deviceTaskPending(req.user._id);
+    res.json({ ok: true, awaitingOtp: !!waiting, calTask, deviceName: req.device.name, serverTime: new Date().toISOString() });
+  } catch (err) { next(err); }
+};
+
+/**
+ * POST /api/devices/cal/step — the phone runs the CAL session for calAuto (CAL rejects
+ * the server's IP). `{}` asks for work; later calls answer the previous action. See
+ * services/calDeviceSync.js for the protocol. Mounted before CSRF (Bearer device token).
+ */
+export const calStep = async (req, res, next) => {
+  try {
+    req.device.lastSeenAt = new Date();
+    await req.device.save();
+    const result = await deviceCalStep(req.device, req.body || {});
+    if (result.action !== 'none' && !req.body?.jobId) {
+      await audit(req, 'device.calSync', 'ImportJob', { entityId: result.jobId, after: { device: req.device._id } });
+    }
+    res.json(result);
   } catch (err) { next(err); }
 };
 
@@ -125,6 +147,7 @@ export const relaySmsInbound = async (req, res, next) => {
       user: req.user._id,
       company: { $in: DEVICE_OTP_COMPANIES },
       status: 'awaiting_otp',
+      runsOn: { $ne: 'device' }, // phone-run syncs use the code on the phone itself
       otpExpiresAt: { $gt: new Date() },
     }).sort({ otpRequestedAt: -1 }).lean();
 
@@ -180,6 +203,7 @@ export const submitDeviceOtp = async (req, res, next) => {
       user: req.user._id,
       company: { $in: DEVICE_OTP_COMPANIES },
       status: 'awaiting_otp',
+      runsOn: { $ne: 'device' },
       otpExpiresAt: { $gt: new Date() },
     }).sort({ otpRequestedAt: -1 }).lean();
     if (!job) return res.status(404).json({ matched: false, message: 'אין סנכרון שממתין לקוד' });

@@ -60,5 +60,17 @@ export const deviceSmsLimiter = isDev
       message: { message: 'יותר מדי הודעות מהמכשיר. נסה שוב מאוחר יותר.' },
     });
 
+/* MCP מרוחק (ChatGPT / Claude.ai) — לפי המפתח שבכתובת; כל שאלה עשויה להפעיל כמה כלים */
+export const mcpLimiter = isDev
+  ? (_req, _res, next) => next()
+  : rateLimit({
+      windowMs: 60 * 60 * 1000,
+      max: 600,
+      standardHeaders: true,
+      legacyHeaders: false,
+      keyGenerator: (req) => req.mcpKey || req.ip,
+      message: { message: 'יותר מדי בקשות מהעוזר. נסה שוב מאוחר יותר.' },
+    });
+
 /* ברירת-מחדל */
 export default publicLimiter;

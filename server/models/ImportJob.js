@@ -30,6 +30,18 @@ const importJobSchema = new mongoose.Schema(
     // Provider OTP session handle (encrypted, never returned).
     otpSession: { type: String, select: false },
 
+    // Phone-run sync (calAuto): CAL rejects requests from the server's IP, so the
+    // paired phone executes the CAL requests the server hands it (services/calDeviceSync.js). While it runs the
+    // job stays `awaiting_otp`; deviceStage says how far the phone got.
+    runsOn: { type: String, enum: ['server', 'device'], default: 'server' },
+    device: { type: mongoose.Schema.Types.ObjectId, ref: 'Device' },
+    deviceStage: { type: String, enum: ['waiting_phone', 'requesting', 'waiting_sms', 'fetching'] },
+    // Step counter the phone echoes back — a stale/duplicate answer is refused.
+    deviceSeq: { type: Number, default: 0 },
+    // Server-side state between phone steps (CAL session, auth token, raw data) —
+    // encrypted, never returned.
+    deviceState: { type: String, select: false },
+
     startedAt: { type: Date },
     finishedAt: { type: Date },
     durationMs: { type: Number },
@@ -48,7 +60,7 @@ const importJobSchema = new mongoose.Schema(
 );
 
 importJobSchema.index({ user: 1, createdAt: -1 });
-importJobSchema.set('toJSON', { transform: (_doc, ret) => { delete ret.otpSession; return ret; } });
+importJobSchema.set('toJSON', { transform: (_doc, ret) => { delete ret.otpSession; delete ret.deviceState; return ret; } });
 // Auto-clean old job records after 90 days.
 importJobSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 90 });
 

@@ -44,6 +44,7 @@ import bankConnectionRoutes from './routes/bankConnectionRoutes.js';
 import deviceRoutes from './routes/deviceRoutes.js';
 import { aiDataRouter, aiKeysRouter } from './routes/aiRoutes.js';
 import apiKeyAuth from './middlewares/apiKeyAuth.js';
+import { handleMcp } from './mcp/remoteMcp.js';
 import calRoutes from './routes/calRoutes.js';
 import maaserRoutes from './routes/maaserRoutes.js';
 import familyRoutes from './routes/familyRoutes.js';
@@ -54,9 +55,9 @@ import accountRoutes from './routes/accountRoutes.js';
 import subscriptionRoutes from './routes/subscriptionRoutes.js';
 
 // ייבוא מידלוור
-import rateLimiter, { authLimiter, scrapeLimiter, deviceLimiter, deviceSmsLimiter } from './middlewares/rateLimiter.js';
+import rateLimiter, { authLimiter, scrapeLimiter, deviceLimiter, deviceSmsLimiter, mcpLimiter } from './middlewares/rateLimiter.js';
 import deviceAuth from './middlewares/deviceAuth.js';
-import { relaySmsInbound, heartbeat as deviceHeartbeat } from './controllers/deviceController.js';
+import { relaySmsInbound, heartbeat as deviceHeartbeat, calStep } from './controllers/deviceController.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
 import { requestLogger, errorHandler } from './middlewares/errorHandler.js';
 import { csrfTokenHandler, csrfProtection } from './middlewares/csrf.js';
@@ -133,6 +134,13 @@ app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 app.use(cookieParser());
 app.use(mongoSanitize());
+// Remote MCP: the AI key is in the URL (/api/mcp/fk_…). Move it out of req.url BEFORE any
+// logger runs, so it is never written to logs.
+app.use((req, _res, next) => {
+  const m = /^\/api\/mcp\/(fk_[A-Za-z0-9_-]+)(\/.*)?$/.exec(req.url.split('?')[0]);
+  if (m) { req.mcpKey = m[1]; req.url = '/api/mcp' + (m[2] || ''); }
+  next();
+});
 app.use(requestLogger); // Request logging middleware
 app.use(loggingMiddleware); // Visitor analytics logging
 
@@ -151,6 +159,17 @@ app.get('/api/csrf-token', rateLimiter, csrfTokenHandler);
 //     it sits before CSRF. See docs/modules/import.md § Phone OTP relay. ---
 app.post('/api/devices/sms', deviceSmsLimiter, deviceAuth, relaySmsInbound);
 app.post('/api/devices/heartbeat', deviceLimiter, deviceAuth, deviceHeartbeat);
+app.post('/api/devices/cal/step', deviceSmsLimiter, deviceAuth, calStep); // phone-run CAL sync
+
+// --- Remote MCP for ChatGPT / Claude.ai connectors: https://<fina>/api/mcp/<fk_ key>.
+//     Token in the URL (those clients can't send headers), so it sits before CSRF.
+//     See docs/modules/ai-mcp.md § Remote MCP. ---
+app.all('/api/mcp', mcpLimiter, (req, res, next) => {
+  if (!req.mcpKey) return res.status(401).json({ message: 'חסר מפתח AI בכתובת (/api/mcp/fk_…)' });
+  req.headers.authorization = `Bearer ${req.mcpKey}`;
+  req.isMcp = true;
+  next();
+}, apiKeyAuth, resolveHousehold, handleMcp);
 
 // --- הפעלת הגנת CSRF על כל הנתיבים מכאן ומטה ---
 app.use(csrfProtection);

@@ -34,9 +34,30 @@ function HourSelect({ value, onChange, id }) {
 
 // Shown while a CAL sync waits for its SMS code. The paired phone normally sends
 // it within seconds; typing it here is the fallback.
+// Phone-run CAL sync (CAL blocks the server): the phone does everything, nothing to type.
+const DEVICE_STAGE_TEXT = {
+  waiting_phone: 'ממתין לטלפון — פתח את אפליקציית Fina SMS כדי להתחיל מיד',
+  requesting: 'הטלפון מתחבר לכאל…',
+  waiting_sms: 'כאל שלחה קוד SMS — הטלפון יזין אותו לבד',
+  fetching: 'הטלפון מושך את העסקאות מכאל…',
+};
+
 function OtpWaiting({ job, onSubmit }) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  if (job?.runsOn === 'device') {
+    return (
+      <div className="mt-3 rounded-md border border-sky-200 bg-sky-50 p-3 dark:border-sky-500/30 dark:bg-sky-500/10" aria-live="polite">
+        <p className="flex items-center gap-2 text-sm font-medium text-sky-900 dark:text-sky-200">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {DEVICE_STAGE_TEXT[job.deviceStage] || 'הסנכרון רץ דרך הטלפון…'}
+        </p>
+        <p className="mt-1 text-xs text-sky-800/80 dark:text-sky-200/70">
+          כאל חוסמת גישה מהשרת, ולכן הטלפון המצומד מתחבר אליה בעצמו ומעביר את העסקאות.
+        </p>
+      </div>
+    );
+  }
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
@@ -480,7 +501,7 @@ export default function BankConnectionsPage() {
                     )}
                     {(syncing[c._id] === 'awaiting_otp' || c.pendingOtpJob) && (activeJobs[c._id] || c.pendingOtpJob) && (
                       <OtpWaiting
-                        job={c.pendingOtpJob || jobInfo[c._id]}
+                        job={(activeJobs[c._id] && jobInfo[c._id]) || c.pendingOtpJob}
                         onSubmit={(code) => submitOtp(c._id, activeJobs[c._id] || c.pendingOtpJob._id, code)}
                       />
                     )}
@@ -499,7 +520,7 @@ export default function BankConnectionsPage() {
                       {isSyncing
                         ? <><Loader2 className="ml-1 h-3.5 w-3.5 animate-spin" />{
                             syncing[c._id] === 'running' ? 'מסנכרן…'
-                              : syncing[c._id] === 'awaiting_otp' ? 'ממתין לקוד…' : 'בתור…'}</>
+                              : syncing[c._id] === 'awaiting_otp' ? (jobInfo[c._id]?.runsOn === 'device' ? 'דרך הטלפון…' : 'ממתין לקוד…') : 'בתור…'}</>
                         : <><RefreshCw className="ml-1 h-3.5 w-3.5" />סנכרן עכשיו</>}
                     </Button>
                     <Button
