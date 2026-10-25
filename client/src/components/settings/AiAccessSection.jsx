@@ -87,6 +87,13 @@ export default function AiAccessSection() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <CopyBlock label="ChatGPT — כתובת שרת MCP" text={`${url}/mcp`} />
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            החיבור ל-ChatGPT דורש הגדרת OAuth מאובטחת בשרת.
+            אין להכניס מפתח API לתוך כתובת החיבור.
+          </p>
+        </div>
         {token ? (
           <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10" role="status">
             <p className="text-sm font-medium text-amber-900 dark:text-amber-200">

@@ -165,8 +165,12 @@ app.post('/api/devices/cal/step', deviceSmsLimiter, deviceAuth, calStep); // pho
 //     Token in the URL (those clients can't send headers), so it sits before CSRF.
 //     See docs/modules/ai-mcp.md § Remote MCP. ---
 app.all('/api/mcp', mcpLimiter, (req, res, next) => {
-  if (!req.mcpKey) return res.status(401).json({ message: 'חסר מפתח AI בכתובת (/api/mcp/fk_…)' });
-  req.headers.authorization = `Bearer ${req.mcpKey}`;
+  if (!req.get('authorization') && req.mcpKey) {
+    req.headers.authorization = `Bearer ${req.mcpKey}`;
+  }
+  if (!req.get('authorization')) {
+    return res.status(401).json({ message: 'נדרש מפתח AI בכותרת Authorization או בכתובת החיבור' });
+  }
   req.isMcp = true;
   next();
 }, apiKeyAuth, resolveHousehold, handleMcp);

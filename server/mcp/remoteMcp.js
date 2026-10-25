@@ -125,6 +125,7 @@ const buildServer = (req) => {
 
 /** Express handler for /api/mcp (runs after apiKeyAuth + resolveHousehold). */
 export const handleMcp = async (req, res) => {
+  res.set('Cache-Control', 'no-store');
   if (req.method !== 'POST') {
     // Stateless server: no standalone SSE stream / session to resume or delete.
     return res.status(405).set('Allow', 'POST').json({ jsonrpc: '2.0', error: { code: -32000, message: 'Method not allowed' }, id: null });
