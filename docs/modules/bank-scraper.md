@@ -1,10 +1,12 @@
-> Last updated: 2026-07-03
+> Last updated: 2026-10-25
 
 # Module: Bank Scraper
 
 ## Overview
 
-Automated bank data import using the `israeli-bank-scrapers` npm package (v6.7.9).
+Automated bank data import using the `israeli-bank-scrapers` npm package (v6.12.2, bundles Puppeteer 24.43).
+Remaining `npm audit` highs on this package come from its Puppeteer dependency chain; npm's only
+suggested "fix" is a downgrade to 4.x, so they are accepted until upstream updates.
 Allows users to connect their Israeli bank accounts and automatically import transactions.
 Since Phase 0 hardening (2026-07) these routes **require auth** (jwt cookie + CSRF header)
 and are rate limited via `scrapeLimiter` (10/hour in production).

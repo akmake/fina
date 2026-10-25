@@ -6,7 +6,7 @@
 
 - **Provider:** MongoDB Atlas
 - **Database name:** `corse`
-- **ODM:** Mongoose 8.4.0
+- **ODM:** Mongoose 8.24
 - **Config file:** `server/config/db.js`
 - **Connection string env:** `MONGO_URI`
 

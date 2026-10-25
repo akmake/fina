@@ -35,20 +35,20 @@
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18.3.1 + Vite 5.2 |
-| Routing (client) | React Router DOM 6.23.1 |
-| Data fetching | TanStack React Query 5.83 |
+| Frontend | React 18.3.1 + Vite 5.4 |
+| Routing (client) | React Router DOM 6.30 |
+| Data fetching | TanStack React Query 5.104 |
 | State management | Zustand 4.5.7 |
-| Styling | Tailwind CSS 3.4.3 |
-| Charts | Recharts 3.1 |
-| 3D / Canvas | Three.js 0.183 + Fabric.js 7.2 |
-| Animations | Framer Motion 12.23 |
-| HTTP client | Axios 1.7.2 |
-| Backend | Node.js + Express 4.19.2 |
-| Database | MongoDB Atlas (Mongoose 8.4) |
+| Styling | Tailwind CSS 3.4 |
+| Charts | Recharts 3.10 |
+| 3D / Canvas | Three.js 0.183 + Fabric.js 7.4 |
+| Animations | Framer Motion 12.43 |
+| HTTP client | Axios 1.20 |
+| Backend | Node.js + Express 4.22 |
+| Database | MongoDB Atlas (Mongoose 8.24) |
 | Auth | JWT (httpOnly cookies) + Google OAuth |
 | Security | Helmet, CORS, CSRF (custom header), Rate limiting, AES-256-GCM credential encryption |
-| Bank scraping | israeli-bank-scrapers 6.7.9 |
+| Bank scraping | israeli-bank-scrapers 6.12.2 |
 | Language / Direction | Hebrew (RTL), `lang="he" dir="rtl"` |
 
 ---
