@@ -110,6 +110,14 @@ wrong code → 422 (code OTP_INVALID), job goes back to awaiting_otp until it
 no code in 10 min → scheduler tick marks it error (transient) + notifies the owner
 ```
 
+**OTP-request failures** (`calOtpRequestError` in `calService.js`): only a JSON
+400/401/404 from CAL counts as "details not recognised" (credential error → connection
+`status:'error'`). A 403/429 or a non-JSON (WAF/HTML) page means CAL blocked the
+request — transient, message says so, connection stays active. The raw HTTP status +
+body snippet are logged (`[cal] OTP request failed`). Open question: CAL may block
+the VPS IP outright (the one-time import runs browser-side for that reason —
+`client/src/utils/calDirectApi.js`); see `docs/known-unknowns.md`.
+
 The dashboard ("what's new") and `/connections` show "waiting for SMS code" live
 with the manual-entry box; both poll while a job is waiting.
 

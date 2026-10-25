@@ -42,12 +42,29 @@ export const requestCalOtp = async ({ id, last4 }) => {
     return { uuid, maskedPhone: data?.phoneNumber || '' };
   } catch (err) {
     if (err instanceof AppError) throw err;
-    const s = err.response?.status;
-    if (s === 400 || s === 401 || s === 403 || s === 404) {
-      throw new AppError(err.response?.data?.message || 'כאל לא זיהתה את תעודת הזהות / 4 הספרות — בדוק את הפרטים', 400);
-    }
-    throw new AppError(err.response?.data?.message || 'שגיאה בשליחת קוד מכאל', 502);
+    throw calOtpRequestError(err);
   }
+};
+
+/**
+ * Classify a failed OTP request. Only a JSON 400/401/404 from CAL itself means
+ * "details not recognised"; a 403/429 or a non-JSON (WAF/HTML) page means CAL
+ * blocked the request (e.g. a server IP) — transient, not the user's details.
+ * The raw status + a body snippet are logged so the real cause is visible.
+ */
+const calOtpRequestError = (err) => {
+  const s = err.response?.status;
+  const data = err.response?.data;
+  const json = data && typeof data === 'object';
+  console.warn(`[cal] OTP request failed: HTTP ${s ?? err.code ?? '?'} ${String(json ? JSON.stringify(data) : data ?? err.message).slice(0, 300)}`);
+
+  if (json && [400, 401, 404].includes(s)) {
+    return new AppError(data.message || 'כאל לא זיהתה את תעודת הזהות / 4 הספרות — בדוק את הפרטים', 400);
+  }
+  const blocked = s === 403 || s === 429 || (s && !json);
+  return Object.assign(new AppError(blocked
+    ? `כאל חסמה את הבקשה מהשרת (HTTP ${s}) — זו לא בעיה בפרטים שלך`
+    : (json && data.message) || 'שגיאה בשליחת קוד מכאל', 502), { transient: true });
 };
 
 // Wrong/expired SMS code: 422 + code, so it is never confused with an auth 401
