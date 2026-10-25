@@ -124,7 +124,7 @@ Compose), adapted to Fina in 2026-10. Production server: **https://ziporiteem.co
   `https://ziporiteem.com`, override with `-PFINA_BASE_URL=https://…`, https only). There is
   no editable address; an old stored one is deleted on start. Endpoints:
   `POST /api/devices/sms` and `POST /api/devices/heartbeat` (both **before CSRF**, Bearer auth).
-- **Pairing.** Fina → `/connections` → "צימוד טלפון" gives a one-time `fd_…` key. The app
+- **Pairing.** Fina → `/connections` → "צימוד טלפון" shows a **QR** (`finasms://pair?token=fd_…`, returned as `qr` by `POST /api/devices`) that the app scans with Google's code scanner; the raw `fd_…` key is shown too as a fallback. The app
   **verifies it with a heartbeat before saving** (so "connected" means Fina accepted it;
   wrong key / no network show a clear message).
 - **Only CAL codes leave the phone.** `SmsFilter` (same pattern as the server's `CAL_SMS`):
