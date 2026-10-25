@@ -100,7 +100,8 @@ export const heartbeat = async (req, res, next) => {
 // every attempt counts at CAL, and the Relay app forwards *all* incoming SMS.
 // (Hebrew words are matched whole: "כאלה" = "such" must not count.) Keep in sync with
 // SmsFilter.kt in the AppSms repo — same pattern on both sides.
-export const CAL_SMS = /visa\s*cal|\bcal\b|cal-?online|(?<![\u05D0-\u05EA])[\u05D1\u05DC\u05DE\u05D4\u05D5\u05E9\u05DB]?(\u05DB\u05D0\u05DC|\u05D5\u05D9\u05D6\u05D4)(?![\u05D0-\u05EA])/i;
+// Real CAL OTP sender (seen 2026-10): "CalLogin"; bodies say "... של כאל" / cal-online.co.il.
+export const CAL_SMS = /cal\s*login|visa\s*cal|\bcal\b|cal-?online|(?<![\u05D0-\u05EA])[\u05D1\u05DC\u05DE\u05D4\u05D5\u05E9\u05DB]?(\u05DB\u05D0\u05DC|\u05D5\u05D9\u05D6\u05D4)(?![\u05D0-\u05EA])/i;
 export const looksLikeCalSms = (from, body) => CAL_SMS.test(String(from || '')) || CAL_SMS.test(String(body || ''));
 
 /**

@@ -128,7 +128,7 @@ Compose), adapted to Fina in 2026-10. Production server: **https://ziporiteem.co
   **verifies it with a heartbeat before saving** (so "connected" means Fina accepted it;
   wrong key / no network show a clear message).
 - **Only CAL codes leave the phone.** `SmsFilter` (same pattern as the server's `CAL_SMS`):
-  sender/body matches CAL (Visa Cal, cal-online, whole-word כאל/ויזה with one prefix letter —
+  sender/body matches CAL (the real sender is **CalLogin**; also Visa Cal, cal-online, whole-word כאל/ויזה with one prefix letter —
   not "כאלה") **and** the body has a standalone 4-8 digit code. Everything else stays local.
 - **Delivery.** The SMS broadcast (`goAsync`) records the message in a durable ledger, enqueues
   an expedited WorkManager job (safety net: survives process death / Doze / no network;
