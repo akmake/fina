@@ -43,8 +43,9 @@ submit an SMS code but can never read data. Revoked devices and inactive owners 
 ## AI Key (MCP assistant)
 
 `Authorization: Bearer fk_<…>` — created in Settings (shown once), stored as SHA-256,
-revocable. `middlewares/apiKeyAuth.js` accepts it only on `/api/ai/*` and only for
-`GET` (405 otherwise); owners must be active. See [modules/ai-mcp.md](modules/ai-mcp.md).
+revocable. `middlewares/apiKeyAuth.js` accepts it only on `/api/ai/*`; writes need the
+`categorize` scope (`requireAiScope`, else 405/403) and are limited to renaming merchants
+and categories; owners must be active. See [modules/ai-mcp.md](modules/ai-mcp.md).
 
 ---
 

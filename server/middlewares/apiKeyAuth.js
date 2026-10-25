@@ -5,15 +5,19 @@ import { hashDeviceToken } from './deviceAuth.js';
 const LAST_USED_THROTTLE_MS = 5 * 60 * 1000;
 
 /**
- * Authenticates the read-only AI key: `Authorization: Bearer fk_<…>`.
- * GET only — any other method is refused, so a leaked key can never change data.
- * Sets a minimal req.user (owner id) for resolveHousehold/scopeFilter.
+ * Authenticates the AI key: `Authorization: Bearer fk_<…>`.
+ * GET is always allowed; any write needs a scope (see requireAiScope) — a plain
+ * key can never change data. Sets a minimal req.user (owner id) for scoping.
  */
+export const requireAiScope = (scope) => (req, res, next) => {
+  if (!req.apiKey?.scopes?.includes(scope)) {
+    return res.status(403).json({ message: 'למפתח הזה אין הרשאה לשנות שמות וקטגוריות — צור מפתח עם ההרשאה בהגדרות' });
+  }
+  next();
+};
+
 export default async function apiKeyAuth(req, res, next) {
   try {
-    if (req.method !== 'GET') {
-      return res.status(405).json({ message: 'מפתח AI הוא לקריאה בלבד' });
-    }
     const [scheme, token] = (req.get('authorization') || '').split(' ');
     if (scheme !== 'Bearer' || !token?.startsWith('fk_')) {
       return res.status(401).json({ message: 'נדרש מפתח AI' });
@@ -30,6 +34,11 @@ export default async function apiKeyAuth(req, res, next) {
     if (!key.lastUsedAt || Date.now() - key.lastUsedAt.getTime() > LAST_USED_THROTTLE_MS) {
       key.lastUsedAt = new Date();
       await key.save();
+    }
+
+    // Writes only with an explicit scope; checked again per route by requireAiScope.
+    if (req.method !== 'GET' && !(key.scopes || []).length) {
+      return res.status(405).json({ message: 'מפתח AI הוא לקריאה בלבד' });
     }
 
     req.apiKey = key;

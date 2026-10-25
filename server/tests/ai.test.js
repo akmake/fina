@@ -3,6 +3,7 @@ import request from 'supertest';
 import app from '../app.js';
 import { registerApproved } from './helpers.js';
 import { persistTransactions } from '../services/transactionPersistence.js';
+import Budget from '../models/Budget.js';
 import { israelMonthStart, israelMonthKey } from '../utils/israelTime.js';
 
 const CSRF = { 'X-Fina-Client': 'web-app' };
@@ -75,6 +76,55 @@ describe('MCP — API קריאה בלבד עם מפתח AI', () => {
     expect(keys.body[0].tokenHash).toBeUndefined();
     await a.agent.delete(`/api/ai-keys/${a.keyId}`).set(CSRF);
     expect((await ai('/overview', a.token)).status).toBe(401);
+  });
+
+  it('שינוי שמות וקטגוריות — רק עם מפתח שקיבל הרשאה, ונלמד לייבוא הבא', async () => {
+    const agent = request.agent(app);
+    const { body: { user } } = await registerApproved(agent, { email: 'ai-cat@test.com' });
+    const readOnly = (await agent.post('/api/ai-keys').set(CSRF).send({ name: 'קריאה' })).body.token;
+    const writer = (await agent.post('/api/ai-keys').set(CSRF).send({ name: 'כותב', allowCategorize: true })).body;
+    expect(writer.key.scopes).toEqual(['categorize']);
+    const post = (path, token, body) => request(app).post(`/api/ai/categorize/${path}`).set(CSRF).set('Authorization', `Bearer ${token}`).send(body);
+
+    const raw = 'PAYPAL *NETFLIX.COM 4029357733';
+    const row = (date) => ({ date, amount: 54.9, description: raw, rawDescription: raw, type: 'הוצאה', category: 'כללי', account: 'checking' });
+    await persistTransactions({ userId: user._id, transactions: [row(new Date('2026-09-05')), row(new Date('2026-10-05'))] });
+
+    // A read-only key can't write.
+    expect((await post('merchant-name', readOnly, { currentName: raw, newName: 'נטפליקס' })).status).toBe(405);
+
+    const dry = await post('merchant-name', writer.token, { currentName: raw, newName: 'נטפליקס', dryRun: true });
+    expect(dry.body).toMatchObject({ dryRun: true, wouldUpdate: 2 });
+    expect((await ai(`/transactions?q=${encodeURIComponent('נטפליקס')}`, writer.token)).body.total).toBe(0);
+
+    const renamed = await post('merchant-name', writer.token, { currentName: raw, newName: 'נטפליקס' });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body).toMatchObject({ updated: 2, rulesLearned: 1 });
+
+    // Category that doesn't exist → clear 404 unless explicitly created.
+    expect((await post('merchant-category', writer.token, { merchant: 'נטפליקס', category: 'מנויים' })).status).toBe(404);
+    const cat = await post('merchant-category', writer.token, { merchant: 'נטפליקס', category: 'מנויים', createIfMissing: true });
+    expect(cat.body).toMatchObject({ updated: 2, categoryCreated: true });
+
+    // Learned: next month's import of the same raw bank text arrives renamed + categorized.
+    await persistTransactions({ userId: user._id, transactions: [row(new Date('2026-11-05'))] });
+    const after = await ai(`/transactions?q=${encodeURIComponent('נטפליקס')}`, writer.token);
+    expect(after.body.total).toBe(3);
+    expect(after.body.transactions.every((t) => t.category === 'מנויים')).toBe(true);
+
+    // One-off fix of a single transaction by id.
+    const one = await post('transaction-category', writer.token, { transactionId: after.body.transactions[0].id, category: 'פנאי', createIfMissing: true });
+    expect(one.body).toMatchObject({ previousCategory: 'מנויים', category: 'פנאי' });
+
+    // Rename a category everywhere it is referenced (incl. the budget).
+    await Budget.create({ user: user._id, month: 11, year: 2026, totalLimit: 100, items: [{ category: 'מנויים', limit: 100 }] });
+    const rc = await post('rename-category', writer.token, { currentName: 'מנויים', newName: 'מנויים דיגיטליים' });
+    expect(rc.body).toMatchObject({ transactionsUpdated: 2, budgetsUpdated: 1 });
+    expect((await Budget.findOne({ user: user._id })).items[0].category).toBe('מנויים דיגיטליים');
+    expect((await post('rename-category', writer.token, { currentName: 'מנויים דיגיטליים', newName: 'פנאי' })).status).toBe(409);
+
+    const cats = await ai('/categories', writer.token);
+    expect(cats.body.map((c) => c.name)).toEqual(expect.arrayContaining(['מנויים דיגיטליים', 'פנאי']));
   });
 
   it('חיבורים והתראות זמינים לעוזר', async () => {

@@ -11,6 +11,7 @@ import { audit } from '../utils/audit.js';
 import { scopeFilter } from '../utils/scopeFilter.js';
 import { hashDeviceToken } from '../middlewares/deviceAuth.js';
 import { IL_TZ, israelMonthStart, israelMonthKey, israelWallToDate } from '../utils/israelTime.js';
+import * as categorization from '../services/categorizationService.js';
 
 /**
  * aiController — the read-only API behind the Fina MCP server (/mcp), plus
@@ -51,6 +52,7 @@ const parseDay = (value, name, { endOfDay = false } = {}) => {
 };
 
 const txOut = (t) => ({
+  id: t._id,
   date: t.date,
   description: t.description,
   amount: round(t.amount),
@@ -80,8 +82,9 @@ export const createKey = async (req, res, next) => {
       name: String(req.body?.name || 'עוזר AI').trim().slice(0, 60) || 'עוזר AI',
       tokenHash: hashDeviceToken(token),
       tokenHint: token.slice(0, 7),
+      scopes: req.body?.allowCategorize === true ? ['categorize'] : [],
     });
-    await audit(req, 'aiKey.create', 'ApiKey', { entityId: key._id, after: { name: key.name } });
+    await audit(req, 'aiKey.create', 'ApiKey', { entityId: key._id, after: { name: key.name, scopes: key.scopes } });
     res.status(201).json({ key, token });
   } catch (err) { next(err); }
 };
@@ -260,3 +263,30 @@ export const alerts = async (req, res, next) => {
     res.json(rows.map(({ _id, ...a }) => a));
   } catch (err) { next(err); }
 };
+
+// ── Categorization (AI key with the 'categorize' scope) ─────────────────────
+
+/** GET /api/ai/categories — names the assistant may use, most used first. */
+export const categories = async (req, res, next) => {
+  try { res.json(await categorization.listCategories(req)); } catch (err) { next(err); }
+};
+
+// Wrap a categorization op: run it, audit real changes (who + which key), respond.
+const categorize = (op, action) => async (req, res, next) => {
+  try {
+    const result = await categorization[op](req, req.body || {});
+    if (!result.dryRun) {
+      await audit(req, action, 'Transaction', { after: { ...result, viaAiKey: req.apiKey?._id } });
+    }
+    res.json(result);
+  } catch (err) { next(err); }
+};
+
+/** POST /api/ai/categorize/merchant-name { currentName, newName, dryRun? } */
+export const renameMerchant = categorize('renameMerchant', 'ai.merchant.rename');
+/** POST /api/ai/categorize/merchant-category { merchant, category, createIfMissing?, dryRun? } */
+export const setMerchantCategory = categorize('setMerchantCategory', 'ai.merchant.category');
+/** POST /api/ai/categorize/transaction-category { transactionId, category, createIfMissing? } */
+export const setTransactionCategory = categorize('setTransactionCategory', 'ai.transaction.category');
+/** POST /api/ai/categorize/rename-category { currentName, newName, dryRun? } */
+export const renameCategory = categorize('renameCategory', 'ai.category.rename');

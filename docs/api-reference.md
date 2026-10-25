@@ -366,7 +366,7 @@ Mounted at `/api/budgets` (`requireAuth` + `familyScope`).
 
 ## AI Assistant (MCP) — read-only
 
-See [modules/ai-mcp.md](modules/ai-mcp.md). Data routes need `Authorization: Bearer fk_…` (personal AI key) and are **GET only**.
+See [modules/ai-mcp.md](modules/ai-mcp.md). Data routes need `Authorization: Bearer fk_…` (personal AI key). Reads work with any key; `/categorize/*` needs a key with the `categorize` scope (else 405/403) and the `X-Fina-Client` header.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -375,8 +375,13 @@ See [modules/ai-mcp.md](modules/ai-mcp.md). Data routes need `Authorization: Bea
 | GET | `/ai/spending` | AI key | Totals by `groupBy` (category / month / merchant) |
 | GET | `/ai/connections` | AI key | Connection health incl. waiting-for-SMS |
 | GET | `/ai/alerts` | AI key | Unread alerts |
+| GET | `/ai/categories` | AI key | Category names in use |
+| POST | `/ai/categorize/merchant-name` | AI key + `categorize` | `{ currentName, newName, dryRun? }` |
+| POST | `/ai/categorize/merchant-category` | AI key + `categorize` | `{ merchant, category, createIfMissing?, dryRun? }` |
+| POST | `/ai/categorize/transaction-category` | AI key + `categorize` | `{ transactionId, category, createIfMissing? }` |
+| POST | `/ai/categorize/rename-category` | AI key + `categorize` | `{ currentName, newName, dryRun? }` |
 | GET | `/ai-keys` | Session | The user's active AI keys (no hashes) |
-| POST | `/ai-keys` | Session | Create `{ name? }` → `201 { key, token }` (token shown once; max 5) |
+| POST | `/ai-keys` | Session | Create `{ name?, allowCategorize? }` → `201 { key, token }` (token shown once; max 5) |
 | DELETE | `/ai-keys/:id` | Session | Revoke (immediate) |
 
 ---

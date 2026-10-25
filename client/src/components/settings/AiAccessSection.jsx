@@ -38,6 +38,7 @@ function CopyBlock({ label, text }) {
 export default function AiAccessSection() {
   const [keys, setKeys] = useState(null); // null = loading
   const [name, setName] = useState('Claude');
+  const [allowCategorize, setAllowCategorize] = useState(false);
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -47,7 +48,7 @@ export default function AiAccessSection() {
   const create = async () => {
     setBusy(true);
     try {
-      const { data } = await api.post('/ai-keys', { name });
+      const { data } = await api.post('/ai-keys', { name, allowCategorize });
       setToken(data.token);
       await load();
     } catch (e) {
@@ -82,7 +83,7 @@ export default function AiAccessSection() {
         <CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5" /> חיבור לעוזר AI</CardTitle>
         <CardDescription>
           מאפשר לעוזר כמו Claude לענות על שאלות על הכסף שלך ("כמה הוצאנו על מסעדות החודש?").
-          המפתח <strong>לקריאה בלבד</strong> — העוזר לא יכול לשנות או למחוק כלום. הנתונים שהעוזר שולף עוברים לספק ה-AI.
+          כברירת מחדל המפתח <strong>לקריאה בלבד</strong>. אפשר להרשות לו גם לשנות שמות של בתי עסק וקטגוריות — שום דבר אחר (לא מחיקות, לא העברות, לא הגדרות). הנתונים שהעוזר שולף עוברים לספק ה-AI.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -102,6 +103,13 @@ export default function AiAccessSection() {
               <label htmlFor="ai-key-name" className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">שם המפתח</label>
               <Input id="ai-key-name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
             </div>
+            <label className="flex w-full cursor-pointer select-none items-start gap-2 rounded-md border border-slate-200 p-3 text-sm dark:border-white/[0.08]">
+              <input type="checkbox" className="mt-0.5 h-4 w-4" checked={allowCategorize} onChange={(e) => setAllowCategorize(e.target.checked)} />
+              <span>
+                <span className="font-medium text-slate-700 dark:text-slate-200">לאפשר לעוזר לשנות שמות של בתי עסק וקטגוריות</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400">השינוי חל על כל העסקאות של אותו בית עסק ונלמד לייבואים הבאים. כל שינוי נרשם ביומן.</span>
+              </span>
+            </label>
             <Button type="button" onClick={create} disabled={busy}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'יצירת מפתח'}
             </Button>
@@ -119,6 +127,9 @@ export default function AiAccessSection() {
                 <div>
                   <span className="font-medium text-slate-700 dark:text-slate-200">{k.name}</span>
                   <span className="mr-2 text-xs text-slate-400" dir="ltr">{k.tokenHint}…</span>
+                  <span className={`mr-2 rounded-full px-2 py-0.5 text-[11px] font-medium ${(k.scopes || []).includes('categorize') ? 'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200' : 'bg-slate-100 text-slate-600 dark:bg-white/[0.06] dark:text-slate-300'}`}>
+                    {(k.scopes || []).includes('categorize') ? 'קריאה + שינוי שמות וקטגוריות' : 'קריאה בלבד'}
+                  </span>
                   <p className="text-xs text-slate-400">נוצר {fmt(k.createdAt)} · שימוש אחרון: {fmt(k.lastUsedAt)}</p>
                 </div>
                 <Button type="button" size="sm" variant="ghost" className="text-red-500 hover:bg-red-50 hover:text-red-700" onClick={() => revoke(k)} aria-label={`בטל את ${k.name}`}>
