@@ -178,6 +178,29 @@ describe('כאל — קוד SMS שמגיע מהטלפון', () => {
     expect((await ImportJob.findById(stuck._id)).status).toBe('error');
   });
 
+  it('Relay webhook (אפליקציית AppSms): Bearer, בלי כותרת CSRF; SMS שאינו מכאל לא נוגע בסנכרון', async () => {
+    const { agent } = await userAgent('relay1@test.com');
+    const conn = await createCalAuto(agent);
+    const token = await pairDevice(agent);
+    const job = await startScheduledJob(conn.body._id);
+
+    // Unrelated SMS (another service's code) — ignored, no attempt at CAL.
+    const other = await request(app).post('/api/devices/sms').set('Authorization', `Bearer ${token}`)
+      .send({ id: '1', from: 'AliExpress', body: 'Your code is 777777', receivedAt: Date.now(), platform: 'android' });
+    expect(other.status).toBe(200);
+    expect(other.body).toMatchObject({ handled: false, reason: 'not-a-cal-sms' });
+    expect(calService.verifyCalOtp).not.toHaveBeenCalled();
+    expect((await ImportJob.findById(job._id)).status).toBe('awaiting_otp');
+
+    const cal = await request(app).post('/api/devices/sms').set('Authorization', `Bearer ${token}`)
+      .send({ id: '2', from: 'CAL', body: SMS, receivedAt: Date.now(), platform: 'android' });
+    expect(cal.status).toBe(200);
+    expect(cal.body).toMatchObject({ handled: true, status: 'success', inserted: 1 });
+
+    const bad = await request(app).post('/api/devices/sms').set('Authorization', 'Bearer fd_nope').send({ from: 'CAL', body: SMS });
+    expect(bad.status).toBe(401);
+  });
+
   it('extractOtp מוציא את הקוד מתוך הודעה מלאה', () => {
     expect(extractOtp(SMS)).toBe('482913');
     expect(extractOtp('  654321 ')).toBe('654321');

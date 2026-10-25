@@ -5,7 +5,8 @@ import User from '../models/User.js';
 export const hashDeviceToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
 /**
- * Authenticates a paired phone by `Authorization: Device <token>`.
+ * Authenticates a paired phone by `Authorization: Device <token>` — or
+ * `Bearer <token>`, which is what the Relay SMS app (AppSms repo) sends.
  * Sets req.device and a minimal req.user (owner id) — NOT a session: only the
  * device routes accept it. Rejects revoked devices and inactive owners.
  */
@@ -13,7 +14,7 @@ export default async function deviceAuth(req, res, next) {
   try {
     const header = req.get('authorization') || '';
     const [scheme, token] = header.split(' ');
-    if (scheme !== 'Device' || !token) {
+    if (!['Device', 'Bearer'].includes(scheme) || !token?.startsWith('fd_')) {
       return res.status(401).json({ message: 'מכשיר לא מזוהה' });
     }
 

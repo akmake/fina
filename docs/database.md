@@ -21,6 +21,7 @@ Located in `server/models/`.
 | Model | File | Key Fields |
 |-------|------|-----------|
 | `User` | `User.js` | `email`, `passwordHash`, `name`, `googleId`, `role` (`user`/`admin` — system-level), `activeHousehold`→`Household`, `familyGroup` (legacy), `tokenVersion`, `createdAt`. **Phase 4:** `emailVerified`/`emailVerifiedAt`, `emailVerificationTokenHash`/`emailVerificationExpires` (select:false), `onboardedAt`, `twoFactorEnabled`, `twoFactorSecret`/`twoFactorPendingSecret`/`twoFactorRecoveryHashes` (select:false, hashed), `deletedAt` (anonymize-in-place). **Access approval (2026-10):** `approvalStatus` (`pending`/`approved`/`rejected`, schema default `approved` so pre-existing users stay active; sign-up sets `pending`), `approvalDecidedAt`, `approvalDecidedBy`. **Dashboard:** `dashboardVisitAt`, `dashboardPrevVisitAt` ("what's new since your last visit") |
+| `ApiKey` | `ApiKey.js` | **2026-10** — personal READ-ONLY AI key for the MCP server: `user`, `name`, `tokenHash` (SHA-256, `select:false`, unique), `tokenHint`, `lastUsedAt`, `revokedAt`. See [modules/ai-mcp.md](modules/ai-mcp.md) |
 | `Device` | `Device.js` | **2026-10** — a paired phone that relays bank SMS codes: `user`, `name`, `tokenHash` (SHA-256, `select:false`, unique), `tokenHint` (first chars), `lastSeenAt`, `lastOtpAt`, `revokedAt` |
 | `Subscription` | `Subscription.js` | **Phase 4** — one per `household` (unique). `plan` (`free`/`premium`), `status` (`trialing`/`active`/`past_due`/`cancelled`), `provider` (`stub`/`manual`/`stripe`/`paddle`), `providerCustomerId`/`providerSubscriptionId`, `periodEnd`, `canceledAt`. Plan catalog + gating live in `services/subscriptionService.js` |
 
@@ -37,7 +38,7 @@ Located in `server/models/`.
 
 | Model | File | Key Fields |
 |-------|------|-----------|
-| `Transaction` | `Transaction.js` | `user`, `amount`, `date`, `description`, `category`, `type` (income/expense), `account`, bank scraper fields (`identifier`, `processedDate`, `memo`) |
+| `Transaction` | `Transaction.js` | `user`, `amount`, `date`, `description`, `category`, `type` (income/expense), `account`, bank scraper fields (`identifier`, `processedDate`, `memo`); indexes incl. `{user, createdAt}` (dashboard / what's new) |
 | `Category` | `Category.js` | `user`, `name`, `type`, `color`, `icon`, `isDefault` |
 | `CategoryRule` | `CategoryRule.js` | `user`, `searchString`, `matchType` (contains/exact/starts_with), `newName`, `category` (ref) |
 | `Budget` | `Budget.js` | `user`, `month`, `year`, `totalLimit`, `items[]` {category, limit, spent, color}, `alertThreshold`, `carryOverEnabled` (Phase 3 §5.4), soft-delete |

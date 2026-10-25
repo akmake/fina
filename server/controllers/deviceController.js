@@ -92,6 +92,48 @@ export const heartbeat = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// The SMS must look like it comes from CAL before it may be tried as a code —
+// every attempt counts at CAL, and the Relay app forwards *all* incoming SMS.
+const CAL_SMS = /cal|כאל|ויזה/i;
+export const looksLikeCalSms = (from, body) => CAL_SMS.test(String(from || '')) || CAL_SMS.test(String(body || ''));
+
+/**
+ * POST /api/devices/sms — webhook for the Relay SMS app (AppSms repo), in its own
+ * contract: `Authorization: Bearer <device token>`, body `{ id, from, body,
+ * receivedAt, platform }`. Mounted before the CSRF middleware (token auth, no
+ * cookies). The SMS text is never stored or logged. Always answers 2xx for a
+ * handled message (Relay retries 408/429/5xx), 401 for a bad token.
+ */
+export const relaySmsInbound = async (req, res, next) => {
+  try {
+    req.device.lastSeenAt = new Date();
+    await req.device.save();
+
+    const { from, body } = req.body || {};
+    const job = await ImportJob.findOne({
+      user: req.user._id,
+      company: { $in: DEVICE_OTP_COMPANIES },
+      status: 'awaiting_otp',
+      otpExpiresAt: { $gt: new Date() },
+    }).sort({ otpRequestedAt: -1 }).lean();
+
+    if (!job) return res.json({ handled: false, reason: 'no-sync-waiting' });
+    if (!body || !looksLikeCalSms(from, body)) return res.json({ handled: false, reason: 'not-a-cal-sms' });
+
+    try {
+      const finished = await submitJobOtp(job._id, body);
+      req.device.lastOtpAt = new Date();
+      await req.device.save();
+      await audit(req, 'device.otp', 'ImportJob', { entityId: job._id, after: { device: req.device._id, via: 'relay' } });
+      return res.json({ handled: true, status: finished.status, inserted: finished.stats?.inserted ?? 0 });
+    } catch (err) {
+      // Wrong / expired code etc. — reported, but not as a retryable failure.
+      if (err.statusCode && err.statusCode < 500) return res.json({ handled: false, reason: err.message });
+      throw err;
+    }
+  } catch (err) { next(err); }
+};
+
 /**
  * POST /api/devices/otp { code } | { message, sender }
  * The phone relays the bank SMS (or just the code). Applied to the owner's most
@@ -102,6 +144,9 @@ export const submitDeviceOtp = async (req, res, next) => {
   try {
     const input = req.body?.code ?? req.body?.message;
     if (!input) throw new AppError('חסר קוד או תוכן הודעה', 400);
+    if (!req.body?.code && !looksLikeCalSms(req.body?.sender, req.body?.message)) {
+      return res.status(404).json({ matched: false, message: 'ההודעה אינה מכאל' });
+    }
 
     const job = await ImportJob.findOne({
       user: req.user._id,

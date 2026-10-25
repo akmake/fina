@@ -32,11 +32,19 @@ default `approved` applies, so nobody existing is locked out (no migration neede
 
 ## Device Token (paired phone)
 
-`Authorization: Device <token>` — issued once by `POST /api/devices` (session), stored
+`Authorization: Device <token>` (or `Bearer <token>` from the Relay app) — issued once by `POST /api/devices` (session), stored
 only as a SHA-256 hash (`Device.tokenHash`), revocable. `middlewares/deviceAuth.js`
 accepts it **only** on `/api/devices/heartbeat` and `/api/devices/otp`; every other
 route ignores the header (cookie-based `requireAuth`), so a stolen phone token can
 submit an SMS code but can never read data. Revoked devices and inactive owners → 401.
+
+---
+
+## AI Key (MCP assistant)
+
+`Authorization: Bearer fk_<…>` — created in Settings (shown once), stored as SHA-256,
+revocable. `middlewares/apiKeyAuth.js` accepts it only on `/api/ai/*` and only for
+`GET` (405 otherwise); owners must be active. See [modules/ai-mcp.md](modules/ai-mcp.md).
 
 ---
 

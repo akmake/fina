@@ -31,6 +31,7 @@ Full-stack personal finance management application. Hebrew RTL. React + Node.js 
 | [modules/real-estate.md](modules/real-estate.md) | Real estate, insurance |
 | [modules/bank-scraper.md](modules/bank-scraper.md) | Bank scraping, data import |
 | [modules/import.md](modules/import.md) | Import 2.0 — saved bank connections, daily sync at a chosen hour, CAL auto-sync via the phone SMS relay (+ Android app contract) |
+| [modules/ai-mcp.md](modules/ai-mcp.md) | AI assistant access — read-only `/api/ai` + the MCP server in `/mcp` |
 | [modules/core-loop.md](modules/core-loop.md) | Core Loop (Phase 3) — notification engine, budget cycle, rule learning, connected goals, UI hubs |
 | [modules/saas-shell.md](modules/saas-shell.md) | SaaS Shell (Phase 4) — email verification, 2FA, account export/deletion, subscription & plan gating |
 | [modules/electrical.md](modules/electrical.md) | Electrical CAD editor |

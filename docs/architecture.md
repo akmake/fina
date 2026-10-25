@@ -119,7 +119,8 @@ fina/
 | CSRF | Custom header `X-Fina-Client: web-app` | `server/middlewares/csrf.js` |
 | Auth | JWT in httpOnly cookies; 2FA `mfaToken`s are rejected as sessions | `server/middlewares/authMiddleware.js`, `server/middlewares/requireAuth.js` |
 | Access approval | Sign-up = request; no session until a platform admin approves (`User.approvalStatus`) | `server/controllers/authController.js`, `server/controllers/admin/userAdminController.js` |
-| Device tokens | Paired phones use a hashed, revocable, least-privilege token (OTP relay only) | `server/middlewares/deviceAuth.js`, `server/models/Device.js` |
+| Device tokens | Paired phones use a hashed, revocable, least-privilege token (OTP relay only) |
+| AI keys | Personal hashed, revocable, **GET-only** key for the MCP server (`/api/ai/*` only) | `server/middlewares/apiKeyAuth.js`, `server/models/ApiKey.js` | `server/middlewares/deviceAuth.js`, `server/models/Device.js` |
 | Rate limiting | `publicLimiter` (100/10min), `authLimiter` (20/15min), `scrapeLimiter` (10/hour) — prod only | `server/middlewares/rateLimiter.js` |
 | Audit log | Append-only `AuditLog` for deletes + role changes | `server/models/AuditLog.js`, `server/utils/audit.js` |
 | Soft delete | `deletedAt` on Transaction/Budget/Goal/Loan/Account | `server/utils/softDelete.js` |

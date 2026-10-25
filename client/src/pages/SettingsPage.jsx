@@ -19,6 +19,7 @@ import toast from 'react-hot-toast';
 import api from '@/utils/api';
 import TwoFactorSection from '@/components/settings/TwoFactorSection';
 import PlanSection from '@/components/settings/PlanSection';
+import AiAccessSection from '@/components/settings/AiAccessSection';
 
 // ---------------------------------------------------------------------------
 // Section wrapper
@@ -174,6 +175,9 @@ export default function SettingsPage() {
 
       {/* Security — 2FA (Phase 4) */}
       <TwoFactorSection />
+
+      {/* AI assistant access (MCP) — read-only key */}
+      <AiAccessSection />
 
       {/* Data management */}
       <Section icon={Database} title="ניהול נתונים" description="ייצוא, גיבוי ומחיקת הנתונים שלך">

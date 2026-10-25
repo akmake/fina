@@ -115,6 +115,15 @@ with the manual-entry box; both poll while a job is waiting.
 
 ## Phone OTP relay
 
+**Relay app (AppSms repo, `GitHub/AppSms`) — no code changes needed.** It forwards every
+SMS to a webhook. Configure it with **endpoint** `https://<fina>/api/devices/sms` and
+**bearer token** = the pairing code from `/connections`. The server ignores any SMS that
+doesn't look like CAL (`looksLikeCalSms`: sender/body matches cal|כאל|ויזה) and never
+stores SMS text. Recommended app change for privacy: a sender allow-list so personal
+SMS never leave the phone.
+
+Generic contract (for any other client):
+
 Contract for the Android companion app (the app lives in a separate repo):
 
 1. **Pairing** — the user taps "צימוד טלפון" on `/connections` → `POST /api/devices`

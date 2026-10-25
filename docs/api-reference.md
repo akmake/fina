@@ -109,7 +109,9 @@ Contract details: [modules/import.md § Phone OTP relay](modules/import.md#phone
 | POST | `/devices/heartbeat` | `Authorization: Device <token>` | Marks the phone alive → `{ ok, awaitingOtp }` |
 | POST | `/devices/otp` | `Authorization: Device <token>` | `{ code }` or `{ message, sender }` (full SMS text) → applied to the owner's newest sync waiting for a code → `{ matched, status, stats }`; `404 { matched:false }` if nothing is waiting (scrape rate-limited) |
 
-> A device token can **only** call these two endpoints — it is rejected everywhere
+| POST | `/devices/sms` | `Authorization: Bearer <device token>` | **Webhook of the Relay SMS app** (AppSms repo) — body `{ id, from, body, receivedAt, platform }`. Mounted **before CSRF** (no `X-Fina-Client`). Only a CAL-looking SMS (sender/body matches CAL) is tried as a code; always `200 { handled, reason? | status, inserted }` for a handled message, `401` bad token. The SMS text is never stored |
+
+> A device token can **only** call these phone endpoints — it is rejected everywhere
 > else (it is not a session). Requests still need `X-Fina-Client` (global CSRF).
 
 ---
@@ -359,6 +361,23 @@ Mounted at `/api/budgets` (`requireAuth` + `familyScope`).
 | PATCH | `/admin/users/:id/approval` | Admin | `{ decision: 'approve' \| 'reject' }` — approve an access request, or block a user (bumps `tokenVersion` → sessions end). Audited; not allowed on yourself |
 | PUT | `/admin/users/:id` | Admin | Change system role `{ role }` |
 | DELETE | `/admin/users/:id` | Admin | Delete user (hard delete — see AUDIT P1-6) |
+
+---
+
+## AI Assistant (MCP) — read-only
+
+See [modules/ai-mcp.md](modules/ai-mcp.md). Data routes need `Authorization: Bearer fk_…` (personal AI key) and are **GET only**.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/ai/overview` | AI key | Month overview (`month` YYYY-MM) |
+| GET | `/ai/transactions` | AI key | Search (`q`, `category`, `type`, `from`, `to`, `minAmount`, `maxAmount`, `limit` ≤200) |
+| GET | `/ai/spending` | AI key | Totals by `groupBy` (category / month / merchant) |
+| GET | `/ai/connections` | AI key | Connection health incl. waiting-for-SMS |
+| GET | `/ai/alerts` | AI key | Unread alerts |
+| GET | `/ai-keys` | Session | The user's active AI keys (no hashes) |
+| POST | `/ai-keys` | Session | Create `{ name? }` → `201 { key, token }` (token shown once; max 5) |
+| DELETE | `/ai-keys/:id` | Session | Revoke (immediate) |
 
 ---
 

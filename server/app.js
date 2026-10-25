@@ -42,6 +42,8 @@ import reportRoutes from './routes/reportRoutes.js';
 import scraperRoutes from './routes/scraperRoutes.js';
 import bankConnectionRoutes from './routes/bankConnectionRoutes.js';
 import deviceRoutes from './routes/deviceRoutes.js';
+import { aiDataRouter, aiKeysRouter } from './routes/aiRoutes.js';
+import apiKeyAuth from './middlewares/apiKeyAuth.js';
 import calRoutes from './routes/calRoutes.js';
 import maaserRoutes from './routes/maaserRoutes.js';
 import familyRoutes from './routes/familyRoutes.js';
@@ -52,11 +54,13 @@ import accountRoutes from './routes/accountRoutes.js';
 import subscriptionRoutes from './routes/subscriptionRoutes.js';
 
 // ייבוא מידלוור
-import rateLimiter, { authLimiter, scrapeLimiter } from './middlewares/rateLimiter.js';
+import rateLimiter, { authLimiter, scrapeLimiter, deviceLimiter } from './middlewares/rateLimiter.js';
+import deviceAuth from './middlewares/deviceAuth.js';
+import { relaySmsInbound } from './controllers/deviceController.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
 import { requestLogger, errorHandler } from './middlewares/errorHandler.js';
 import { csrfTokenHandler, csrfProtection } from './middlewares/csrf.js';
-import { familyScope } from './middlewares/familyScope.js';
+import { familyScope, resolveHousehold } from './middlewares/familyScope.js';
 import logger from './utils/logger.js';
 import loggingMiddleware from './middlewares/loggingMiddleware.js';
 
@@ -143,6 +147,10 @@ app.use('/api/auth', authLimiter, authRoutes);
 // --- Endpoint לקבלת ה-CSRF Token ---
 app.get('/api/csrf-token', rateLimiter, csrfTokenHandler);
 
+// --- Webhook of the Relay SMS app (phone) — device-token auth, no cookies, so
+//     it sits before CSRF. See docs/modules/import.md § Phone OTP relay. ---
+app.post('/api/devices/sms', deviceLimiter, deviceAuth, relaySmsInbound);
+
 // --- הפעלת הגנת CSRF על כל הנתיבים מכאן ומטה ---
 app.use(csrfProtection);
 
@@ -184,6 +192,9 @@ app.use('/api/import',  requireAuth, familyScope, scrapeLimiter, importRoutes);
 app.use('/api/scrape',  requireAuth, familyScope, scrapeLimiter, scraperRoutes);
 app.use('/api/connections', requireAuth, familyScope, bankConnectionRoutes);
 app.use('/api/devices', deviceRoutes); // per-route auth: session (web) or device token (phone)
+// AI assistant (MCP): read-only data with a personal AI key; keys managed with a session.
+app.use('/api/ai',      deviceLimiter, apiKeyAuth, resolveHousehold, aiDataRouter);
+app.use('/api/ai-keys', requireAuth, aiKeysRouter);
 app.use('/api/cal',     scrapeLimiter, calRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/admin/users', adminUsersRoutes);
