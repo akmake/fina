@@ -70,12 +70,13 @@ function OtpWaiting({ job, onSubmit }) {
 // Paired phones that relay CAL codes. The pairing token is shown exactly once.
 function DevicesPanel({ devices, onPair, onRevoke }) {
   const [token, setToken] = useState('');
+  const [qr, setQr] = useState('');
   const [busy, setBusy] = useState(false);
   const pair = async () => {
     setBusy(true);
-    const t = await onPair('טלפון');
+    const result = await onPair('טלפון');
     setBusy(false);
-    if (t) setToken(t);
+    if (result) { setToken(result.token); setQr(result.qr || ''); }
   };
   const copy = async () => {
     try { await navigator.clipboard.writeText(token); toast.success('הועתק'); } catch { /* user can select manually */ }
@@ -99,12 +100,19 @@ function DevicesPanel({ devices, onPair, onRevoke }) {
 
       {token && (
         <div className="mt-3 rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/30 dark:bg-blue-500/10" role="status">
-          <p className="text-sm font-medium text-blue-900 dark:text-blue-200">הזן את קוד הצימוד באפליקציה. הוא מוצג פעם אחת בלבד:</p>
+          {qr && (
+            <div className="mb-3 flex flex-col items-center gap-2 text-center">
+              <p className="text-sm font-medium text-blue-900 dark:text-blue-200">באפליקציית Fina SMS לחץ ״סריקת QR״ וכוון את המצלמה לקוד:</p>
+              <img src={qr} alt="קוד QR לצימוד הטלפון" className="h-48 w-48 rounded bg-white p-2" />
+              <p className="text-xs text-blue-800/80 dark:text-blue-200/70">הקוד מוצג פעם אחת בלבד. אם סגרת אותו — צמד מחדש.</p>
+            </div>
+          )}
+          <p className="text-sm font-medium text-blue-900 dark:text-blue-200">{qr ? 'או הדבק ידנית:' : 'הזן את קוד הצימוד באפליקציה. הוא מוצג פעם אחת בלבד:'}</p>
           <div className="mt-2 flex items-center gap-2">
             <code dir="ltr" className="flex-1 break-all rounded bg-white px-2 py-1.5 text-xs text-slate-800 dark:bg-black/30 dark:text-slate-100">{token}</code>
             <Button size="sm" variant="ghost" onClick={copy} aria-label="העתק קוד צימוד"><Copy className="h-4 w-4" /></Button>
           </div>
-          <button type="button" className="mt-2 text-xs text-blue-700 underline dark:text-blue-300" onClick={() => setToken('')}>סיימתי</button>
+          <button type="button" className="mt-2 text-xs text-blue-700 underline dark:text-blue-300" onClick={() => { setToken(''); setQr(''); }}>סיימתי</button>
         </div>
       )}
 

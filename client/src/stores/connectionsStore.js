@@ -170,7 +170,7 @@ export const useConnectionsStore = create((set, get) => ({
     try {
       const { data } = await api.post('/devices', { name });
       await get().fetchDevices();
-      return data.token;
+      return { token: data.token, qr: data.qr };
     } catch (err) {
       toast.error(err.response?.data?.message || 'שגיאה בצימוד המכשיר');
       return null;

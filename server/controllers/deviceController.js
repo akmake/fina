@@ -6,6 +6,7 @@ import { audit } from '../utils/audit.js';
 import { hashDeviceToken } from '../middlewares/deviceAuth.js';
 import { submitJobOtp, extractOtp } from '../services/importRunner.js';
 import logger from '../utils/logger.js';
+import { qrDataUrl } from '../services/twoFactorService.js';
 import { notify } from '../services/notificationService.js';
 import { COMPANY_CONFIG } from '../services/scrapeService.js';
 
@@ -61,7 +62,10 @@ export const pairDevice = async (req, res, next) => {
       relatedId: device._id,
       dedupeKey: `device_pair:${device._id}`,
     }).catch(() => {});
-    res.status(201).json({ device, token });
+    // QR for the phone app: scanning avoids hand-copying a 46-character key (a single
+    // wrong character = "unknown device"). Format: finasms://pair?token=fd_…
+    const qr = await qrDataUrl(`finasms://pair?token=${token}`);
+    res.status(201).json({ device, token, qr });
   } catch (err) { next(err); }
 };
 
