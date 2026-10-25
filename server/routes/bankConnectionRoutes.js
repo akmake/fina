@@ -16,6 +16,7 @@ import {
   syncConnection,
   listConnectionJobs,
   getJob,
+  submitOtp,
 } from '../controllers/bankConnectionController.js';
 
 const router = Router();
@@ -28,6 +29,8 @@ router.get('/companies', listCompanies);
 
 // Job polling (static path — declared before the /:id params).
 router.get('/jobs/:id', getJob);
+// Finish a CAL sync waiting for its SMS code (web fallback to the phone relay).
+router.post('/jobs/:id/otp', scrapeLimiter, submitOtp);
 
 router.get('/', listConnections);
 // Plan gate: free tier caps connected accounts (returns 402 when the cap is hit).

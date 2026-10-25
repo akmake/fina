@@ -99,9 +99,12 @@ const refreshBalances = async (userId) => {
  * @param {string|import('mongoose').Types.ObjectId} p.userId
  * @param {object[]} p.transactions  parsed transactions (client shape / parseTransactions output)
  * @param {object[]} [p.rules]       preloaded CategoryRule docs; loaded if omitted
+ * @param {boolean} [p.includeDeleted] dedupe against soft-deleted rows too (unattended bank
+ *        sync: a row the user deleted must not come back). Manual imports keep it false
+ *        so "delete all, re-import the file" still works.
  * @returns {Promise<{inserted:number, skipped:number, received:number}>}
  */
-export const persistTransactions = async ({ userId, transactions, rules }) => {
+export const persistTransactions = async ({ userId, transactions, rules, includeDeleted = false }) => {
   const received = Array.isArray(transactions) ? transactions.length : 0;
   if (received === 0) return { inserted: 0, skipped: 0, received: 0 };
 
@@ -121,10 +124,13 @@ export const persistTransactions = async ({ userId, transactions, rules }) => {
   minDate.setDate(minDate.getDate() - 1);
   maxDate.setDate(maxDate.getDate() + 1);
 
-  const existingInRange = await Transaction.find(
+  // includeDeleted (unattended sync): a transaction the user deleted must NOT
+  // come back on the next sync (the bank re-sends the same rows every day).
+  const existingQuery = Transaction.find(
     { user: userId, date: { $gte: minDate, $lte: maxDate } },
     { date: 1, amount: 1, rawDescription: 1, description: 1, identifier: 1, processedDate: 1, installments: 1 },
-  ).lean();
+  );
+  const existingInRange = await (includeDeleted ? existingQuery.withDeleted() : existingQuery).lean();
 
   const existingKeys = new Set(existingInRange.map(makeDedupeKey));
   const existingIdentifiers = new Set(existingInRange.filter((t) => t.identifier).map((t) => t.identifier));

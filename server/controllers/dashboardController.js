@@ -3,8 +3,9 @@ import mongoose from 'mongoose';
 import Transaction from '../models/Transaction.js';
 import Project from '../models/Project.js';
 import FinanceProfile from '../models/FinanceProfile.js';
-import { startOfMonth, endOfMonth, subMonths, subDays } from 'date-fns';
+import { subDays } from 'date-fns';
 import { scopeFilter } from '../utils/scopeFilter.js';
+import { IL_TZ, israelMonthStart, israelMonthKey } from '../utils/israelTime.js';
 
 export const getDashboardData = async (req, res, next) => {
     try {
@@ -14,25 +15,27 @@ export const getDashboardData = async (req, res, next) => {
         // Find most recent transaction to determine effective month
         const mostRecentTx = await Transaction.findOne(scopeFilter(req)).sort({ date: -1 }).lean();
 
-        let effectiveMonthStart = startOfMonth(today);
+        // Months are Israel-local, independent of the server timezone (AUDIT UX-2:
+        // UTC-vs-local month keys made "this month" show last month's totals).
+        let effectiveMonthStart = israelMonthStart(today);
         if (mostRecentTx) {
             const currentMonthCount = await Transaction.countDocuments({
                 ...scopeFilter(req),
-                date: { $gte: startOfMonth(today) }
+                date: { $gte: effectiveMonthStart }
             });
             if (currentMonthCount === 0) {
-                effectiveMonthStart = startOfMonth(new Date(mostRecentTx.date));
+                effectiveMonthStart = israelMonthStart(new Date(mostRecentTx.date));
             }
         }
 
-        const effectivePrevMonthStart = startOfMonth(subMonths(effectiveMonthStart, 1));
-        const effectiveMonthEnd = endOfMonth(effectiveMonthStart);
+        const effectivePrevMonthStart = israelMonthStart(effectiveMonthStart, -1);
+        const effectiveMonthEnd = new Date(israelMonthStart(effectiveMonthStart, 1).getTime() - 1);
 
         // For balance chart: 30 days ending at effective month end
         const chartStart = subDays(effectiveMonthEnd, 29);
 
-        const effectiveMonthStr = effectiveMonthStart.toISOString().slice(0, 7) + '-01';
-        const prevMonthStr = effectivePrevMonthStart.toISOString().slice(0, 7) + '-01';
+        const effectiveMonthStr = israelMonthKey(effectiveMonthStart);
+        const prevMonthStr = israelMonthKey(effectivePrevMonthStart);
 
         const [
             financeProfile,
@@ -49,7 +52,7 @@ export const getDashboardData = async (req, res, next) => {
                 { $match: { ...scopeFilter(req), date: { $gte: effectivePrevMonthStart, $lte: effectiveMonthEnd } } },
                 { $group: {
                     _id: {
-                        monthStart: { $dateToString: { format: "%Y-%m-01", date: "$date" } },
+                        monthStart: { $dateToString: { format: "%Y-%m-01", date: "$date", timezone: IL_TZ } },
                         type: "$type"
                     },
                     total: { $sum: "$amount" }
@@ -69,7 +72,7 @@ export const getDashboardData = async (req, res, next) => {
                 { $match: { ...scopeFilter(req), date: { $gte: chartStart, $lte: effectiveMonthEnd } } },
                 { $sort: { date: 1 } },
                 { $group: {
-                    _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
+                    _id: { $dateToString: { format: "%Y-%m-%d", date: "$date", timezone: IL_TZ } },
                     dailyChange: { $sum: { $cond: [{ $eq: ["$type", "הכנסה"] }, "$amount", { $multiply: ["$amount", -1] }] }}
                 }},
                 { $sort: { _id: 1 } }

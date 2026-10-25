@@ -143,7 +143,9 @@ api.interceptors.response.use(
 
     // --- טיפול ב-401: חידוש access token ---
     // מניעת לולאה: אם בקשת ה-refresh עצמה נכשלת ב-401, לא ננסה לרענן שוב
-    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/refresh')) {
+    // גם בקשות התחברות/הרשמה לא מנסות refresh — 401 שם הוא "פרטים שגויים", לא "סשן פג"
+    const isAuthEntry = /\/auth\/(refresh|login|register|google|2fa\/login)/.test(originalRequest.url || '');
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEntry) {
       
       // אם אנחנו כבר באמצע תהליך חידוש, הכנס לתור
       if (isRefreshing) {

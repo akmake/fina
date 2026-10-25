@@ -304,6 +304,14 @@ export const COMPANY_CONFIG = {
     credFields: ['username', 'password'],
     toRow: toRowBank('pagi'),
   },
+  // CAL via its direct API (services/calService.js), not the headless scraper:
+  // ID + last-4 + an SMS code that the paired phone relays on every sync.
+  calAuto: {
+    fileType: 'cal',
+    name: 'כאל (קוד SMS אוטומטי מהטלפון)',
+    credFields: ['id', 'last4'],
+    deviceOtp: true,
+  },
   oneZero: {
     companyId: CompanyTypes.oneZero,
     fileType: 'cal',
@@ -319,6 +327,7 @@ export const COMPANY_CONFIG = {
 // Map an israeli-bank-scrapers failure result → AppError with a Hebrew message
 const ERROR_MAP = {
   invalidpassword: { status: 401, message: 'שם משתמש או סיסמא שגויים — בדוק את הפרטים ונסה שנית' },
+  accountblocked:  { status: 400, message: 'החשבון חסום באתר הבנק/חברת האשראי — יש לשחרר אותו שם' },
   changepassword:  { status: 400, message: 'נדרש לשנות סיסמה באתר הבנק/חברת האשראי לפני הייבוא' },
   timeout:         { status: 504, message: 'אתר הבנק לא הגיב בזמן — האתר עמוס, נסה שנית בעוד מספר דקות' },
   generic:         { status: 502, message: 'שגיאה בהתחברות לאתר הבנק — ייתכן שהאתר בתחזוקה, נסה שנית מאוחר יותר' },
@@ -419,7 +428,7 @@ export const buildScrapeResponse = async (result, config, { incomesOnly, userId 
  */
 export const runScrape = async ({ company, credentials, startDate, incomesOnly, userId }) => {
   const config = getCompanyConfig(company);
-  if (config.otpFlow) {
+  if (config.otpFlow || config.deviceOtp) {
     throw new AppError('חברה זו דורשת אימות בקוד חד-פעמי — השתמש בזרימת ה-OTP', 400);
   }
 
@@ -504,6 +513,7 @@ export const getCompaniesConfig = () => {
     userCode:   'קוד משתמש',
     id:         'תעודת זהות',
     card6Digits:'6 ספרות אחרונות של הכרטיס',
+    last4:      '4 ספרות אחרונות של הכרטיס',
     num:        'מספר לקוח',
     nationalID: 'מספר זהות',
     email:      'אימייל',
@@ -513,7 +523,7 @@ export const getCompaniesConfig = () => {
 
   const GROUPS = {
     max: 'כרטיסי אשראי', visaCal: 'כרטיסי אשראי',
-    isracard: 'כרטיסי אשראי', amex: 'כרטיסי אשראי',
+    isracard: 'כרטיסי אשראי', amex: 'כרטיסי אשראי', calAuto: 'כרטיסי אשראי',
     hapoalim: 'בנקים', leumi: 'בנקים', discount: 'בנקים',
     mercantile: 'בנקים', mizrahi: 'בנקים', otsarHahayal: 'בנקים',
     beinleumi: 'בנקים', union: 'בנקים', massad: 'בנקים',
@@ -526,11 +536,12 @@ export const getCompaniesConfig = () => {
     label: cfg.name,
     group: GROUPS[key] || 'אחר',
     otpFlow: cfg.otpFlow || false,
+    deviceOtp: cfg.deviceOtp || false,
     fields: cfg.credFields.map(f => ({
       name: f,
       label: FIELD_LABELS[f] || f,
       type: f === 'password' ? 'password' : f === 'email' ? 'email' : f === 'phoneNumber' ? 'tel' : 'text',
-      inputMode: ['card6Digits', 'num', 'id', 'nationalID', 'userCode'].includes(f) ? 'numeric' : undefined,
+      inputMode: ['card6Digits', 'num', 'id', 'nationalID', 'userCode', 'last4'].includes(f) ? 'numeric' : undefined,
     })),
   }));
 };

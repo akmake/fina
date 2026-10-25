@@ -4,6 +4,36 @@
 
 # Fina — Product Audit
 
+## Status update — 2026-10-25
+
+Fixed with regression tests (server suite) unless noted:
+
+| ID | Status | Where |
+|----|--------|-------|
+| P0-1 | ✅ fixed — mfaToken rejected by both `requireAuth`s; 2FA disable needs a code | `tests/verification2fa.test.js` |
+| P0-2 | ✅ mitigated — `/api/management` unmounted (files remain, delete later) | `server/app.js` |
+| P0-3 | ⛔ **owner action still required** — revoke the GCP key, rotate the admin password, purge history | — |
+| P0-4 | ⚠ reduced, not fixed — sign-up now needs admin approval, so a guessed code only helps an already-approved user; code itself unchanged | — |
+| P1-2 | ✅ fixed — dedupe includes soft-deleted rows | `tests/autoSync.test.js` |
+| P1-4 | ✅ fixed — transient errors stay active + backoff; back-fill from `lastSuccessAt − 7d` | `tests/autoSync.test.js` |
+| P1-5 | ✅ fixed in code (aud check, `email_verified`, 2FA step) — not live-tested against Google | `authController.googleAuth` |
+| P1-7 | ◑ partial — `/api/import` + `/api/scrape` now behind `familyScope`; `/api/projects` still not | `server/app.js` |
+| P1-10 | ◑ partial — dashboard reads the real contract (net worth no longer ₪0, history labels); snapshots / amortized loans still open | `FinanceDashboard.jsx` |
+| P2-6 | ✅ fixed — single-flight `409` per connection | `tests/autoSync.test.js` |
+| P2-11 | ◑ partial — routes code-split (main JS 2.1 MB → 493 KB); transaction list pagination still open | `App.jsx` |
+| P2-13 | ✅ fixed — empty dashboard + brief point to `/connections` | `FinanceDashboard.jsx` |
+| P2-17 | ◑ partial — disconnect `$unset`s credentials; consent not recorded yet | `tests/autoSync.test.js` |
+| UX-2 | ✅ fixed — Israel-time month boundaries | `tests/dashboard.test.js` |
+| UX-3 | ✅ fixed — budget widget reads `budget.items[].spent` | browser-verified |
+| UX-4 | ✅ fixed — refresh interceptor skips auth entry routes | browser-verified |
+| UX-1 | ◑ contained — `PageErrorBoundary` keeps the shell alive; loans pages themselves not fixed | `Layout.jsx` |
+| UX-16 | ◑ partial — dark mode on the new brief/connections verified; other pages not re-checked | — |
+| UX-19 | ✅ dashboard links to `/reports` instead of the dead `/smart-analytics` | — |
+
+New since the audit: access approval, daily sync hour, CAL auto-sync via phone
+SMS relay, dashboard "what's new" brief, route code-splitting + page error boundary. See
+`docs/modules/import.md` and `docs/auth-flow.md`.
+
 ## 1. Executive summary
 
 Fina has broad surface area (≈55 routed screens, 40 API routers, spec Phases 1–4 marked done) and a

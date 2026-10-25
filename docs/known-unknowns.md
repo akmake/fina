@@ -15,7 +15,7 @@ When an item is resolved, update its status and move findings to the canonical d
 | ~~`server/stores/authStore.js` purpose~~ | — | **resolved 2026-07** — was an unused client copy; deleted (along with `server/stores/projectsStore.js`) |
 | `Investment.js` model role | `server/models/Investment.js` | unknown — separate from Stock, Fund, Deposit, Pension; unclear what it tracks |
 | `DataRecordModel.js` schema and data types | `server/models/DataRecordModel.js` | unknown — flexible schema; no clear consumer identified |
-| `/api/management` routes and purpose | `server/routes/managementRoutes.js` | unknown — route exists but operations unclear |
+| ~~`/api/management` routes and purpose~~ | — | **resolved 2026-10-25** — unscoped cross-customer CRUD over categories/rules/merchant maps (AUDIT P0-2), unused by the client; **unmounted** in `app.js` (files kept). Delete `routes/managementRoutes.js` + `controllers/managementController.js` when convenient |
 | ~~`server/config/routes.js` vs `app.js`~~ | — | **resolved 2026-07** — legacy, unimported; deleted. `app.js` is canonical (entry point is now `server.js`) |
 | ~~`server/config/middlewares.js` vs `app.js`~~ | — | **resolved 2026-07** — legacy, unimported; deleted |
 | XLSX import expected column format | `server/routes/importRoutes.js` | unknown — no schema or sample found |

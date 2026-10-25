@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import UpdatesBrief from '@/components/dashboard/UpdatesBrief';
 import {
   TrendingUp, TrendingDown, AlertCircle, CheckCircle2,
   Wallet, BarChart2, Home, ChevronLeft, Target, Bell,
@@ -55,10 +57,10 @@ function StatCard({ label, value, sub, positive, icon: Icon }) {
 
 function Block({ children, className = '', colSpan = 1, rowSpan = 1 }) {
   const colClasses = {
-    1: 'lg:col-span-1',
-    2: 'lg:col-span-2',
-    3: 'lg:col-span-3',
-    4: 'lg:col-span-4',
+    1: '',
+    2: 'md:col-span-2',
+    3: 'md:col-span-2 xl:col-span-3',
+    4: 'md:col-span-2 xl:col-span-4',
   };
   const rowClasses = {
     1: 'lg:row-span-1',
@@ -90,51 +92,17 @@ function DashboardSkeleton() {
   );
 }
 
-// ─── רצועת פעולה ראשית: מפנה את המשתמש למשימה הכי דחופה ─────────────────────
-function ActionHero({ alertsCount }) {
-  const hasAlerts = alertsCount > 0;
-  return (
-    <div className={`flex items-center justify-between gap-4 rounded-2xl border border-black/[.04] bg-white p-4 shadow-[0_2px_10px_rgba(17,17,17,.055)] ${
-      hasAlerts
-        ? 'ring-1 ring-amber-400/30'
-        : ''
-    }`}>
-      <div className="flex items-center gap-3 min-w-0">
-        <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-          hasAlerts ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400' : 'bg-white dark:bg-blue-900/50 text-blue-600 dark:text-blue-300'
-        }`}>
-          {hasAlerts ? <Bell className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-[#171717] dark:text-white">
-            {hasAlerts ? `יש ${alertsCount} התראות שדורשות טיפול` : 'הכול מעודכן'}
-          </p>
-          <p className="mt-1 text-xs text-slate-500 truncate">
-            {hasAlerts ? 'עבור להתראות כדי לראות מה קרה' : 'סנכרן את החשבונות שלך כדי לשמור על נתונים עדכניים'}
-          </p>
-        </div>
-      </div>
-      <Link
-        to={hasAlerts ? '/alerts' : '/import/auto'}
-        className={`relative flex-shrink-0 inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-semibold transition-colors ${
-          hasAlerts ? 'bg-amber-400 text-[#171717] hover:bg-amber-300' : 'bg-[#171717] text-white hover:bg-black'
-        }`}
-      >
-        {hasAlerts ? 'לצפייה בהתראות' : 'סנכרן עכשיו'}
-        <ArrowLeft className="h-4 w-4" />
-      </Link>
-    </div>
-  );
-}
-
 // ─── Main Component ─────────────────────────────────────────────────────────
 export default function FinanceDashboard() {
   const navigate = useNavigate();
   const chartTheme = useChartTheme();
+  const queryClient = useQueryClient();
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  // Loads all dashboard widgets. Re-run (without the skeleton) when a background
+  // bank sync finishes, so new numbers appear without a manual refresh.
+  const load = useCallback(() => {
     (async () => {
       try {
         const now = new Date();
@@ -200,6 +168,13 @@ export default function FinanceDashboard() {
     })();
   }, []);
 
+  useEffect(() => { load(); }, [load]);
+
+  const onSynced = useCallback(() => {
+    load();
+    queryClient.invalidateQueries({ queryKey: ['dashboard-updates'] });
+  }, [load, queryClient]);
+
   if (loading) return <DashboardSkeleton />;
 
   // ─── Data Extraction ───
@@ -233,14 +208,16 @@ export default function FinanceDashboard() {
     הוצאות: t.expense ?? 0,
   })).filter(t => t.name);
 
-  // Formatting for Assets Pie
-  const assetRows = [
-    { label: 'פיקדונות', value: netWorth?.deposits ?? 0 },
-    { label: 'מניות', value: netWorth?.stocks ?? 0 },
-    { label: 'קרנות', value: netWorth?.funds ?? 0 },
-    { label: 'פנסיה', value: netWorth?.pension ?? 0 },
-    { label: 'נדל"ן', value: netWorth?.realEstate ?? 0 },
-  ].filter(r => r.value > 0);
+  // Net worth — API contract: { netWorth, assets: { total, ... }, assetBreakdown: [{label, value}] }
+  // (AUDIT P1-10: the dashboard used to read totalNetWorth/totalAssets, which don't exist → ₪0)
+  const netWorthTotal = netWorth?.netWorth ?? 0;
+  const totalAssets = netWorth?.assets?.total ?? 0;
+  const assetRows = (netWorth?.assetBreakdown ?? [])
+    .map(r => ({ label: r.label, value: r.value }))
+    .filter(r => r.value > 0);
+
+  // Budget — API: { budget: { items: [{ category, limit, spent }] } } (AUDIT UX-3)
+  const budgetItems = (budget?.budget?.items ?? []).filter(i => i.limit > 0);
 
   // Formatting for Annual Bar Chart
   const MONTH_NAMES = ['ינו','פבר','מרץ','אפר','מאי','יוני','יולי','אוג','ספט','אוק','נוב','דצמ'];
@@ -256,31 +233,31 @@ export default function FinanceDashboard() {
     .filter(m => m.הכנסות > 0 || m.הוצאות > 0);
 
   // Formatting Net Worth History
+  // History API: [{ label: 'אוק 2026', netWorth }]
   const histData = (nwHistory || []).map(h => ({
-    name: h.date ? format(new Date(h.date), 'MMM yy', { locale: he }) : '',
+    name: h.label ?? (h.date ? format(new Date(h.date), 'MMM yy', { locale: he }) : ''),
     שווי: h.netWorth ?? h.value ?? 0,
   })).filter(h => h.name);
 
   // ─── מצב ריק: משתמש חדש ללא נתונים בכלל → onboarding במקום גרפים ריקים ───
   const isEmpty =
-    (netWorth?.totalNetWorth ?? 0) === 0 &&
+    netWorthTotal === 0 &&
     income === 0 && expense === 0 &&
     assetRows.length === 0 &&
     (summary?.recentTransactions?.length ?? 0) === 0;
 
   if (isEmpty) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8 font-sans" dir="rtl">
-        <div className="max-w-2xl mx-auto pt-10">
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">ברוך הבא ל-fina 👋</h1>
-          <p className="text-slate-500 dark:text-slate-400 mb-8">בוא נתחיל — חבר חשבון או ייבא נתונים כדי לראות את התמונה הפיננסית המלאה שלך.</p>
+      <div className="page-shell font-sans" dir="rtl">
+        <div className="max-w-3xl space-y-8 pt-4">
+          <UpdatesBrief onSynced={onSynced} />
           <Panel className="p-8">
             <EmptyState
               icon={Upload}
               title="עדיין אין נתונים במערכת"
-              description="חבר את הבנק או כרטיס האשראי שלך לסנכרון אוטומטי, או ייבא קובץ אקסל. תוך דקות תראה כאן שווי נקי, תזרים והתראות."
-              actionLabel="חבר חשבון / ייבא נתונים"
-              actionTo="/import/auto"
+              description="חבר בנק או כרטיס אשראי פעם אחת — מאותו רגע הסנכרון רץ כל יום לבד ואתה רק נכנס ורואה מה חדש. אפשר גם לייבא קובץ אקסל."
+              actionLabel="חיבור בנק או כרטיס"
+              actionTo="/connections"
             />
           </Panel>
         </div>
@@ -292,29 +269,15 @@ export default function FinanceDashboard() {
     <div className="page-shell text-slate-800 dark:text-slate-200 font-sans" dir="rtl">
       <div className="space-y-7">
 
-        {/* ─── Header ─── */}
-        <div className="page-header">
-          <div>
-            <p className="eyebrow">התמונה הפיננסית שלך</p>
-            <h1 className="page-title">בוקר טוב</h1>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-              תמונת מצב עדכנית · {summary?.recentTransactions?.[0]?.date ? format(new Date(summary.recentTransactions[0].date), "dd.MM.yyyy") : 'היום'}
-            </p>
-          </div>
-          <Link to="/import/auto" className="inline-flex h-10 items-center gap-2 rounded-full bg-[#171717] px-4 text-xs font-semibold text-white transition-colors hover:bg-black">
-            <Upload className="h-4 w-4" /> ייבוא נתונים
-          </Link>
-        </div>
-
-        {/* ─── רצועת פעולה ראשית ─── */}
-        <ActionHero alertsCount={activeAlerts.length} />
+        {/* ─── Morning brief: what's new, live sync state, alerts ─── */}
+        <UpdatesBrief onSynced={onSynced} />
 
         {/* ─── Row 1: Key Performance Indicators (KPIs) ─── */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard 
-            label="שווי נקי כולל" value={fmt(netWorth?.totalNetWorth ?? 0)} 
-            sub={healthScore ? `דירוג בריאות: ${healthScore.grade}` : null} 
-            positive={(netWorth?.totalNetWorth ?? 0) >= 0} icon={Home} 
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <StatCard
+            label="שווי נקי כולל" value={fmt(netWorthTotal)}
+            sub={healthScore ? `דירוג בריאות: ${healthScore.grade}` : null}
+            positive={netWorthTotal >= 0} icon={Home}
           />
           <StatCard 
             label="הכנסות החודש" value={fmt(income)} 
@@ -334,11 +297,11 @@ export default function FinanceDashboard() {
         </div>
 
         {/* ─── Row 2: Analytics & Budget (Current Focus) ─── */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           
           {/* Main Chart: Income vs Expenses Trend (Spans 2 cols) */}
           <Block colSpan={2} className="min-h-[350px]">
-            <SectionTitle icon={<BarChart2 className="h-4 w-4" />} title="מגמות תזרים מזומנים (6 חודשים)" link="/smart-analytics" linkLabel="דו״ח מלא" />
+            <SectionTitle icon={<BarChart2 className="h-4 w-4" />} title="מגמות תזרים מזומנים (6 חודשים)" link="/reports" linkLabel="דו״ח מלא" />
             <div className="flex-1 w-full h-full min-h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={trendChart} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
@@ -385,19 +348,20 @@ export default function FinanceDashboard() {
             </div>
           </Block>
 
-          {/* Budget & Alerts (Spans 1 col) */}
+          {/* Budget (alerts live in the morning brief above) */}
           <Block colSpan={1} className="flex flex-col gap-6">
             <div className="flex-1">
               <SectionTitle icon={<Wallet className="h-4 w-4" />} title="ניצול תקציב" link="/budget" linkLabel="נהל" />
               <div className="space-y-4">
-                {(budget?.categories ?? []).filter(c => c.limit > 0).slice(0, 4).map((cat, i) => {
-                  const pct = Math.round((cat.actual / cat.limit) * 100);
+                {budgetItems.slice(0, 4).map((item, i) => {
+                  const spent = item.spent ?? 0;
+                  const pct = Math.round((spent / item.limit) * 100);
                   const over = pct > 100;
                   return (
                     <div key={i}>
                       <div className="flex justify-between text-xs mb-1.5">
-                        <span className="font-bold text-slate-700 dark:text-slate-200">{cat.category}</span>
-                        <span className={over ? 'text-red-500 font-semibold' : 'text-slate-500'}>{fmt(cat.actual)} / {fmt(cat.limit)}</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-200">{item.category}</span>
+                        <span className={over ? 'text-red-500 font-semibold' : 'text-slate-500'}>{fmt(spent)} / {fmt(item.limit)}</span>
                       </div>
                       <div className="h-2 bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden">
                         <div className={`h-full rounded-full ${over ? 'bg-red-500' : pct > 80 ? 'bg-amber-400' : 'bg-emerald-500'}`} style={{ width: `${Math.min(pct, 100)}%` }} />
@@ -405,48 +369,17 @@ export default function FinanceDashboard() {
                     </div>
                   );
                 })}
-                {(!budget?.categories || budget.categories.filter(c => c.limit > 0).length === 0) && (
-                  <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">לא הוגדרו יעדי תקציב</p>
+                {budgetItems.length === 0 && (
+                  <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">לא הוגדר תקציב לחודש הזה</p>
                 )}
               </div>
             </div>
-            {activeAlerts.length > 0 && (
-              <div className="pt-4 border-t border-slate-100 dark:border-white/[0.06]">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-red-500" />
-                    <span className="text-sm font-bold text-slate-800 dark:text-slate-100">התראות פעילות</span>
-                  </div>
-                  <Link to="/alerts" className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">הכל</Link>
-                </div>
-                <div className="space-y-2">
-                  {activeAlerts.slice(0, 3).map((a, i) => {
-                    const sev = ALERT_SEVERITY[a.severity] || ALERT_SEVERITY.info;
-                    const card = (
-                      <div className={`flex items-start gap-2.5 p-2.5 rounded-lg border ${sev.box}`}>
-                        <span className="text-base leading-none mt-0.5 shrink-0">{a.icon || '🔔'}</span>
-                        <div className="min-w-0 flex-1">
-                          <p className={`text-xs font-bold ${sev.text} leading-snug`}>{a.title}</p>
-                          {a.message && a.message !== a.title && (
-                            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-snug mt-0.5 line-clamp-2">{a.message}</p>
-                          )}
-                        </div>
-                        {!a.isRead && <div className={`h-2 w-2 rounded-full ${sev.dot} shrink-0 mt-1`} />}
-                      </div>
-                    );
-                    return a.actionUrl
-                      ? <Link key={a._id || i} to={a.actionUrl} className="block hover:opacity-90 transition-opacity">{card}</Link>
-                      : <div key={a._id || i}>{card}</div>;
-                  })}
-                </div>
-              </div>
-            )}
           </Block>
 
         </div>
 
         {/* ─── Row 3: Wealth & Assets ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 md:gap-6">
           
           {/* Net Worth Growth Chart (Spans 2 cols) */}
           <Block colSpan={2} className="min-h-[350px]">
@@ -487,7 +420,7 @@ export default function FinanceDashboard() {
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-xs text-slate-500 font-bold">סך נכסים</span>
-                    <span className="text-lg font-bold text-slate-900 dark:text-white">{fmt(netWorth?.totalAssets ?? 0)}</span>
+                    <span className="text-lg font-bold text-slate-900 dark:text-white">{fmt(totalAssets)}</span>
                   </div>
                 </div>
                 <div className="space-y-2.5">
@@ -513,7 +446,7 @@ export default function FinanceDashboard() {
         </div>
 
         {/* ─── Row 4: Annual + YoY + Recommendations ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 md:gap-6">
 
           {/* Annual Chart with YoY comparison (Spans 2 cols) */}
           <Block colSpan={2} className="min-h-[340px]">
@@ -572,7 +505,7 @@ export default function FinanceDashboard() {
 
           {/* AI Recommendations */}
           <Block colSpan={1}>
-            <SectionTitle icon={<CheckCircle2 className="h-4 w-4" />} title="תובנות וייעול" link="/smart-analytics" linkLabel="הכל" />
+            <SectionTitle icon={<CheckCircle2 className="h-4 w-4" />} title="תובנות וייעול" link="/reports" linkLabel="הכל" />
             <div className="space-y-3 overflow-y-auto">
               {(recommendations || []).length > 0 ? recommendations.slice(0, 4).map((rec, i) => (
                 <div key={i} className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 rounded-xl p-3 flex items-start gap-2.5">

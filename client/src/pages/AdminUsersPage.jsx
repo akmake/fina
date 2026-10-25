@@ -2,7 +2,16 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/utils/api';
 import { toast } from 'react-hot-toast';
-import { Users, Shield, Trash2, RefreshCw, Search, UserCircle, Lock } from 'lucide-react';
+import { Users, Shield, Trash2, RefreshCw, Search, UserCircle, Lock, Clock, Check, X } from 'lucide-react';
+
+const STATUS_LABEL = { pending: 'ממתין לאישור', approved: 'פעיל', rejected: 'נדחה' };
+const STATUS_STYLE = {
+  pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+  approved: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+};
+// Users created before the approval flow have no status → they are active.
+const statusOf = (u) => u.approvalStatus || 'approved';
 
 const fetchUsers = () => api.get('/admin/users').then(r => r.data);
 
@@ -36,12 +45,23 @@ export default function AdminUsersPage() {
     onError: () => toast.error('שגיאה במחיקה'),
   });
 
-  const filtered = users.filter(u =>
+  const approvalMutation = useMutation({
+    mutationFn: ({ id, decision }) => api.patch(`/admin/users/${id}/approval`, { decision }),
+    onSuccess: (_res, { decision }) => {
+      toast.success(decision === 'approve' ? 'הגישה אושרה' : 'הבקשה נדחתה');
+      queryClient.invalidateQueries(['admin-users']);
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'שגיאה בעדכון הבקשה'),
+  });
+
+  const pending = users.filter(u => statusOf(u) === 'pending');
+
+  const filtered = users.filter(u => statusOf(u) !== 'pending').filter(u =>
     u.name?.toLowerCase().includes(search.toLowerCase()) ||
     u.email?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const admins = filtered.filter(u => u.role === 'admin').length;
+  const admins = users.filter(u => u.role === 'admin').length;
 
   return (
     <div className="page-shell min-h-screen" dir="rtl">
@@ -53,7 +73,7 @@ export default function AdminUsersPage() {
           </div>
           <div>
             <h1 className="text-xl font-black text-slate-900 dark:text-white">ניהול משתמשים</h1>
-            <p className="text-xs text-slate-400">{users.length} משתמשים · {admins} מנהלים</p>
+            <p className="text-xs text-slate-400">{users.length} משתמשים · {admins} מנהלים{pending.length > 0 ? ` · ${pending.length} ממתינים` : ''}</p>
           </div>
         </div>
         <button
@@ -64,6 +84,48 @@ export default function AdminUsersPage() {
           רענן
         </button>
       </div>
+
+      {/* Access requests */}
+      {pending.length > 0 && (
+        <section className="mb-6 rounded-2xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/60 dark:bg-amber-950/20 p-4" aria-labelledby="pending-title">
+          <div className="mb-3 flex items-center gap-2">
+            <Clock className="h-4 w-4 text-amber-600" />
+            <h2 id="pending-title" className="text-sm font-bold text-amber-900 dark:text-amber-200">
+              בקשות הצטרפות ממתינות ({pending.length})
+            </h2>
+          </div>
+          <ul className="space-y-2">
+            {pending.map(u => (
+              <li key={u._id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white dark:bg-slate-800 border border-amber-100 dark:border-slate-700 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-800 dark:text-slate-100">
+                    {u.name}
+                    {u.googleId && <span className="mr-2 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500">Google</span>}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400" dir="ltr">{u.email}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">ביקש/ה ב-{formatDate(u.createdAt)}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => approvalMutation.mutate({ id: u._id, decision: 'approve' })}
+                    disabled={approvalMutation.isPending}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    <Check className="h-3.5 w-3.5" /> אישור
+                  </button>
+                  <button
+                    onClick={() => { if (confirm(`לדחות את הבקשה של ${u.name}?`)) approvalMutation.mutate({ id: u._id, decision: 'reject' }); }}
+                    disabled={approvalMutation.isPending}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-60"
+                  >
+                    <X className="h-3.5 w-3.5" /> דחייה
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Search */}
       <div className="relative mb-4">
@@ -90,6 +152,7 @@ export default function AdminUsersPage() {
                   <th className="text-right px-4 py-3 font-semibold text-slate-500 dark:text-slate-400">משתמש</th>
                   <th className="text-right px-4 py-3 font-semibold text-slate-500 dark:text-slate-400">אימייל</th>
                   <th className="text-right px-4 py-3 font-semibold text-slate-500 dark:text-slate-400">תפקיד</th>
+                  <th className="text-right px-4 py-3 font-semibold text-slate-500 dark:text-slate-400">גישה</th>
                   <th className="text-right px-4 py-3 font-semibold text-slate-500 dark:text-slate-400">נרשם</th>
                   <th className="text-right px-4 py-3 font-semibold text-slate-500 dark:text-slate-400">פעולות</th>
                 </tr>
@@ -122,9 +185,31 @@ export default function AdminUsersPage() {
                         {user.role === 'admin' ? 'מנהל' : 'משתמש'}
                       </span>
                     </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_STYLE[statusOf(user)]}`}>
+                        {STATUS_LABEL[statusOf(user)]}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-slate-400 text-xs">{formatDate(user.createdAt)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
+                        {statusOf(user) === 'rejected' ? (
+                          <button
+                            onClick={() => approvalMutation.mutate({ id: user._id, decision: 'approve' })}
+                            disabled={approvalMutation.isPending}
+                            className="text-xs px-2.5 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/30 transition-colors"
+                          >
+                            אשר גישה
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => { if (confirm(`לחסום את הגישה של ${user.name}? הוא/היא ינותק/תנותק מיד.`)) approvalMutation.mutate({ id: user._id, decision: 'reject' }); }}
+                            disabled={approvalMutation.isPending}
+                            className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                          >
+                            חסום גישה
+                          </button>
+                        )}
                         <button
                           onClick={() => roleMutation.mutate({ id: user._id, role: user.role === 'admin' ? 'user' : 'admin' })}
                           disabled={roleMutation.isPending}

@@ -1,4 +1,4 @@
-> Last updated: 2026-07-03
+> Last updated: 2026-10-25
 
 # Architecture
 
@@ -91,8 +91,9 @@ fina/
 | `GOOGLE_CLIENT_SECRET` | Google OAuth app secret | `server/controllers/authController.js` | Google login fails |
 | `FINA_ENCRYPTION_KEY` | 64 hex chars (32 bytes) — AES-256-GCM key for bank-connection credentials (`openssl rand -hex 32`) | `server/utils/crypto.js` | **FATAL in production**; in dev the app starts but bank connections + auto-sync are disabled |
 | `IMPORT_MAX_CONCURRENCY` | Max simultaneous scrapes (default 2 — each launches Chrome) | `server/services/importRunner.js` | Defaults to 2 |
-| `IMPORT_SCHEDULER_INTERVAL_MS` | How often the auto-sync scheduler checks for due connections (default 30 min) | `server/services/importScheduler.js` | Defaults to 30 min |
-| `IMPORT_SYNC_INTERVAL_MS` | Per-connection sync cadence (default 24 h) | `server/services/importScheduler.js` | Defaults to daily |
+| `IMPORT_SCHEDULER_INTERVAL_MS` | How often the auto-sync scheduler checks for due connections + expires unanswered CAL SMS-code waits (default 5 min) | `server/services/importScheduler.js` | Defaults to 5 min |
+| ~~`IMPORT_SYNC_INTERVAL_MS`~~ | Removed 2026-10-25 — each connection now syncs daily at its own Israel-local `syncHour` | — | — |
+| `ALLOW_LOCAL_DEV_ORIGINS` | `true` lets any `http://localhost:<port>` / `127.0.0.1` origin through CORS (Vite moves to 5174+ when 5173 is busy). **Never set in production** | `server/app.js` | Off by default — only the exact allow-list is accepted |
 | `EMAIL_ENABLED` | `true` arms the email channel of the notification engine (Phase 3). Unset/false → in-app only, email is logged as a stub | `server/services/emailService.js` | Off by default; no SMTP provider wired yet |
 | `BUDGET_SCHEDULER_INTERVAL_MS` | How often the periodic budget-threshold check runs 75/90/100% alerts per household (default 6 h) | `server/services/budgetScheduler.js` | Defaults to 6 h |
 
@@ -116,7 +117,9 @@ fina/
 | Credential encryption | Bank credentials stored AES-256-GCM (`FINA_ENCRYPTION_KEY`); never returned to clients | `server/utils/crypto.js`, `server/models/BankConnection.js` |
 | CORS | Origin whitelist via `CLIENT_URL` | `server/app.js` |
 | CSRF | Custom header `X-Fina-Client: web-app` | `server/middlewares/csrf.js` |
-| Auth | JWT in httpOnly cookies | `server/middlewares/authMiddleware.js` |
+| Auth | JWT in httpOnly cookies; 2FA `mfaToken`s are rejected as sessions | `server/middlewares/authMiddleware.js`, `server/middlewares/requireAuth.js` |
+| Access approval | Sign-up = request; no session until a platform admin approves (`User.approvalStatus`) | `server/controllers/authController.js`, `server/controllers/admin/userAdminController.js` |
+| Device tokens | Paired phones use a hashed, revocable, least-privilege token (OTP relay only) | `server/middlewares/deviceAuth.js`, `server/models/Device.js` |
 | Rate limiting | `publicLimiter` (100/10min), `authLimiter` (20/15min), `scrapeLimiter` (10/hour) — prod only | `server/middlewares/rateLimiter.js` |
 | Audit log | Append-only `AuditLog` for deletes + role changes | `server/models/AuditLog.js`, `server/utils/audit.js` |
 | Soft delete | `deletedAt` on Transaction/Budget/Goal/Loan/Account | `server/utils/softDelete.js` |

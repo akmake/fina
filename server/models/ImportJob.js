@@ -18,7 +18,17 @@ const importJobSchema = new mongoose.Schema(
     company: { type: String, required: true },
 
     trigger: { type: String, enum: ['manual', 'scheduled'], default: 'manual' },
-    status: { type: String, enum: ['queued', 'running', 'success', 'error', 'partial'], default: 'queued', index: true },
+    // awaiting_otp: the provider sent an SMS code; the job resumes when the paired
+    // phone (or the user, on the web) submits it, or expires at otpExpiresAt.
+    status: { type: String, enum: ['queued', 'running', 'awaiting_otp', 'success', 'error', 'partial'], default: 'queued', index: true },
+
+    otpRequestedAt: { type: Date },
+    otpExpiresAt: { type: Date },
+    maskedPhone: { type: String },
+    // Codes tried for this job — capped so stray SMS relays can't lock the CAL account.
+    otpAttempts: { type: Number, default: 0 },
+    // Provider OTP session handle (encrypted, never returned).
+    otpSession: { type: String, select: false },
 
     startedAt: { type: Date },
     finishedAt: { type: Date },
@@ -38,6 +48,7 @@ const importJobSchema = new mongoose.Schema(
 );
 
 importJobSchema.index({ user: 1, createdAt: -1 });
+importJobSchema.set('toJSON', { transform: (_doc, ret) => { delete ret.otpSession; return ret; } });
 // Auto-clean old job records after 90 days.
 importJobSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 90 });
 

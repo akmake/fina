@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import app from '../app.js';
+import { registerApproved } from './helpers.js';
 
 const CSRF = { 'X-Fina-Client': 'web-app' };
 
@@ -40,9 +41,7 @@ describe('נתיבי סריקה דורשים אימות', () => {
 describe('נתיבי אדמין', () => {
   it('משתמש רגיל לא יכול לגשת ל-GET /api/admin/users', async () => {
     const agent = request.agent(app);
-    await agent
-      .post('/api/auth/register')
-      .send({ name: 'רגיל', email: 'plain@test.com', password: 'Str0ngPass!' });
+    await registerApproved(agent, { name: 'רגיל', email: 'plain@test.com' });
 
     const res = await agent.get('/api/admin/users');
     expect(res.status).toBe(403);

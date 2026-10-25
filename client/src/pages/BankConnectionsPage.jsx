@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import api from '@/utils/api';
 import { useConnectionsStore } from '@/stores/connectionsStore';
 import { Button } from '@/components/ui/Button';
@@ -7,12 +8,133 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/Input';
 import {
   Plus, RefreshCw, Trash2, Loader2, ShieldCheck, AlertTriangle,
-  CheckCircle, Clock, Building2, Smartphone,
+  CheckCircle, Clock, Building2, Smartphone, MessageSquareText, Copy, Link2Off,
 } from 'lucide-react';
 
-// visaCal uses a per-session browser OTP token that can't be reused for
-// unattended sync — it stays on the one-time /import/auto page.
+// The scraper-based visaCal needs a fresh browser OTP on every login, so it can't
+// auto-sync. CAL auto-sync is offered as `calAuto` (code relayed by the phone).
 const UNSUPPORTED = new Set(['visaCal']);
+
+const HOURS = Array.from({ length: 24 }, (_, h) => h);
+const hourLabel = (h) => `${String(h).padStart(2, '0')}:00`;
+const fmtNext = (d) => (d ? new Date(d).toLocaleString('he-IL', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+
+function HourSelect({ value, onChange, id }) {
+  return (
+    <select
+      id={id}
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-slate-200"
+    >
+      {HOURS.map((h) => <option key={h} value={h}>{hourLabel(h)}</option>)}
+    </select>
+  );
+}
+
+// Shown while a CAL sync waits for its SMS code. The paired phone normally sends
+// it within seconds; typing it here is the fallback.
+function OtpWaiting({ job, onSubmit }) {
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    const ok = await onSubmit(code);
+    setBusy(false);
+    if (ok) setCode('');
+  };
+  return (
+    <form onSubmit={submit} className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10" aria-live="polite">
+      <p className="flex items-center gap-2 text-sm font-medium text-amber-900 dark:text-amber-200">
+        <MessageSquareText className="h-4 w-4" />
+        ממתין לקוד SMS{job?.maskedPhone && <> שנשלח ל-<bdi dir="ltr">{job.maskedPhone}</bdi></>}
+      </p>
+      <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-200/70">
+        הטלפון המצומד ישלח את הקוד אוטומטית. אם הוא לא מחובר — הקלד את הקוד כאן.
+      </p>
+      <div className="mt-2 flex gap-2">
+        <Input
+          inputMode="numeric" maxLength={8} placeholder="קוד מה-SMS" aria-label="קוד אימות מה-SMS"
+          className="max-w-[10rem] text-center tracking-widest"
+          value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+        />
+        <Button type="submit" size="sm" disabled={busy || code.length < 4}>
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'שלח קוד'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// Paired phones that relay CAL codes. The pairing token is shown exactly once.
+function DevicesPanel({ devices, onPair, onRevoke }) {
+  const [token, setToken] = useState('');
+  const [busy, setBusy] = useState(false);
+  const pair = async () => {
+    setBusy(true);
+    const t = await onPair('טלפון');
+    setBusy(false);
+    if (t) setToken(t);
+  };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(token); toast.success('הועתק'); } catch { /* user can select manually */ }
+  };
+  return (
+    <section className="mt-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-white/[0.08] dark:bg-[#0f1117]" aria-labelledby="devices-title">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 id="devices-title" className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-100">
+            <Smartphone className="h-4 w-4 text-blue-600 dark:text-blue-400" /> טלפון שמעביר קודי SMS
+          </h3>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            כאל שולחת קוד בכל כניסה. אפליקציית Fina בטלפון קולטת אותו ושולחת לשרת — כך הסנכרון היומי רץ לבד.
+          </p>
+        </div>
+        <Button size="sm" variant="outline" onClick={pair} disabled={busy}>
+          {busy ? <Loader2 className="ml-1 h-3.5 w-3.5 animate-spin" /> : <Plus className="ml-1 h-3.5 w-3.5" />}
+          צימוד טלפון
+        </Button>
+      </div>
+
+      {token && (
+        <div className="mt-3 rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/30 dark:bg-blue-500/10" role="status">
+          <p className="text-sm font-medium text-blue-900 dark:text-blue-200">הזן את קוד הצימוד באפליקציה. הוא מוצג פעם אחת בלבד:</p>
+          <div className="mt-2 flex items-center gap-2">
+            <code dir="ltr" className="flex-1 break-all rounded bg-white px-2 py-1.5 text-xs text-slate-800 dark:bg-black/30 dark:text-slate-100">{token}</code>
+            <Button size="sm" variant="ghost" onClick={copy} aria-label="העתק קוד צימוד"><Copy className="h-4 w-4" /></Button>
+          </div>
+          <button type="button" className="mt-2 text-xs text-blue-700 underline dark:text-blue-300" onClick={() => setToken('')}>סיימתי</button>
+        </div>
+      )}
+
+      {devices.length === 0 ? (
+        <p className="mt-3 text-sm text-slate-400">אין טלפון מצומד. עד שתצמד — אפשר להקליד את הקוד כאן כשהסנכרון ממתין.</p>
+      ) : (
+        <ul className="mt-3 divide-y divide-slate-100 dark:divide-white/[0.06]">
+          {devices.map((d) => (
+            <li key={d._id} className="flex items-center justify-between gap-3 py-2 text-sm">
+              <div>
+                <span className="font-medium text-slate-700 dark:text-slate-200">{d.name}</span>
+                <span className="mr-2 text-xs text-slate-400" dir="ltr">{d.tokenHint}…</span>
+                <p className="text-xs text-slate-400">
+                  {d.lastSeenAt ? `נראה לאחרונה ${fmtDate(d.lastSeenAt)}` : 'עוד לא התחבר'}
+                  {d.lastOtpAt ? ` · קוד אחרון ${fmtDate(d.lastOtpAt)}` : ''}
+                </p>
+              </div>
+              <Button
+                size="sm" variant="ghost" className="text-red-500 hover:bg-red-50 hover:text-red-700"
+                onClick={() => { if (confirm(`לבטל את הצימוד של "${d.name}"?`)) onRevoke(d._id); }}
+              >
+                <Link2Off className="ml-1 h-3.5 w-3.5" /> בטל
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 const STATUS_BADGE = {
   active:    { label: 'פעיל',            cls: 'bg-green-50 text-green-700 border-green-200',  Icon: ShieldCheck },
@@ -35,9 +157,11 @@ function StatusBadge({ status }) {
 
 export default function BankConnectionsPage() {
   const {
-    connections, companies, loading, syncing,
+    connections, companies, devices, loading, syncing, activeJobs, jobInfo,
     fetchConnections, fetchCompanies, createConnection, deleteConnection, updateConnection, syncConnection,
+    followJob, submitOtp, fetchDevices, pairDevice, revokeDevice,
   } = useConnectionsStore();
+  const [syncHour, setSyncHour] = useState(6);
 
   const [showAdd, setShowAdd] = useState(false);
   const [company, setCompany] = useState('');
@@ -57,12 +181,22 @@ export default function BankConnectionsPage() {
   useEffect(() => {
     fetchConnections();
     fetchCompanies();
-  }, [fetchConnections, fetchCompanies]);
+    fetchDevices();
+  }, [fetchConnections, fetchCompanies, fetchDevices]);
+
+  // A scheduled CAL sync may already be waiting for its code — follow it so the
+  // page updates by itself when the phone delivers the code.
+  useEffect(() => {
+    for (const c of connections) {
+      if (c.pendingOtpJob && !activeJobs[c._id]) followJob(c._id, c.pendingOtpJob._id);
+    }
+  }, [connections, activeJobs, followJob]);
 
   const supported = companies.filter((c) => !UNSUPPORTED.has(c.value));
   const config = supported.find((c) => c.value === company);
   const isBank = config?.group === 'בנקים';
   const isOneZero = config?.otpFlow === true;
+  const isDeviceOtp = config?.deviceOtp === true;
 
   const groups = supported.reduce((acc, c) => {
     (acc[c.group] = acc[c.group] || []).push(c);
@@ -70,7 +204,7 @@ export default function BankConnectionsPage() {
   }, {});
 
   const resetForm = () => {
-    setCompany(''); setFields({}); setDisplayName(''); setAutoSync(true); setIncomesOnly(false);
+    setCompany(''); setFields({}); setDisplayName(''); setAutoSync(true); setIncomesOnly(false); setSyncHour(6);
     setOzStep('form'); setOzContext(''); setOzCode(''); setOzError('');
   };
 
@@ -85,7 +219,7 @@ export default function BankConnectionsPage() {
 
   const saveStandard = async () => {
     setSaving(true);
-    const ok = await createConnection({ company, displayName, autoSync, incomesOnly, ...fields });
+    const ok = await createConnection({ company, displayName, autoSync, incomesOnly, syncHour, ...fields });
     setSaving(false);
     if (ok) { setShowAdd(false); resetForm(); }
   };
@@ -116,7 +250,7 @@ export default function BankConnectionsPage() {
 
       if (!data.otpLongTermToken) throw new Error('לא התקבל טוקן קבוע מ-One Zero');
       const ok = await createConnection({
-        company: 'oneZero', displayName, autoSync, incomesOnly,
+        company: 'oneZero', displayName, autoSync, incomesOnly, syncHour,
         email: fields.email, password: fields.password, phoneNumber: fields.phoneNumber,
         otpLongTermToken: data.otpLongTermToken,
       });
@@ -220,10 +354,27 @@ export default function BankConnectionsPage() {
                   </label>
                 )}
 
-                <label className="flex items-center gap-3 p-3 rounded-md border bg-slate-50 cursor-pointer select-none dark:bg-white/[0.04] dark:border-white/[0.08]">
-                  <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} className="h-4 w-4 accent-blue-600" />
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">סנכרון אוטומטי יומי</span>
-                </label>
+                <div className="flex flex-wrap items-center gap-3 p-3 rounded-md border bg-slate-50 dark:bg-white/[0.04] dark:border-white/[0.08]">
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} className="h-4 w-4 accent-blue-600" />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">סנכרון אוטומטי יומי</span>
+                  </label>
+                  {autoSync && (
+                    <label htmlFor="new-sync-hour" className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                      בשעה <HourSelect id="new-sync-hour" value={syncHour} onChange={setSyncHour} />
+                    </label>
+                  )}
+                </div>
+
+                {isDeviceOtp && (
+                  <div className="flex gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
+                    <Smartphone className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                      כאל שולחת קוד SMS בכל סנכרון. צמד טלפון עם אפליקציית Fina (בתחתית העמוד) והקוד יועבר אוטומטית.
+                      בלי טלפון מצומד — תוכל להקליד את הקוד כאן כשהסנכרון ממתין.
+                    </span>
+                  </div>
+                )}
               </>
             )}
 
@@ -309,9 +460,22 @@ export default function BankConnectionsPage() {
                           ? <AlertTriangle className="h-3 w-3 text-red-500" />
                           : <Clock className="h-3 w-3" />}
                       סונכרן לאחרונה: {fmtDate(c.lastSyncAt)}
-                      {c.lastSyncStatus === 'success' && c.lastInserted > 0 && <span className="text-green-600">(+{c.lastInserted})</span>}
-                      {c.lastError && <span className="text-red-500 truncate">— {c.lastError}</span>}
+                      {c.lastSyncStatus === 'success' && c.lastInserted > 0 && <span className="text-green-600">· {c.lastInserted} חדשות</span>}
+                      {c.lastError && c.lastSyncStatus === 'error' && <span className="text-red-500 truncate">— {c.lastError}</span>}
                     </div>
+                    {c.autoSync && c.status === 'active' && (
+                      <div className="mt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <label htmlFor={`hour-${c._id}`}>סנכרון יומי בשעה</label>
+                        <HourSelect id={`hour-${c._id}`} value={c.syncHour ?? 6} onChange={(h) => updateConnection(c._id, { syncHour: h })} />
+                        {c.nextSyncAt && <span>· הבא: {fmtNext(c.nextSyncAt)}</span>}
+                      </div>
+                    )}
+                    {(syncing[c._id] === 'awaiting_otp' || c.pendingOtpJob) && (activeJobs[c._id] || c.pendingOtpJob) && (
+                      <OtpWaiting
+                        job={c.pendingOtpJob || jobInfo[c._id]}
+                        onSubmit={(code) => submitOtp(c._id, activeJobs[c._id] || c.pendingOtpJob._id, code)}
+                      />
+                    )}
                   </div>
 
                   <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-nowrap">
@@ -325,7 +489,9 @@ export default function BankConnectionsPage() {
                     </label>
                     <Button size="sm" variant="outline" onClick={() => syncConnection(c._id)} disabled={isSyncing}>
                       {isSyncing
-                        ? <><Loader2 className="ml-1 h-3.5 w-3.5 animate-spin" />{syncing[c._id] === 'running' ? 'מסנכרן…' : 'בתור…'}</>
+                        ? <><Loader2 className="ml-1 h-3.5 w-3.5 animate-spin" />{
+                            syncing[c._id] === 'running' ? 'מסנכרן…'
+                              : syncing[c._id] === 'awaiting_otp' ? 'ממתין לקוד…' : 'בתור…'}</>
                         : <><RefreshCw className="ml-1 h-3.5 w-3.5" />סנכרן עכשיו</>}
                     </Button>
                     <Button
@@ -343,6 +509,8 @@ export default function BankConnectionsPage() {
           })}
         </div>
       )}
+
+      <DevicesPanel devices={devices} onPair={pairDevice} onRevoke={revokeDevice} />
     </div>
   );
 }

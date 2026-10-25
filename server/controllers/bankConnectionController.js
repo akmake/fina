@@ -5,8 +5,10 @@ import { audit } from '../utils/audit.js';
 import { scopeFilter } from '../utils/scopeFilter.js';
 import { encrypt } from '../utils/crypto.js';
 import { getCompanyConfig, buildCredentials, getCompaniesConfig } from '../services/scrapeService.js';
-import { enqueueImportJob, runImportJob } from '../services/importRunner.js';
+import { enqueueImportJob, runImportJob, submitJobOtp } from '../services/importRunner.js';
 import { computeNextSyncAt } from '../services/importScheduler.js';
+
+const IN_FLIGHT_WINDOW_MS = 30 * 60 * 1000;
 
 /**
  * bankConnectionController — CRUD + sync for saved bank connections
@@ -16,6 +18,14 @@ import { computeNextSyncAt } from '../services/importScheduler.js';
  */
 
 const WRITABLE_META = ['displayName', 'autoSync', 'incomesOnly'];
+
+// Israel-local hour 0-23; undefined when not supplied, 400 when invalid.
+const parseSyncHour = (value) => {
+  if (value === undefined || value === null || value === '') return undefined;
+  const hour = Number(value);
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) throw new AppError('שעת סנכרון לא תקינה (0-23)', 400);
+  return hour;
+};
 
 /** Which credential fields a company needs (throws 400 for unknown company). */
 export const listCompanies = (req, res) => {
@@ -28,7 +38,17 @@ export const listConnections = async (req, res, next) => {
     const connections = await BankConnection.find(scopeFilter(req))
       .sort({ createdAt: -1 })
       .lean(); // select:false keeps credentials/otpLongTermToken out of lean results
-    res.json(connections);
+
+    // Surface any sync currently waiting for an SMS code (scheduled or manual),
+    // so the UI can show "waiting for code" + a manual entry fallback.
+    const waiting = await ImportJob.find({
+      connection: { $in: connections.map((c) => c._id) },
+      status: 'awaiting_otp',
+      otpExpiresAt: { $gt: new Date() },
+    }).select('_id connection otpExpiresAt maskedPhone').lean();
+    const byConn = new Map(waiting.map((j) => [String(j.connection), j]));
+
+    res.json(connections.map((c) => ({ ...c, pendingOtpJob: byConn.get(String(c._id)) || null })));
   } catch (err) {
     next(err);
   }
@@ -40,8 +60,9 @@ export const listConnections = async (req, res, next) => {
  */
 export const createConnection = async (req, res, next) => {
   try {
-    const { company, displayName, autoSync, incomesOnly, otpLongTermToken, ...formFields } = req.body;
+    const { company, displayName, autoSync, incomesOnly, otpLongTermToken, syncHour: rawHour, ...formFields } = req.body;
     const config = getCompanyConfig(company); // throws 400 if unknown
+    const syncHour = parseSyncHour(rawHour) ?? 6;
 
     let credentials;
     let encryptedToken;
@@ -68,7 +89,8 @@ export const createConnection = async (req, res, next) => {
       autoSync: autoSync !== false,
       incomesOnly: !!incomesOnly,
       status: 'active',
-      nextSyncAt: computeNextSyncAt(),
+      syncHour,
+      nextSyncAt: computeNextSyncAt(new Date(), syncHour),
     });
 
     await audit(req, 'bankConnection.create', 'BankConnection', {
@@ -93,6 +115,12 @@ export const updateConnection = async (req, res, next) => {
       if (req.body[field] !== undefined) connection[field] = req.body[field];
     }
 
+    const syncHour = parseSyncHour(req.body.syncHour);
+    if (syncHour !== undefined && syncHour !== connection.syncHour) {
+      connection.syncHour = syncHour;
+      connection.nextSyncAt = computeNextSyncAt(new Date(), syncHour);
+    }
+
     // Optional credential rotation — re-encrypt only if new fields were supplied.
     const config = getCompanyConfig(connection.company);
     const credFieldsProvided = config.credFields.some((f) => req.body[f] !== undefined);
@@ -100,6 +128,7 @@ export const updateConnection = async (req, res, next) => {
       connection.credentials = encrypt(JSON.stringify(buildCredentials(config, req.body)));
       connection.status = 'active';
       connection.lastError = undefined;
+      connection.consecutiveFailures = 0;
     }
     if (req.body.otpLongTermToken) {
       connection.otpLongTermToken = encrypt(req.body.otpLongTermToken);
@@ -110,6 +139,10 @@ export const updateConnection = async (req, res, next) => {
     // Explicit enable/disable of auto-sync toggles status between active/disabled.
     if (req.body.autoSync === false && connection.status === 'active') connection.status = 'disabled';
     if (req.body.autoSync === true && connection.status === 'disabled') connection.status = 'active';
+    // Re-enabling must not fire an immediate sync from a stale slot (for CAL: a surprise SMS).
+    if (req.body.autoSync === true && (!connection.nextSyncAt || connection.nextSyncAt < new Date())) {
+      connection.nextSyncAt = computeNextSyncAt(new Date(), connection.syncHour ?? 6);
+    }
 
     await connection.save();
     await audit(req, 'bankConnection.update', 'BankConnection', { entityId: connection._id });
@@ -124,6 +157,13 @@ export const deleteConnection = async (req, res, next) => {
   try {
     const connection = await BankConnection.softDeleteOne({ _id: req.params.id, ...scopeFilter(req) });
     if (!connection) return next(new AppError('החיבור לא נמצא', 404));
+
+    // Disconnecting must remove the stored bank secrets, not just hide the row.
+    // (credentials is `required` on the schema, so unset at the driver level.)
+    await BankConnection.collection.updateOne(
+      { _id: connection._id },
+      { $unset: { credentials: '', otpLongTermToken: '' }, $set: { autoSync: false, status: 'disabled' } },
+    );
 
     await audit(req, 'bankConnection.delete', 'BankConnection', {
       entityId: connection._id,
@@ -144,9 +184,40 @@ export const syncConnection = async (req, res, next) => {
     const connection = await BankConnection.findOne({ _id: req.params.id, ...scopeFilter(req) });
     if (!connection) return next(new AppError('החיבור לא נמצא', 404));
 
+    // Single-flight: a second click must not start a parallel bank login (or a
+    // second CAL SMS). Hand back the in-flight job instead.
+    const inFlight = await ImportJob.findOne({
+      connection: connection._id,
+      createdAt: { $gte: new Date(Date.now() - IN_FLIGHT_WINDOW_MS) },
+      $or: [
+        { status: { $in: ['queued', 'running'] } },
+        { status: 'awaiting_otp', otpExpiresAt: { $gt: new Date() } }, // an expired wait no longer blocks
+      ],
+    }).sort({ createdAt: -1 }).lean();
+    if (inFlight) {
+      return res.status(409).json({ message: 'סנכרון כבר פועל עבור החיבור הזה', jobId: inFlight._id, status: inFlight.status });
+    }
+
     const job = await enqueueImportJob(connection, { trigger: 'manual' });
     await audit(req, 'bankConnection.sync', 'BankConnection', { entityId: connection._id });
     res.status(202).json({ jobId: job._id, status: job.status });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/connections/jobs/:id/otp { code } — finish a sync that is waiting
+ * for an SMS code, typed on the web (fallback when the phone app isn't paired).
+ */
+export const submitOtp = async (req, res, next) => {
+  try {
+    const job = await ImportJob.findOne({ _id: req.params.id, ...scopeFilter(req) }).lean();
+    if (!job) return next(new AppError('משימת הייבוא לא נמצאה', 404));
+
+    const finished = await submitJobOtp(job._id, req.body?.code);
+    await audit(req, 'bankConnection.otp', 'BankConnection', { entityId: job.connection });
+    res.json(finished);
   } catch (err) {
     next(err);
   }

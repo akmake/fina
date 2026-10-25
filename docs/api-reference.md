@@ -1,4 +1,4 @@
-> Last updated: 2026-07-03
+> Last updated: 2026-10-25
 
 # API Reference
 
@@ -16,9 +16,9 @@ All protected routes require:
 |--------|------|-------------|
 | GET | `/health` | Health check — returns `{ status: 'ok' }` |
 | GET | `/csrf-token` | Returns CSRF token (rate limited) |
-| POST | `/auth/register` | Register new user `{ name, email, password }` |
-| POST | `/auth/login` | Login `{ email, password }` → sets JWT cookies |
-| POST | `/auth/google` | Google OAuth `{ credential: id_token }` |
+| POST | `/auth/register` | **Access request** `{ name, email, password (≥8) }` → `202 { pendingApproval, message }`, **no session** until an admin approves |
+| POST | `/auth/login` | Login `{ email, password }` → sets JWT cookies; `403 { code: 'PENDING_APPROVAL' \| 'ACCESS_REJECTED' }` (only after a correct password) |
+| POST | `/auth/google` | Google OAuth `{ credential }` or `{ access_token }` (audience-checked, `email_verified` required). New user → `202 { pendingApproval }`; 2FA users get `{ twoFactorRequired, mfaToken }` |
 | POST | `/auth/logout` | Clears JWT cookies |
 | POST | `/auth/refresh` | Refresh access token using refresh cookie |
 | POST | `/auth/verify-email` | Verify email `{ token }` (Phase 4 — from the email link) |
@@ -84,14 +84,33 @@ returned. Mounted at `/api/connections`. See [modules/import.md](modules/import.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/connections/companies` | Supported institutions + required credential fields (`visaCal` excluded client-side — browser-OTP, not reusable) |
-| GET | `/connections` | List the household's connections (metadata only — no secrets) |
-| POST | `/connections` | Create (body: `company`, `displayName?`, `autoSync?`, `incomesOnly?`, `otpLongTermToken?` for One Zero, `...credFields`). Credentials encrypted on write |
-| PATCH | `/connections/:id` | Update `displayName`/`autoSync`/`incomesOnly`, or rotate credentials/token |
-| DELETE | `/connections/:id` | Soft delete (audited) |
-| POST | `/connections/:id/sync` | Trigger sync now → `202 { jobId }` (scrape rate-limited); poll the job |
+| GET | `/connections/companies` | Supported institutions + required credential fields + `otpFlow`/`deviceOtp` flags (`visaCal` excluded client-side; CAL auto-sync is `calAuto`) |
+| GET | `/connections` | List the household's connections (metadata only — no secrets); each has `pendingOtpJob` (`{ _id, otpExpiresAt, maskedPhone }` or null) |
+| POST | `/connections` | Create (body: `company`, `displayName?`, `autoSync?`, `incomesOnly?`, `syncHour?` 0-23 Israel time (default 6), `otpLongTermToken?` for One Zero, `...credFields`). Credentials encrypted on write |
+| PATCH | `/connections/:id` | Update `displayName`/`autoSync`/`incomesOnly`/`syncHour`, or rotate credentials/token |
+| DELETE | `/connections/:id` | Soft delete + **removes stored credentials** (audited) |
+| POST | `/connections/:id/sync` | Trigger sync now → `202 { jobId }`; `409 { jobId }` if a sync is already in flight (scrape rate-limited) |
 | GET | `/connections/:id/jobs` | Recent sync history (last 20) for a connection |
-| GET | `/connections/jobs/:id` | Poll a single ImportJob's status/stats |
+| GET | `/connections/jobs/:id` | Poll a single ImportJob's status/stats (`awaiting_otp` = waiting for the SMS code) |
+| POST | `/connections/jobs/:id/otp` | Finish a sync waiting for its SMS code `{ code }` (web fallback to the phone relay). `422` wrong code (job keeps waiting; after 3 wrong codes → `429` and the sync is postponed), `410` expired |
+
+---
+
+## Paired Phones — SMS code relay (`/api/devices`)
+
+A phone running the Fina app relays the CAL SMS code during unattended sync.
+Contract details: [modules/import.md § Phone OTP relay](modules/import.md#phone-otp-relay).
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/devices` | Session | The user's active paired phones (no token hashes) |
+| POST | `/devices` | Session | Pair a phone `{ name? }` → `201 { device, token }` — the raw token is shown **once** (max 5 devices) |
+| DELETE | `/devices/:id` | Session | Revoke a phone (its token stops working immediately) |
+| POST | `/devices/heartbeat` | `Authorization: Device <token>` | Marks the phone alive → `{ ok, awaitingOtp }` |
+| POST | `/devices/otp` | `Authorization: Device <token>` | `{ code }` or `{ message, sender }` (full SMS text) → applied to the owner's newest sync waiting for a code → `{ matched, status, stats }`; `404 { matched:false }` if nothing is waiting (scrape rate-limited) |
+
+> A device token can **only** call these two endpoints — it is rejected everywhere
+> else (it is not a session). Requests still need `X-Fina-Client` (global CSRF).
 
 ---
 
@@ -99,8 +118,8 @@ returned. Mounted at `/api/connections`. See [modules/import.md](modules/import.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/auth/register` | No | Register |
-| POST | `/auth/login` | No | Login |
+| POST | `/auth/register` | No | Access request (pending until admin approval — see Public Routes) |
+| POST | `/auth/login` | No | Login (blocked for pending/rejected users) |
 | POST | `/auth/google` | No | Google OAuth |
 | POST | `/auth/logout` | Yes | Logout, clear cookies |
 | POST | `/auth/refresh` | Refresh cookie | Get new access token |
@@ -108,7 +127,7 @@ returned. Mounted at `/api/connections`. See [modules/import.md](modules/import.
 | POST | `/auth/resend-verification` | Yes | **Phase 4** — re-send the verification email |
 | POST | `/auth/2fa/setup` | Yes | **Phase 4** — start 2FA; returns `{ secret, otpauth, qr }` |
 | POST | `/auth/2fa/enable` | Yes | **Phase 4** — confirm `{ code }`, activate; returns one-time `recoveryCodes` |
-| POST | `/auth/2fa/disable` | Yes | **Phase 4** — disable with `{ code }` (TOTP/recovery) or `{ password }` |
+| POST | `/auth/2fa/disable` | Yes | **Phase 4** — disable with `{ code }` (TOTP or recovery code). A password alone is **not** accepted |
 | POST | `/auth/2fa/login` | No | **Phase 4** — exchange `{ mfaToken, code }` for session cookies |
 
 ---
@@ -298,7 +317,8 @@ Mounted at `/api/budgets` (`requireAuth` + `familyScope`).
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/analytics` | Yes | Analytics data (charts, trends) |
-| GET | `/dashboard` | Yes | Dashboard summary data |
+| GET | `/dashboard/summary` | Yes | Dashboard summary data (month totals computed in **Israel time**) |
+| GET | `/dashboard/updates` | Yes | "What's new" feed: `{ since, isFirstVisit, lastSyncAt, connections[] (with activeJob), newTransactions { count, income, expense, items[≤8] }, alerts { count, items[≤5] }, pendingApprovals (admin) }`. "since" = the previous visit (a visit starts after 30 min away) |
 | GET | `/reports` | Yes | Generate reports |
 
 ---
@@ -335,14 +355,17 @@ Mounted at `/api/budgets` (`requireAuth` + `familyScope`).
 |--------|------|------|-------------|
 | GET | `/admin/logs` | Admin | View system logs |
 | GET | `/admin/user-activity` | Admin | View user activity |
+| GET | `/admin/users` | Admin | List users (`?status=pending\|approved\|rejected`); includes `approvalStatus` |
+| PATCH | `/admin/users/:id/approval` | Admin | `{ decision: 'approve' \| 'reject' }` — approve an access request, or block a user (bumps `tokenVersion` → sessions end). Audited; not allowed on yourself |
+| PUT | `/admin/users/:id` | Admin | Change system role `{ role }` |
+| DELETE | `/admin/users/:id` | Admin | Delete user (hard delete — see AUDIT P1-6) |
 
 ---
 
 ## Management
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| * | `/management` | Yes | Management operations (unknown — requires clarification) |
+`/api/management` is **not mounted** (2026-10-25): it was unscoped across
+customers (AUDIT P0-2) and unused by the client. Category rules live under `/categories`.
 
 ---
 

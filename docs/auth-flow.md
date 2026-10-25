@@ -1,4 +1,4 @@
-> Last updated: 2026-07-03
+> Last updated: 2026-10-25
 
 # Auth Flow
 
@@ -6,6 +6,37 @@
 
 JWT-based authentication stored in **httpOnly cookies**. Supports email/password and Google OAuth.
 Access tokens are short-lived (15 min). Refresh tokens are long-lived (7 days).
+
+**Access is by approval (2026-10):** signing up creates an *access request*
+(`User.approvalStatus = 'pending'`); no session cookie is issued until a platform
+admin approves it. Paired phones authenticate separately with a device token (below).
+
+---
+
+## Access Request & Approval Flow
+
+```
+POST /api/auth/register (or first Google sign-in)
+  → User { approvalStatus: 'pending' } + personal household
+  → notify every admin (Alert type 'access_request', in-app + email when enabled)
+  → 202 { pendingApproval: true }        ← NO cookies
+Login while pending/rejected (only AFTER a correct password, so status isn't leaked):
+  → 403 { code: 'PENDING_APPROVAL' | 'ACCESS_REJECTED' }   (client shows an amber notice)
+Admin: /admin/users → PATCH /api/admin/users/:id/approval { decision }
+  approve → user can log in (+ email)        reject → tokenVersion++ (sessions end)
+Also enforced on: /auth/refresh, /auth/2fa/login, /auth/google, the device token, the import scheduler.
+```
+
+Users created before the field existed have no `approvalStatus` → the schema
+default `approved` applies, so nobody existing is locked out (no migration needed).
+
+## Device Token (paired phone)
+
+`Authorization: Device <token>` — issued once by `POST /api/devices` (session), stored
+only as a SHA-256 hash (`Device.tokenHash`), revocable. `middlewares/deviceAuth.js`
+accepts it **only** on `/api/devices/heartbeat` and `/api/devices/otp`; every other
+route ignores the header (cookie-based `requireAuth`), so a stolen phone token can
+submit an SMS code but can never read data. Revoked devices and inactive owners → 401.
 
 ---
 
@@ -190,6 +221,9 @@ POST /api/auth/logout
 - Bank scraper routes (`/api/scrape`, `/api/cal`, `/api/import`) **require auth** (jwt cookie + CSRF header) and are rate limited (`scrapeLimiter`, 10/hour prod)
 - `/api/auth/*` is rate limited (`authLimiter`, 20/15min prod) against brute-force
 - `role` is **never accepted from the register request body** — first admin is created with `server/createAdmin.js` only
+- The 2FA `mfaToken` (claim `mfa: true`) is **rejected by both `requireAuth` implementations** (fixed 2026-10-25, AUDIT P0-1); `/auth/2fa/disable` requires a TOTP/recovery code — a password alone is refused
+- Google sign-in checks the token's audience (`tokeninfo.aud === GOOGLE_CLIENT_ID`) and requires `email_verified`; 2FA users go through the mfa step there too
+- The client's 401→refresh interceptor skips `/auth/login|register|google|2fa/login` so a wrong password shows the real message (AUDIT UX-4)
 - Two `requireAuth` implementations exist: `middlewares/authMiddleware.js` (JWT-only, sets `{id,_id,role}` — used in `app.js` mounts) and `middlewares/requireAuth.js` (DB lookup, full user doc — used inside `calRoutes.js`/`transactionRoutes.js`). Consolidation planned for Phase 1 (Household)
 - Google Client ID must match between `server/.env` and `client/.env` — mismatch causes silent OAuth failure
 - Token refresh uses a queue to prevent race conditions when multiple requests 401 simultaneously

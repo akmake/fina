@@ -19,7 +19,6 @@ import financeRoutes from './routes/financeRoutes.js';
 import transactionRoutes from './routes/transactionRoutes.js';
 import importRoutes from './routes/importRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
-import managementRoutes from './routes/managementRoutes.js';
 import stockRoutes from './routes/stockRoutes.js';
 import depositRoutes from './routes/depositRoutes.js';
 import loanRoutes from './routes/loanRoutes.js';
@@ -42,6 +41,7 @@ import foreignCurrencyRoutes from './routes/foreignCurrencyRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import scraperRoutes from './routes/scraperRoutes.js';
 import bankConnectionRoutes from './routes/bankConnectionRoutes.js';
+import deviceRoutes from './routes/deviceRoutes.js';
 import calRoutes from './routes/calRoutes.js';
 import maaserRoutes from './routes/maaserRoutes.js';
 import familyRoutes from './routes/familyRoutes.js';
@@ -156,7 +156,8 @@ app.use("/api/data",            requireAuth, familyScope, dataRoutes);
 app.use(["/api/finance", "/api/finances"], requireAuth, familyScope, financeRoutes);
 app.use('/api/transactions',    requireAuth, familyScope, transactionRoutes);
 app.use('/api/categories',      requireAuth, familyScope, categoryRoutes);
-app.use('/api/management',      requireAuth, managementRoutes);
+// /api/management is intentionally NOT mounted: it was unscoped (cross-customer
+// read/delete — AUDIT P0-2) and no client calls it. Rules live under /api/categories.
 app.use('/api/stocks',          requireAuth, familyScope, stockRoutes);
 app.use('/api/deposits',        requireAuth, familyScope, depositRoutes);
 app.use('/api/funds',           requireAuth, familyScope, fundRoutes);
@@ -178,9 +179,11 @@ app.use('/api/child-savings',   requireAuth, familyScope, childSavingsRoutes);
 app.use('/api/foreign-currency',requireAuth, familyScope, foreignCurrencyRoutes);
 app.use('/api/reports',         requireAuth, familyScope, reportRoutes);
 app.use('/api/maaser',          requireAuth, familyScope, maaserRoutes);
-app.use('/api/import',  requireAuth, scrapeLimiter, importRoutes);
-app.use('/api/scrape',  requireAuth, scrapeLimiter, scraperRoutes);
+// familyScope here blocks household viewers from writing via import (AUDIT P1-7).
+app.use('/api/import',  requireAuth, familyScope, scrapeLimiter, importRoutes);
+app.use('/api/scrape',  requireAuth, familyScope, scrapeLimiter, scraperRoutes);
 app.use('/api/connections', requireAuth, familyScope, bankConnectionRoutes);
+app.use('/api/devices', deviceRoutes); // per-route auth: session (web) or device token (phone)
 app.use('/api/cal',     scrapeLimiter, calRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/admin/users', adminUsersRoutes);

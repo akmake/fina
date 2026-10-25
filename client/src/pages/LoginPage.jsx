@@ -3,13 +3,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import api from '@/utils/api';
 import { useAuthStore } from '@/stores/authStore';
-import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, TrendingUp, WalletCards } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, TrendingUp, WalletCards, Clock } from 'lucide-react';
 
 export default function LoginPage() {
   const [email,        setEmail]        = useState('');
   const [password,     setPassword]     = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error,        setError]        = useState('');
+  const [notice,       setNotice]       = useState(''); // access-request state (pending/rejected) — informational, not an error
   const [loading,      setLoading]      = useState(false);
   const [gLoading,     setGLoading]     = useState(false);
   // Phase 4 — 2FA second step
@@ -21,17 +22,32 @@ export default function LoginPage() {
 
   const finish = (user) => { loginAction(user); navigate('/'); };
 
+  // Shared handling of a login-style response (password / Google / 2FA step).
+  const handleAuthResponse = (data) => {
+    if (data?.pendingApproval) { setNotice(data.message); return; }
+    if (data?.twoFactorRequired) { setMfaToken(data.mfaToken); return; } // show 2FA step
+    if (data?.user) finish(data.user);
+    else throw new Error();
+  };
+
+  const handleAuthError = (err, fallback) => {
+    const body = err.response?.data;
+    if (body?.code === 'PENDING_APPROVAL' || body?.code === 'ACCESS_REJECTED') {
+      setNotice(body.message);
+      return;
+    }
+    setError(body?.message || fallback);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setNotice('');
     try {
       const { data } = await api.post('/auth/login', { email, password });
-      if (data?.twoFactorRequired) { setMfaToken(data.mfaToken); return; } // show 2FA step
-      if (data?.user) finish(data.user);
-      else throw new Error();
+      handleAuthResponse(data);
     } catch (err) {
-      setError(err.response?.data?.message || 'שם משתמש או סיסמה שגויים');
+      handleAuthError(err, 'אימייל או סיסמה שגויים');
     } finally { setLoading(false); }
   };
 
@@ -41,22 +57,20 @@ export default function LoginPage() {
     setLoading(true); setError('');
     try {
       const { data } = await api.post('/auth/2fa/login', { mfaToken, code: mfaCode });
-      if (data?.user) finish(data.user);
-      else throw new Error();
+      handleAuthResponse(data);
     } catch (err) {
-      setError(err.response?.data?.message || 'קוד אימות שגוי');
+      handleAuthError(err, 'קוד אימות שגוי');
     } finally { setLoading(false); }
   };
 
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
-      setGLoading(true); setError('');
+      setGLoading(true); setError(''); setNotice('');
       try {
         const { data } = await api.post('/auth/google', { access_token: tokenResponse.access_token });
-        if (data?.user) finish(data.user);
-        else throw new Error();
+        handleAuthResponse(data);
       } catch (err) {
-        setError(err.response?.data?.message || 'ההתחברות עם Google נכשלה');
+        handleAuthError(err, 'ההתחברות עם Google נכשלה');
       } finally { setGLoading(false); }
     },
     onError: () => setError('ההתחברות עם Google נכשלה'),
@@ -108,6 +122,12 @@ export default function LoginPage() {
             <div className="mb-5 flex items-center gap-3 bg-red-50 border border-red-100 rounded-2xl px-4 py-3">
               <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
               <p className="text-sm text-red-600 font-medium">{error}</p>
+            </div>
+          )}
+          {notice && (
+            <div role="status" className="mb-5 flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3">
+              <Clock className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800 font-medium">{notice}</p>
             </div>
           )}
 
@@ -233,9 +253,9 @@ export default function LoginPage() {
 
           {/* Register link */}
           <p className="text-center text-sm text-slate-400 mt-6">
-            עדיין אין חשבון?{' '}
+            עדיין אין גישה?{' '}
             <Link to="/register" className="font-semibold text-[#c92f4c] hover:text-[#a8243d] transition-colors">
-              הירשם עכשיו
+              שליחת בקשת הצטרפות
             </Link>
           </p>
           </>

@@ -1,4 +1,4 @@
-> Last updated: 2026-03-12
+> Last updated: 2026-10-25
 
 # Fina — Documentation Index
 
@@ -17,7 +17,7 @@ Full-stack personal finance management application. Hebrew RTL. React + Node.js 
 | [contracts.md](contracts.md) | Conventions: response format, naming, folder structure, patterns |
 | [sync-map.md](sync-map.md) | Coupling map: change file X → must update files A, B, C |
 | [known-unknowns.md](known-unknowns.md) | Open questions and unresolved items from project scan |
-| [product/AUDIT.md](product/AUDIT.md) | Product audit 2026-10-13: prioritized defects (P0–P3), evidence, repair roadmap |
+| [product/AUDIT.md](product/AUDIT.md) | Product audit 2026-10-13 + status update 2026-10-25: prioritized defects (P0–P3), evidence, repair roadmap |
 
 ## Module Deep-Dives (`modules/`)
 
@@ -30,7 +30,7 @@ Full-stack personal finance management application. Hebrew RTL. React + Node.js 
 | [modules/projects.md](modules/projects.md) | Projects, goals, child savings |
 | [modules/real-estate.md](modules/real-estate.md) | Real estate, insurance |
 | [modules/bank-scraper.md](modules/bank-scraper.md) | Bank scraping, data import |
-| [modules/import.md](modules/import.md) | Import 2.0 — saved bank connections & unattended daily sync (Phase 2) |
+| [modules/import.md](modules/import.md) | Import 2.0 — saved bank connections, daily sync at a chosen hour, CAL auto-sync via the phone SMS relay (+ Android app contract) |
 | [modules/core-loop.md](modules/core-loop.md) | Core Loop (Phase 3) — notification engine, budget cycle, rule learning, connected goals, UI hubs |
 | [modules/saas-shell.md](modules/saas-shell.md) | SaaS Shell (Phase 4) — email verification, 2FA, account export/deletion, subscription & plan gating |
 | [modules/electrical.md](modules/electrical.md) | Electrical CAD editor |

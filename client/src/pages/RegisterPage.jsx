@@ -1,14 +1,12 @@
 // client/src/pages/RegisterPage.jsx
 
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import api from "@/utils/api";
-import { useAuthStore } from "@/stores/authStore";
-import { Eye, EyeOff, Check, X, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Check, X, Clock } from "lucide-react";
 
 export default function RegisterPage() {
-  const navigate = useNavigate();
-  const loginAction = useAuthStore((s) => s.login);
+  const [submitted, setSubmitted] = useState(null); // message after a successful access request
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -60,8 +58,8 @@ export default function RegisterPage() {
           password: form.password,
         }
       );
-      if (data.user) loginAction(data.user);
-      navigate("/finance-dashboard");
+      // ההרשמה היא בקשת גישה — אין סשן עד שמנהל מאשר
+      setSubmitted(data?.message || "הבקשה התקבלה ותיבדק על ידי מנהל המערכת.");
     } catch (err) {
       setError(err.response?.data?.message || "אירעה שגיאה בהרשמה");
     } finally {
@@ -76,13 +74,29 @@ export default function RegisterPage() {
       <div className="flex-1 flex items-center justify-center px-4 py-10 sm:px-8 lg:px-16 xl:px-24 z-10">
         <div className="w-full max-w-sm space-y-8">
           
+          {submitted ? (
+            <div className="text-center sm:text-right space-y-5" role="status">
+              <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                <Clock className="h-7 w-7" />
+              </div>
+              <h2 className="font-display text-3xl font-semibold text-slate-950 tracking-[-0.03em]">הבקשה נשלחה</h2>
+              <p className="text-sm leading-6 text-gray-600">{submitted}</p>
+              <p className="text-sm leading-6 text-gray-500">
+                אחרי האישור אפשר להתחבר עם <span dir="ltr" className="font-medium text-slate-700">{form.email}</span> והסיסמה שבחרת.
+              </p>
+              <Link to="/login" className="inline-flex w-full justify-center rounded-lg bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-black">
+                למסך ההתחברות
+              </Link>
+            </div>
+          ) : (
+          <>
           <div className="text-center sm:text-right">
-            <p className="eyebrow">מתחילים מסודר</p>
+            <p className="eyebrow">בקשת גישה</p>
             <h2 className="font-display text-4xl font-semibold text-slate-950 tracking-[-0.04em]">
-              יצירת חשבון
+              הצטרפות ל-Fina
             </h2>
             <p className="mt-2 text-sm text-gray-500">
-              הצטרף אלינו וקבל שליטה מלאה על הכספים שלך.
+              הגישה למערכת באישור מנהל. מלאו את הפרטים ונעדכן כשהבקשה תאושר.
             </p>
           </div>
 
@@ -194,7 +208,7 @@ export default function RegisterPage() {
                 {loading ? (
                   <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 ) : (
-                   "הירשם למערכת"
+                   "שליחת בקשת גישה"
                 )}
               </button>
             </div>
@@ -209,6 +223,8 @@ export default function RegisterPage() {
             </div>
 
           </form>
+          </>
+          )}
         </div>
       </div>
 

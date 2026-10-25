@@ -1,5 +1,21 @@
 import User from '../models/User.js';
 import HouseholdMember from '../models/HouseholdMember.js';
+import BankConnection from '../models/BankConnection.js';
+import Device from '../models/Device.js';
+
+/**
+ * Remove a user's stored bank credentials (driver-level $unset — `credentials`
+ * is schema-required) and revoke their paired phones. Used on account deletion
+ * (self and admin).
+ */
+export const purgeBankAccess = async (userId) => {
+  const user = new BankConnection.base.Types.ObjectId(String(userId));
+  await BankConnection.collection.updateMany(
+    { user },
+    { $unset: { credentials: '', otpLongTermToken: '' }, $set: { autoSync: false, status: 'disabled' } },
+  );
+  await Device.updateMany({ user: userId, revokedAt: null }, { $set: { revokedAt: new Date() } });
+};
 
 /**
  * accountService — self-service data export + account deletion (Phase 4).
@@ -98,6 +114,9 @@ export const anonymizeAndDelete = async (userId) => {
       await Model.softDeleteMany({ user: userId });
     } catch { /* best effort */ }
   }
+
+  // Bank secrets must not outlive the account; paired phones stop working.
+  await purgeBankAccess(userId);
 
   // Leave the user's households (so shared members stop seeing them as active).
   await HouseholdMember.updateMany({ user: userId }, { status: 'inactive' });

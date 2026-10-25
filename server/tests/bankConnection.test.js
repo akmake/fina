@@ -1,16 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import app from '../app.js';
+import { registerApproved } from './helpers.js';
 import { __resetScrapeResult, __setScrapeResult } from './stubs/israeli-bank-scrapers.js';
 
 const CSRF = { 'X-Fina-Client': 'web-app' };
 
 async function registerAgent(email) {
   const agent = request.agent(app);
-  const res = await agent
-    .post('/api/auth/register')
-    .send({ name: 'בודק', email, password: 'Str0ngPass!' });
-  expect(res.status).toBe(201);
+  const res = await registerApproved(agent, { email });
+  expect(res.status).toBe(200);
   return agent;
 }
 

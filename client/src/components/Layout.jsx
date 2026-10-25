@@ -1,6 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
+import PageErrorBoundary from './PageErrorBoundary';
+
+// Shown while a code-split page chunk loads.
+const PageLoading = () => (
+  <div className="flex h-64 items-center justify-center" role="status" aria-label="טוען">
+    <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-700" />
+  </div>
+);
 import VerifyEmailBanner from './VerifyEmailBanner';
 import { Toaster } from 'react-hot-toast';
 import { useUIStore } from '@/stores/uiStore';
@@ -30,7 +38,11 @@ export default function Layout() {
       {/* Main content — pt-14 top bar + pb-16 bottom tab bar on mobile */}
       <main className={`app-main ${isPublicCanvas ? 'app-main-public' : 'app-main-system'} flex-1 overflow-y-auto overscroll-contain ${isPublicCanvas ? '' : 'pb-14 pt-14 md:pb-0 md:pt-0'}`}>
         <VerifyEmailBanner />
-        <Outlet />
+        <PageErrorBoundary key={pathname}>
+          <Suspense fallback={<PageLoading />}>
+            <Outlet />
+          </Suspense>
+        </PageErrorBoundary>
       </main>
 
       {/* Single toast provider for the whole app */}

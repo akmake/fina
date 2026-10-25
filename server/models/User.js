@@ -76,6 +76,17 @@ const userSchema = new mongoose.Schema(
 
     // Account lifecycle: set when the user self-deletes (anonymize-in-place).
     deletedAt: { type: Date, default: null },
+
+    // ── Access approval: sign-up is a request a platform admin approves ──
+    // Schema default is 'approved' so users created before this field existed
+    // (and createAdmin.js) stay active; register/Google sign-up set 'pending'.
+    approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved', index: true },
+    approvalDecidedAt: { type: Date, default: null },
+    approvalDecidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+
+    // Dashboard "what's new since your last visit" (GET /api/dashboard/updates).
+    dashboardVisitAt: { type: Date, default: null },
+    dashboardPrevVisitAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

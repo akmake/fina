@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import { authenticator } from 'otplib';
 import app from '../app.js';
+import { registerApproved } from './helpers.js';
 import User from '../models/User.js';
 import { issueEmailToken } from '../services/verificationService.js';
 
@@ -9,8 +10,8 @@ const CSRF = { 'X-Fina-Client': 'web-app' };
 
 const registerAgent = async (email) => {
   const agent = request.agent(app);
-  const res = await agent.post('/api/auth/register').send({ name: 'בודק', email, password: 'Str0ngPass!' });
-  expect(res.status).toBe(201);
+  const res = await registerApproved(agent, { email });
+  expect(res.status).toBe(200);
   return { agent, user: res.body.user };
 };
 
@@ -98,5 +99,25 @@ describe('שלב 4 — אימות דו-שלבי (2FA)', () => {
     const login = await request(app).post('/api/auth/login').send({ email: 'tfa3@test.com', password: 'Str0ngPass!' });
     expect(login.body.twoFactorRequired).toBeUndefined();
     expect(login.headers['set-cookie'].join(';')).toContain('jwt=');
+  });
+
+  // Regression for AUDIT P0-1: the mfaToken must never work as a session.
+  it('mfaToken כעוגיית jwt נדחה בכל נתיב מוגן; ביטול 2FA עם סיסמה בלבד נחסם', async () => {
+    const { agent } = await registerAgent('tfa4@test.com');
+    const setup = await agent.post('/api/auth/2fa/setup').set(CSRF);
+    await agent.post('/api/auth/2fa/enable').set(CSRF).send({ code: authenticator.generate(setup.body.secret) });
+
+    const login = await request(app).post('/api/auth/login').send({ email: 'tfa4@test.com', password: 'Str0ngPass!' });
+    const cookie = `jwt=${login.body.mfaToken}`;
+
+    expect((await request(app).get('/api/transactions').set('Cookie', cookie)).status).toBe(401);
+    expect((await request(app).get('/api/account/export').set('Cookie', cookie)).status).toBe(401);
+    expect((await request(app).post('/api/auth/2fa/disable').set(CSRF).set('Cookie', cookie)
+      .send({ password: 'Str0ngPass!' })).status).toBe(401);
+
+    // Even with a real session, a password is not enough to turn 2FA off.
+    const pwOnly = await agent.post('/api/auth/2fa/disable').set(CSRF).send({ password: 'Str0ngPass!' });
+    expect(pwOnly.status).toBe(401);
+    expect((await User.findOne({ email: 'tfa4@test.com' })).twoFactorEnabled).toBe(true);
   });
 });

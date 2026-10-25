@@ -44,6 +44,13 @@ const bankConnectionSchema = new mongoose.Schema(
 
     // When the daily scheduler should next attempt this connection.
     nextSyncAt: { type: Date, index: true },
+    // Israel-local hour (0-23) of the daily sync.
+    syncHour: { type: Number, min: 0, max: 23, default: 6 },
+
+    // Reliability: transient failures retry with backoff instead of disabling the
+    // connection; only credential problems (or repeated failures) need the user.
+    consecutiveFailures: { type: Number, default: 0 },
+    lastSuccessAt: { type: Date },
   },
   { timestamps: true }
 );

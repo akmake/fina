@@ -34,5 +34,18 @@ export const scrapeLimiter = isDev
       message: { message: 'חרגת ממכסת הסנכרונים לשעה. נסה שוב מאוחר יותר.' },
     });
 
+/* Limiter לטלפון המצומד (קודי SMS) — לפי טוקן המכשיר, לא לפי IP, כדי שטלפון
+   ודפדפן מאחורי אותו NAT לא יחלקו מכסה */
+export const deviceLimiter = isDev
+  ? (_req, _res, next) => next()
+  : rateLimit({
+      windowMs: 60 * 60 * 1000,
+      max: 30,
+      standardHeaders: true,
+      legacyHeaders: false,
+      keyGenerator: (req) => req.get('authorization') || req.ip,
+      message: { message: 'יותר מדי בקשות מהמכשיר. נסה שוב מאוחר יותר.' },
+    });
+
 /* ברירת-מחדל */
 export default publicLimiter;

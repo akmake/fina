@@ -46,7 +46,7 @@ export default function ImportHubPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-7" dir="rtl">
-      <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <header className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">
           <div className="mb-2 inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 shadow-sm dark:border-white/[0.08] dark:bg-[#0f1117] dark:text-slate-400">
             <ActiveIcon className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />

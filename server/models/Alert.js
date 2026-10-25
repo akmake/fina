@@ -24,6 +24,8 @@ const alertSchema = new mongoose.Schema({
       'pension_update',         // עדכון פנסיוני
       'net_worth_change',       // שינוי משמעותי בשווי נקי
       'bank_sync_failed',       // סנכרון בנק אוטומטי נכשל
+      'bank_otp_needed',        // הסנכרון ממתין לקוד SMS מהמכשיר
+      'access_request',         // בקשת הצטרפות חדשה (למנהל)
       'general',
     ],
   },

@@ -1,4 +1,4 @@
-> Last updated: 2026-07-05
+> Last updated: 2026-10-25
 
 # Sync Map — Change Coupling Guide
 
@@ -76,7 +76,11 @@
 | `server/services/transactionPersistence.js` | `server/controllers/importController.js`, `server/services/importRunner.js` (both persist via it) |
 | `server/models/BankConnection.js` / `ImportJob.js` | `server/controllers/bankConnectionController.js`, `server/services/importRunner.js`, `server/services/importScheduler.js`, `docs/database.md`, `docs/modules/import.md` |
 | `server/utils/crypto.js` | `server/models/BankConnection.js`, `server/services/importRunner.js`, `server/server.js` (env check), `docs/architecture.md` (env table) |
-| `server/services/importRunner.js` / `importScheduler.js` | `server/controllers/bankConnectionController.js`, `server/server.js` (scheduler start), `client/src/stores/connectionsStore.js` (job polling), `docs/modules/import.md` |
+| `server/services/importRunner.js` / `importScheduler.js` | `server/controllers/bankConnectionController.js`, `server/controllers/deviceController.js` (submitJobOtp), `server/server.js` (scheduler start), `client/src/stores/connectionsStore.js` (job polling), `client/src/components/dashboard/UpdatesBrief.jsx` (job states), `docs/modules/import.md` |
+| `server/services/calService.js` | `server/controllers/calController.js` (one-time import), `server/services/importRunner.js` (`calAuto`), `docs/modules/import.md` |
+| `server/models/Device.js` / `middlewares/deviceAuth.js` / `routes/deviceRoutes.js` | `server/controllers/deviceController.js`, `client/src/pages/BankConnectionsPage.jsx` (pairing panel), the Android app (separate repo — contract in `docs/modules/import.md` § Phone OTP relay), `docs/auth-flow.md` |
+| `server/controllers/updatesController.js` (`/api/dashboard/updates`) | `client/src/components/dashboard/UpdatesBrief.jsx`, `server/models/User.js` (`dashboardVisitAt`), `docs/api-reference.md` |
+| `User.approvalStatus` / access approval | `server/controllers/authController.js` (`approvalBlock` — register/login/google/refresh/2fa), `server/middlewares/deviceAuth.js`, `server/services/importScheduler.js` (owner filter), `server/controllers/admin/userAdminController.js`, `client/src/pages/LoginPage.jsx`/`RegisterPage.jsx`/`AdminUsersPage.jsx`, `server/tests/helpers.js` (`registerApproved`) |
 | `client/src/stores/connectionsStore.js` | `client/src/pages/BankConnectionsPage.jsx`, `docs/state-management.md`, `docs/modules/import.md` |
 
 ---

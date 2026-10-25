@@ -1,4 +1,4 @@
-> Last updated: 2026-07-03
+> Last updated: 2026-10-25
 
 # Database
 
@@ -20,7 +20,8 @@ Located in `server/models/`.
 
 | Model | File | Key Fields |
 |-------|------|-----------|
-| `User` | `User.js` | `email`, `passwordHash`, `name`, `googleId`, `role` (`user`/`admin` — system-level), `activeHousehold`→`Household`, `familyGroup` (legacy), `tokenVersion`, `createdAt`. **Phase 4:** `emailVerified`/`emailVerifiedAt`, `emailVerificationTokenHash`/`emailVerificationExpires` (select:false), `onboardedAt`, `twoFactorEnabled`, `twoFactorSecret`/`twoFactorPendingSecret`/`twoFactorRecoveryHashes` (select:false, hashed), `deletedAt` (anonymize-in-place) |
+| `User` | `User.js` | `email`, `passwordHash`, `name`, `googleId`, `role` (`user`/`admin` — system-level), `activeHousehold`→`Household`, `familyGroup` (legacy), `tokenVersion`, `createdAt`. **Phase 4:** `emailVerified`/`emailVerifiedAt`, `emailVerificationTokenHash`/`emailVerificationExpires` (select:false), `onboardedAt`, `twoFactorEnabled`, `twoFactorSecret`/`twoFactorPendingSecret`/`twoFactorRecoveryHashes` (select:false, hashed), `deletedAt` (anonymize-in-place). **Access approval (2026-10):** `approvalStatus` (`pending`/`approved`/`rejected`, schema default `approved` so pre-existing users stay active; sign-up sets `pending`), `approvalDecidedAt`, `approvalDecidedBy`. **Dashboard:** `dashboardVisitAt`, `dashboardPrevVisitAt` ("what's new since your last visit") |
+| `Device` | `Device.js` | **2026-10** — a paired phone that relays bank SMS codes: `user`, `name`, `tokenHash` (SHA-256, `select:false`, unique), `tokenHint` (first chars), `lastSeenAt`, `lastOtpAt`, `revokedAt` |
 | `Subscription` | `Subscription.js` | **Phase 4** — one per `household` (unique). `plan` (`free`/`premium`), `status` (`trialing`/`active`/`past_due`/`cancelled`), `provider` (`stub`/`manual`/`stripe`/`paddle`), `providerCustomerId`/`providerSubscriptionId`, `periodEnd`, `canceledAt`. Plan catalog + gating live in `services/subscriptionService.js` |
 
 ### Tenancy (v2 — Households)
@@ -82,7 +83,7 @@ Located in `server/models/`.
 
 | Model | File | Key Fields |
 |-------|------|-----------|
-| `Alert` | `Alert.js` | `user`, `type` (enum incl. `bank_sync_failed`), `title`, `message`, `severity`, `icon`, `actionUrl`, `isRead`, `isDismissed`, `expiresAt` (TTL); Phase 3 notification engine: `channels[]` (inapp/email), `emailSentAt`, `dedupeKey`. **This is the in-app notification store** (no separate `Notification` model) |
+| `Alert` | `Alert.js` | `user`, `type` (enum incl. `bank_sync_failed`, `bank_otp_needed`, `access_request`), `title`, `message`, `severity`, `icon`, `actionUrl`, `isRead`, `isDismissed`, `expiresAt` (TTL); Phase 3 notification engine: `channels[]` (inapp/email), `emailSentAt`, `dedupeKey`. **This is the in-app notification store** (no separate `Notification` model) |
 | `ForeignCurrency` | `ForeignCurrency.js` | `user`, `currency`, `amount`, `purchaseRate`, `currentRate` |
 | `Log` | `Log.js` | `timestamp`, `level`, `message`, `meta`, `userId`, `ip` |
 | `MerchantMap` | `MerchantMap.js` | `originalName`, `cleanName`, `category` — merchant name normalization |
@@ -91,8 +92,8 @@ Located in `server/models/`.
 | `Suggestion` | `Suggestion.js` | `user`, `type`, `content`, `isRead`, `createdAt` |
 | `ElectricalProject` | `ElectricalProject.js` | `user`, `name`, `canvasData` (Fabric.js JSON), `components[]`, `createdAt` |
 | `AuditLog` | `AuditLog.js` | `actor`, `action`, `entity`, `entityId`, `before`, `after`, `ip`, `at` — append-only, נכתב דרך `utils/audit.js` |
-| `BankConnection` | `BankConnection.js` | `user`, `household`, `company`, `displayName`, `credentials` (AES-256-GCM blob, `select:false`), `otpLongTermToken` (encrypted, One Zero), `status` (`active`/`error`/`disabled`/`needs_otp`), `autoSync`, `incomesOnly`, `lastSyncAt`, `lastSyncStatus`, `lastInserted`, `nextSyncAt` — **soft delete**; secrets stripped from JSON. See [modules/import.md](modules/import.md) |
-| `ImportJob` | `ImportJob.js` | `user`, `household`, `connection`, `company`, `trigger` (`manual`/`scheduled`), `status` (`queued`/`running`/`success`/`error`/`partial`), `startedAt`, `finishedAt`, `durationMs`, `stats{received,inserted,skipped,accounts}`, `balances[]`, `error` — logs; **TTL 90 days** |
+| `BankConnection` | `BankConnection.js` | `user`, `household`, `company`, `displayName`, `credentials` (AES-256-GCM blob, `select:false`), `otpLongTermToken` (encrypted, One Zero), `status` (`active`/`error`/`disabled`/`needs_otp`), `autoSync`, `incomesOnly`, `lastSyncAt`, `lastSyncStatus`, `lastInserted`, `nextSyncAt`, `syncHour` (0-23, Israel time, default 6), `consecutiveFailures`, `lastSuccessAt` — **soft delete** (delete also `$unset`s `credentials`/`otpLongTermToken`); secrets stripped from JSON. See [modules/import.md](modules/import.md) |
+| `ImportJob` | `ImportJob.js` | `user`, `household`, `connection`, `company`, `trigger` (`manual`/`scheduled`), `status` (`queued`/`running`/`awaiting_otp`/`success`/`error`/`partial`), `otpRequestedAt`, `otpExpiresAt`, `maskedPhone`, `otpSession` (encrypted CAL session, `select:false`, stripped from JSON), `startedAt`, `finishedAt`, `durationMs`, `stats{received,inserted,skipped,accounts}`, `balances[]`, `error` — logs; **TTL 90 days** |
 
 ---
 

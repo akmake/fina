@@ -1,4 +1,4 @@
-> Last updated: 2026-03-12
+> Last updated: 2026-10-25
 
 # State Management
 
@@ -91,11 +91,16 @@ Data fetching uses **TanStack React Query 5.83** for server state (caching, refe
 |---------------|------|-------------|
 | `connections` | array | BankConnection metadata list |
 | `companies` | array | Supported institutions + credential fields |
-| `syncing` | object | `{ [connectionId]: jobStatus }` while a sync runs |
-| `fetchConnections()` / `fetchCompanies()` | async action | GET `/api/connections` / `/api/connections/companies` |
-| `createConnection(payload)` | async action | POST `/api/connections` (credentials encrypted server-side) |
+| `syncing` | object | `{ [connectionId]: jobStatus }` while a sync runs (`queued`/`running`/`awaiting_otp`) |
+| `activeJobs` | object | `{ [connectionId]: jobId }` — the job this page is following |
+| `devices` | array | Paired phones (SMS-code relay) |
+| `fetchConnections({ silent? })` / `fetchCompanies()` | async action | GET `/api/connections` / `/api/connections/companies` |
+| `createConnection(payload)` | async action | POST `/api/connections` (credentials encrypted server-side; payload may include `syncHour`) |
 | `updateConnection(id, patch)` / `deleteConnection(id)` | async action | PATCH / DELETE |
-| `syncConnection(id)` | async action | POST `/:id/sync` then polls `GET /api/connections/jobs/:id` to completion |
+| `syncConnection(id)` | async action | POST `/:id/sync` (on 409 follows the in-flight job) then `followJob` |
+| `followJob(connId, jobId)` | async action | Polls `GET /api/connections/jobs/:id` until terminal (~11 min max — covers a CAL code wait) |
+| `submitOtp(connId, jobId, code)` | async action | POST `/api/connections/jobs/:id/otp` (web fallback for the SMS code) |
+| `fetchDevices()` / `pairDevice(name)` / `revokeDevice(id)` | async action | `/api/devices` — `pairDevice` returns the one-time token |
 
 **Consumers:** `BankConnectionsPage` (routes `/connections`, `/import/connections`)
 
@@ -181,6 +186,12 @@ React Query is initialized in `client/src/main.jsx` with a `QueryClient`.
 **Rule of thumb:**
 - **Zustand** → UI state, auth state, editor state, simple CRUD stores
 - **React Query** → Server data with caching (transactions, analytics, dashboard)
+
+Notable query keys:
+- `['dashboard-updates']` — `UpdatesBrief` (GET `/api/dashboard/updates`). `refetchInterval`
+  is 10 s while any connection has an active job (running / waiting for an SMS code),
+  else 2 min; refetches on window focus. `FinanceDashboard` invalidates it after a sync finishes.
+- `['admin-users']` — `AdminUsersPage` (users + pending access requests).
 
 ---
 
