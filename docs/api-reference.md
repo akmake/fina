@@ -124,6 +124,7 @@ Contract details: [modules/import.md § Phone OTP relay](modules/import.md#phone
 | POST | `/auth/login` | No | Login (blocked for pending/rejected users) |
 | POST | `/auth/google` | No | Google OAuth |
 | POST | `/auth/logout` | Yes | Logout, clear cookies |
+| POST | `/auth/logout-all` | Yes (+CSRF) | Sign out of ALL devices (`tokenVersion++`), clear cookies |
 | POST | `/auth/refresh` | Refresh cookie | Get new access token |
 | POST | `/auth/verify-email` | No | **Phase 4** — verify email `{ token }` |
 | POST | `/auth/resend-verification` | Yes | **Phase 4** — re-send the verification email |

@@ -218,7 +218,11 @@ All pages except `/login` and `/register` are wrapped in `<ProtectedRoute>`.
 ```
 POST /api/auth/logout
   → Server clears jwt and refreshToken cookies
-  → authStore.logout() → clears user state
+  → authStore.logout() → fires POST /auth/logout (clears cookies) + clears user state
+
+POST /api/auth/logout-all   (Settings → "התנתק מכל המכשירים"; csrf + requireAuth)
+  → bumps user.tokenVersion (invalidates every access/refresh token on every device)
+  → clears cookies, then the client runs authStore.logout()
   → Redirect to /login
 ```
 

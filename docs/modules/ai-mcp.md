@@ -65,3 +65,17 @@ Related canonical docs: [api-reference.md](../api-reference.md) (routes),
 has no real category yet (existing import precedence is unchanged).
 
 Validation errors → 400 with a Hebrew message (surfaced to the assistant as a tool error).
+
+## Remote MCP (ChatGPT / Claude.ai connectors)
+
+`server/mcp/remoteMcp.js`, mounted in `app.js` before CSRF: `POST https://<fina>/api/mcp/<fk_ key>`
+(Streamable HTTP, stateless, JSON responses; GET → 405). Web assistants can't send custom headers, so the
+key rides in the URL; `app.js` moves it to `req.mcpKey` before any logger runs and the handler then goes
+through `apiKeyAuth` + `resolveHousehold`. Tools call the same `aiController` handlers as `/api/ai/*`
+(same scoping, validation, audit); write tools need the `categorize` scope. Rate limit: `mcpLimiter` (600/h per key).
+Settings → "חיבור לעוזר AI" shows the ready connector URL once, at key creation.
+
+- No OAuth: in ChatGPT use *Developer mode* → Authentication **None**.
+- **nginx must return 404 for `/.well-known/oauth*`** (`location /.well-known/oauth { return 404; }` in the
+  site config). Otherwise the SPA fallback answers `200 text/html` and ChatGPT fails while probing OAuth
+  discovery. Applied on production 2026-10-26.

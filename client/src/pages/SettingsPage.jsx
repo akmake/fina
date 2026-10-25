@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
+import { Link } from 'react-router-dom';
 import {
   Palette, Bell, Database, LogOut,
-  Moon, Sun, Monitor, Trash2, Download, UserX,
+  Moon, Sun, Trash2, Download, UserX,
 } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -24,9 +24,19 @@ import AiAccessSection from '@/components/settings/AiAccessSection';
 // ---------------------------------------------------------------------------
 // Section wrapper
 // ---------------------------------------------------------------------------
-function Section({ icon: Icon, title, description, children }) {
+const NAV = [
+  { id: 'appearance',    label: 'מראה' },
+  { id: 'notifications', label: 'התראות' },
+  { id: 'plan',          label: 'תוכנית וחיוב' },
+  { id: 'security',      label: 'אבטחה' },
+  { id: 'ai',            label: 'חיבור לעוזר AI' },
+  { id: 'data',          label: 'ניהול נתונים' },
+  { id: 'account',       label: 'פעולות חשבון' },
+];
+
+function Section({ id, icon: Icon, title, description, children }) {
   return (
-    <Card className="rounded-lg shadow-none dark:bg-slate-900">
+    <Card id={id} className="scroll-mt-4 rounded-lg shadow-none dark:bg-slate-900">
       <CardHeader className="border-b border-slate-100 pb-4 dark:border-white/[0.06]">
         <CardTitle className="flex items-center gap-2 text-[15px] dark:text-slate-100">
           <Icon className="h-4 w-4 text-blue-500" />
@@ -49,9 +59,6 @@ export default function SettingsPage() {
   const [confirmLogout,    setConfirmLogout]    = useState(false);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [deletingAll,      setDeletingAll]      = useState(false);
-  const [notifyTransact,   setNotifyTransact]   = useState(true);
-  const [notifyMonthly,    setNotifyMonthly]    = useState(true);
-  const [notifyAnomalies,  setNotifyAnomalies]  = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [deletePassword,    setDeletePassword]    = useState('');
   const [deletingAccount,   setDeletingAccount]   = useState(false);
@@ -71,6 +78,17 @@ export default function SettingsPage() {
     } catch {
       toast.error('שגיאה בייצוא הנתונים');
     }
+  };
+
+  const handleLogoutAll = async () => {
+    try {
+      await api.post('/auth/logout-all');
+      toast.success('נותקת מכל המכשירים');
+    } catch {
+      toast.error('שגיאה בניתוק מהמכשירים. נסה שוב.');
+      return;
+    }
+    logout();
   };
 
   const handleDeleteAccount = async () => {
@@ -110,15 +128,24 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div className="grid items-start gap-0 overflow-hidden rounded-[22px] border border-black/[.06] bg-white shadow-[0_18px_60px_rgba(17,17,17,.12)] lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid items-start gap-0 overflow-hidden rounded-[22px] border border-black/[.06] bg-white shadow-[0_18px_60px_rgba(17,17,17,.12)] lg:grid-cols-[220px_minmax(0,1fr)] dark:border-white/[0.07] dark:bg-slate-950">
       <aside className="sticky top-0 hidden min-h-[680px] border-l border-slate-100 bg-[#f6f7fb] p-4 lg:block dark:border-white/[0.07] dark:bg-slate-900">
-        {['כללי', 'התראות', 'תוכנית וחיוב', 'אבטחה', 'ניהול נתונים'].map((item, index) => (
-          <div key={item} className={`rounded-md px-3 py-2 text-[12px] font-medium ${index === 0 ? 'bg-slate-100 text-slate-950' : 'text-slate-500'}`}>{item}</div>
-        ))}
+        <nav aria-label="חלקי ההגדרות" className="space-y-1">
+          {NAV.map(({ id, label }) => (
+            <a
+              key={id}
+              href={`#${id}`}
+              onClick={(e) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+              className="block rounded-md px-3 py-2 text-[12px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:hover:bg-white/[0.06] dark:hover:text-slate-100"
+            >
+              {label}
+            </a>
+          ))}
+        </nav>
       </aside>
       <div className="space-y-4 p-5 sm:p-7">
       {/* Appearance */}
-      <Section icon={Palette} title="מראה" description="שלוט בצבעים ובמצב התצוגה">
+      <Section id="appearance" icon={Palette} title="מראה" description="מצב תצוגה בהיר או כהה">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -132,55 +159,34 @@ export default function SettingsPage() {
                 </p>
               </div>
             </div>
-            <Switch checked={isDark} onCheckedChange={toggleDark} />
-          </div>
-
-          <Separator />
-
-          <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-slate-400">
-            <Monitor className="h-4 w-4" />
-            <span>עצב מותאם לשפה העברית (RTL) ולאחסון מקומי</span>
+            <Switch id="dark-mode" checked={isDark} onCheckedChange={toggleDark} aria-label="מצב כהה" />
           </div>
         </div>
       </Section>
 
-      {/* Notifications (UI-only, future feature) */}
-      <Section
-        icon={Bell}
-        title="התראות"
-        description="בחר אילו התראות תרצה לקבל"
-      >
-        <div className="space-y-4">
-          {[
-            { id: 'transact', label: 'עסקאות חדשות', desc: 'התראה על כל עסקה חדשה', value: notifyTransact, set: setNotifyTransact },
-            { id: 'monthly',  label: 'סיכום חודשי',  desc: 'סיכום הכנסות והוצאות בסוף חודש', value: notifyMonthly,  set: setNotifyMonthly  },
-            { id: 'anomaly',  label: 'חריגויות',      desc: 'התראה על הוצאה חריגה', value: notifyAnomalies, set: setNotifyAnomalies },
-          ].map(({ id, label, desc, value, set }) => (
-            <div key={id} className="flex items-center justify-between">
-              <div>
-                <Label htmlFor={id} className="text-sm font-medium">{label}</Label>
-                <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs text-gray-400">בקרוב</Badge>
-                <Switch id={id} checked={value} onCheckedChange={set} disabled />
-              </div>
-            </div>
-          ))}
+      {/* Notifications: Alert model is the in-app store; no per-type preferences exist yet */}
+      <Section id="notifications" icon={Bell} title="התראות" description="חריגות תקציב, בעיות סנכרון ועוד מגיעות כהתראות באפליקציה">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            ההתראות מופעלות תמיד ומרוכזות במרכז ההתראות. בחירה אישית של סוגי התראות עדיין לא זמינה.
+          </p>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/alerts">פתח את מרכז ההתראות</Link>
+          </Button>
         </div>
       </Section>
 
       {/* Plan / subscription (Phase 4) */}
-      <PlanSection />
+      <div id="plan" className="scroll-mt-4"><PlanSection /></div>
 
       {/* Security — 2FA (Phase 4) */}
-      <TwoFactorSection />
+      <div id="security" className="scroll-mt-4"><TwoFactorSection /></div>
 
-      {/* AI assistant access (MCP) — read-only key */}
-      <AiAccessSection />
+      {/* AI assistant access (MCP) */}
+      <div id="ai" className="scroll-mt-4"><AiAccessSection /></div>
 
       {/* Data management */}
-      <Section icon={Database} title="ניהול נתונים" description="ייצוא, גיבוי ומחיקת הנתונים שלך">
+      <Section id="data" icon={Database} title="ניהול נתונים" description="ייצוא, גיבוי ומחיקת הנתונים שלך">
         <div className="space-y-3">
           <Button variant="outline" className="w-full justify-start gap-2" onClick={handleExportData}>
             <Download className="h-4 w-4" />
@@ -206,7 +212,7 @@ export default function SettingsPage() {
       </Section>
 
       {/* Account actions */}
-      <Section icon={LogOut} title="פעולות חשבון">
+      <Section id="account" icon={LogOut} title="פעולות חשבון">
         <div className="space-y-3">
           <Button
             variant="outline"
@@ -246,7 +252,7 @@ export default function SettingsPage() {
         title="התנתקות מכל המכשירים"
         description="פעולה זו תנתק אותך מכל המכשירים שמחוברים לחשבון. תצטרך להתחבר מחדש."
         confirmLabel="התנתק"
-        onConfirm={logout}
+        onConfirm={handleLogoutAll}
       />
 
       {/* Confirm delete all transactions */}

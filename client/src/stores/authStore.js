@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 // Import the injector function from api.js. Using a relative path for safety.
-import { injectAuthStore } from '../utils/api';
+import api, { injectAuthStore } from '../utils/api';
 
 const getInitialState = () => {
   try {
@@ -29,6 +29,8 @@ export const useAuthStore = create(
       },
 
       logout: () => {
+        // Also clear the httpOnly session cookies server-side (best effort).
+        api.post('/auth/logout').catch(() => {});
         localStorage.removeItem('user');
         set({ user: null, isAuthenticated: false }, false, 'LOGOUT_ACTION');
       },

@@ -16,7 +16,7 @@ Data fetching uses **TanStack React Query 5.83** for server state (caching, refe
 |---------------|------|-------------|
 | `user` | object \| null | Current logged-in user `{ id, name, email, role }` |
 | `login(userData)` | action | Set user, persist to localStorage |
-| `logout()` | action | Clear user, remove from localStorage |
+| `logout()` | action | Best-effort `POST /auth/logout` (clears httpOnly cookies), then clear user + localStorage |
 | `isAuthenticated` | computed | `user !== null` |
 
 **Consumers:** `ProtectedRoute.jsx`, `Navbar.jsx`, `api.js` (interceptor), all pages (to get `user.id`)

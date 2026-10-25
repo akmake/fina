@@ -2,7 +2,7 @@
 
 import express from 'express';
 import {
-  registerUser, loginUser, logout, refresh, googleAuth, updateProfile, changePassword,
+  registerUser, loginUser, logout, logoutAll, refresh, googleAuth, updateProfile, changePassword,
   verifyEmail, resendVerification,
   setup2FA, enable2FA, disable2FA, verify2FALogin,
 } from '../controllers/authController.js';
@@ -15,6 +15,7 @@ router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/google', googleAuth);
 router.post('/logout', logout);
+router.post('/logout-all', csrfProtection, requireAuth, logoutAll);
 router.post('/refresh', refresh);
 router.put('/profile', csrfProtection, requireAuth, updateProfile);
 router.put('/change-password', csrfProtection, requireAuth, changePassword);

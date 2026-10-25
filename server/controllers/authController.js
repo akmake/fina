@@ -278,6 +278,12 @@ export const logout = async (req, res) => {
   return res.sendStatus(204);
 };
 
+// Sign out of EVERY device: bumping tokenVersion invalidates all issued access/refresh tokens.
+export const logoutAll = async (req, res) => {
+  await User.updateOne({ _id: req.user._id }, { $inc: { tokenVersion: 1 } });
+  return logout(req, res);
+};
+
 export const refresh = async (req, res) => {
   const { refreshToken } = req.cookies;
   if (!refreshToken) {

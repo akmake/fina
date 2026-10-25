@@ -87,19 +87,16 @@ export default function AiAccessSection() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <CopyBlock label="ChatGPT — כתובת שרת MCP" text={`${url}/mcp`} />
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            החיבור ל-ChatGPT דורש הגדרת OAuth מאובטחת בשרת.
-            אין להכניס מפתח API לתוך כתובת החיבור.
-          </p>
-        </div>
         {token ? (
           <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10" role="status">
             <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
               המפתח מוצג פעם אחת בלבד. העתק אותו עכשיו להגדרות העוזר:
             </p>
             <CopyBlock label="המפתח" text={token} />
+            <CopyBlock label="ChatGPT / Claude.ai — כתובת החיבור (Authentication: ללא)" text={`${url}/mcp/${token}`} />
+            <p className="text-xs text-amber-900/80 dark:text-amber-200/80">
+              הכתובת לעיל כוללת את המפתח — התייחס אליה כסיסמה ואל תשתף אותה. ב-ChatGPT: הגדרות ← Apps &amp; Connectors ← Advanced ← Developer mode.
+            </p>
             <CopyBlock label="Claude Code — פקודה אחת בטרמינל" text={codeCommand} />
             <CopyBlock label="Claude Desktop — להוסיף ל-claude_desktop_config.json" text={desktopConfig} />
             <Button type="button" variant="outline" size="sm" onClick={() => setToken('')}>סיימתי</Button>

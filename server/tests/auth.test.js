@@ -96,6 +96,19 @@ describe('הרשמה והתחברות', () => {
       .send({ email: 'password@test.com', password: 'AnotherPass1!' });
     expect(login.status).toBe(200);
   });
+
+  it('logout-all ends every session, including one on another device', async () => {
+    const phone = request.agent(app);
+    await registerApproved(phone, { name: 'Tester', email: 'logoutall@test.com' });
+    const laptop = request.agent(app);
+    await laptop.post('/api/auth/login').send({ email: 'logoutall@test.com', password: PASS });
+
+    expect((await request(app).post('/api/auth/logout-all').set(CSRF)).status).toBe(401);
+    expect((await phone.post('/api/auth/logout-all').set(CSRF)).status).toBe(204);
+
+    expect((await laptop.get('/api/account')).status).toBe(401);
+    expect((await laptop.post('/api/auth/refresh')).status).toBe(403);
+  });
 });
 
 describe('אישור גישה על ידי מנהל', () => {
