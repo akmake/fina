@@ -19,6 +19,10 @@ wellKnownRouter.get([
 ], authorizationServerMetadata);
 
 export const oauthPublicRouter = Router();
+// ChatGPT/Claude open /authorize in a popup and finish via window.opener. Helmet's
+// COOP (same-origin-allow-popups) would sever that link on the first hop → ChatGPT
+// shows "Missing OAuth callback data". The consent page (nginx static) sends no COOP.
+oauthPublicRouter.use((_req, res, next) => { res.set('Cross-Origin-Opener-Policy', 'unsafe-none'); next(); });
 // Same documents under /api, which every proxy already forwards.
 oauthPublicRouter.get('/protected-resource', protectedResourceMetadata);
 oauthPublicRouter.get(['/.well-known/oauth-authorization-server', '/.well-known/openid-configuration'], authorizationServerMetadata);
