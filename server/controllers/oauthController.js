@@ -24,7 +24,8 @@ const DEFAULT_REDIRECT_HOSTS = 'chatgpt.com,chat.openai.com,claude.ai,claude.com
 const publicBase = (req) => (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
 const issuer = (req) => `${publicBase(req)}/api/oauth`;
 export const mcpResource = (req) => `${publicBase(req)}/api/mcp`;
-export const resourceMetadataUrl = (req) => `${publicBase(req)}/.well-known/oauth-protected-resource/api/mcp`;
+// Under /api so it works behind a proxy that only forwards /api (also served at /.well-known).
+export const resourceMetadataUrl = (req) => `${publicBase(req)}/api/oauth/protected-resource`;
 
 const redirectHosts = () => (process.env.OAUTH_REDIRECT_HOSTS || DEFAULT_REDIRECT_HOSTS)
   .split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
