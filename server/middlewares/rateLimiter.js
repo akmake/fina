@@ -68,8 +68,22 @@ export const mcpLimiter = isDev
       max: 600,
       standardHeaders: true,
       legacyHeaders: false,
-      keyGenerator: (req) => req.mcpKey || req.ip,
+      // Secret-URL key, else the OAuth bearer token (many users share ChatGPT's IPs).
+      keyGenerator: (req) => req.mcpKey || req.get('authorization') || req.ip,
       message: { message: 'יותר מדי בקשות מהעוזר. נסה שוב מאוחר יותר.' },
+    });
+
+/* OAuth של ה-MCP המרוחק (רישום / טוקן / גילוי) — מגיע משרתי העוזר, לכן טוקן לפי client_id ורישום לפי IP */
+export const oauthLimiter = isDev
+  ? (_req, _res, next) => next()
+  : rateLimit({
+      windowMs: 60 * 60 * 1000,
+      max: 300,
+      standardHeaders: true,
+      legacyHeaders: false,
+      // Registration per IP (client ids are free to mint); token calls per client.
+      keyGenerator: (req) => (req.path === '/register' ? req.ip : req.body?.client_id || req.ip),
+      message: { error: 'temporarily_unavailable', error_description: 'too many requests' },
     });
 
 /* ברירת-מחדל */

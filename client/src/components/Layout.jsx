@@ -16,7 +16,7 @@ import { useUIStore } from '@/stores/uiStore';
 export default function Layout() {
   const { isDark } = useUIStore();
   const { pathname } = useLocation();
-  const isPublicCanvas = ['/login', '/register', '/privacy', '/verify-email'].some(path => pathname.startsWith(path));
+  const isPublicCanvas = ['/login', '/register', '/privacy', '/verify-email', '/oauth'].some(path => pathname.startsWith(path));
 
   // Keep the <html> class in sync whenever the store value changes
   useEffect(() => {

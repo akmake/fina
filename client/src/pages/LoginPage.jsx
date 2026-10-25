@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import api from '@/utils/api';
 import { useAuthStore } from '@/stores/authStore';
@@ -20,7 +20,12 @@ export default function LoginPage() {
   const loginAction = useAuthStore((s) => s.login);
   const navigate    = useNavigate();
 
-  const finish = (user) => { loginAction(user); navigate('/'); };
+  // Return to the page that sent the user here (e.g. an AI assistant's consent page) — same-site paths only.
+  const [searchParams] = useSearchParams();
+  const next = searchParams.get('next');
+  const target = next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : '/';
+
+  const finish = (user) => { loginAction(user); navigate(target); };
 
   // Shared handling of a login-style response (password / Google / 2FA step).
   const handleAuthResponse = (data) => {

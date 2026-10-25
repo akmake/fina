@@ -73,7 +73,8 @@ export const listKeys = async (req, res, next) => {
 /** POST /api/ai-keys { name } → { key, token } — the token is shown ONCE. */
 export const createKey = async (req, res, next) => {
   try {
-    if (await ApiKey.countDocuments({ user: req.user._id, revokedAt: null }) >= MAX_KEYS) {
+    // Connector grants (OAuth) are managed by the assistant and don't count here.
+    if (await ApiKey.countDocuments({ user: req.user._id, revokedAt: null, oauthClient: null }) >= MAX_KEYS) {
       throw new AppError(`אפשר עד ${MAX_KEYS} מפתחות פעילים — בטל מפתח ישן קודם`, 400);
     }
     const token = `fk_${crypto.randomBytes(32).toString('base64url')}`;

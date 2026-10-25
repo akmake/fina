@@ -20,10 +20,15 @@ const apiKeySchema = new mongoose.Schema(
     scopes: { type: [String], enum: ['categorize'], default: [] },
     lastUsedAt: { type: Date },
     revokedAt: { type: Date, default: null },
+    // Set when the key was issued through OAuth (ChatGPT / Claude.ai connector):
+    // the access token expires hourly and is renewed with the rotating refresh token.
+    oauthClient: { type: String, default: null },
+    expiresAt: { type: Date, default: null },
+    refreshHash: { type: String, select: false, index: { unique: true, sparse: true } },
   },
   { timestamps: true }
 );
 
-apiKeySchema.set('toJSON', { transform: (_doc, ret) => { delete ret.tokenHash; return ret; } });
+apiKeySchema.set('toJSON', { transform: (_doc, ret) => { delete ret.tokenHash; delete ret.refreshHash; return ret; } });
 
 export default mongoose.model('ApiKey', apiKeySchema);

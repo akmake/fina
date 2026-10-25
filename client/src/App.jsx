@@ -24,6 +24,7 @@ const NewProjectPage = lazy(() => import("@/pages/NewProjectPage"));
 const ProjectPage = lazy(() => import("@/pages/ProjectPage"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
+const OAuthConsentPage = lazy(() => import("@/pages/OAuthConsentPage"));
 const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"));
 const SuggestionsPage = lazy(() => import("@/pages/SuggestionsPage"));
 const AdminLogsPage = lazy(() => import("@/pages/AdminLogsPage"));
@@ -112,6 +113,7 @@ export default function App() {
             {/* Account */}
             <Route path="profile"     element={<ProfilePage />}     />
             <Route path="settings"    element={<SettingsPage />}    />
+            <Route path="oauth/consent" element={<OAuthConsentPage />} />
             <Route path="suggestions" element={<SuggestionsPage />} />
 
             {/* Extended Features */}

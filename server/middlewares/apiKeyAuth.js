@@ -1,6 +1,7 @@
 import ApiKey from '../models/ApiKey.js';
 import User from '../models/User.js';
 import { hashDeviceToken } from './deviceAuth.js';
+import { resourceMetadataUrl } from '../controllers/oauthController.js';
 
 const LAST_USED_THROTTLE_MS = 5 * 60 * 1000;
 
@@ -16,19 +17,29 @@ export const requireAiScope = (scope) => (req, res, next) => {
   next();
 };
 
+// On the remote MCP, a 401 must tell OAuth clients to refresh / re-authorize.
+const unauthorized = (req, res, message) => {
+  if (req.isMcp) {
+    res.set('WWW-Authenticate', `Bearer error="invalid_token", resource_metadata="${resourceMetadataUrl(req)}"`);
+  }
+  return res.status(401).json({ message });
+};
+
 export default async function apiKeyAuth(req, res, next) {
   try {
     const [scheme, token] = (req.get('authorization') || '').split(' ');
     if (scheme !== 'Bearer' || !token?.startsWith('fk_')) {
-      return res.status(401).json({ message: 'נדרש מפתח AI' });
+      return unauthorized(req, res, 'נדרש מפתח AI');
     }
 
     const key = await ApiKey.findOne({ tokenHash: hashDeviceToken(token), revokedAt: null });
-    if (!key) return res.status(401).json({ message: 'מפתח AI לא תקין או שבוטל' });
+    if (!key) return unauthorized(req, res, 'מפתח AI לא תקין או שבוטל');
+    // OAuth-issued keys expire hourly (renewed via refresh token); manual keys don't.
+    if (key.expiresAt && key.expiresAt <= new Date()) return unauthorized(req, res, 'פג תוקף החיבור — מתחדש אוטומטית');
 
     const owner = await User.findById(key.user).select('_id deletedAt approvalStatus').lean();
     if (!owner || owner.deletedAt || ['pending', 'rejected'].includes(owner.approvalStatus)) {
-      return res.status(401).json({ message: 'החשבון אינו פעיל' });
+      return unauthorized(req, res, 'החשבון אינו פעיל');
     }
 
     if (!key.lastUsedAt || Date.now() - key.lastUsedAt.getTime() > LAST_USED_THROTTLE_MS) {

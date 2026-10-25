@@ -7,8 +7,9 @@ import { Bot, Copy, Loader2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 /**
- * AI assistant access (MCP): create / revoke the personal READ-ONLY key the
- * Fina MCP server (/mcp in the repo) uses. The key is shown exactly once, with
+ * AI assistant access (MCP): the OAuth connector URL for ChatGPT / Claude.ai,
+ * plus create / revoke personal keys (and connected OAuth assistants) for the
+ * Fina MCP server (/mcp in the repo). The key is shown exactly once, with
  * ready-to-paste setup for Claude Desktop and Claude Code. Talks to /api/ai-keys.
  */
 
@@ -57,7 +58,7 @@ export default function AiAccessSection() {
   };
 
   const revoke = async (k) => {
-    if (!confirm(`לבטל את המפתח "${k.name}"? עוזר שמשתמש בו יפסיק לקבל נתונים מיד.`)) return;
+    if (!confirm(k.oauthClient ? `לנתק את "${k.name}"? הוא יפסיק לקבל נתונים מיד.` : `לבטל את המפתח "${k.name}"? עוזר שמשתמש בו יפסיק לקבל נתונים מיד.`)) return;
     try {
       await api.delete(`/ai-keys/${k._id}`);
       toast.success('המפתח בוטל');
@@ -87,15 +88,24 @@ export default function AiAccessSection() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-500/30 dark:bg-blue-500/10">
+          <p className="text-sm font-medium text-slate-800 dark:text-slate-100">ChatGPT / Claude.ai — בלי מפתח</p>
+          <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">
+            ב-ChatGPT: Plugins ← <span dir="ltr">+</span> ← Add custom MCP server. הדביקו את הכתובת, בחרו <strong dir="ltr">OAuth</strong> ואשרו את הגישה בחלון של Fina שייפתח.
+            ב-Claude.ai: Settings ← Connectors ← Add custom connector, עם אותה כתובת.
+          </p>
+          <CopyBlock label="כתובת השרת" text={`${url}/mcp`} />
+        </div>
+
         {token ? (
           <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10" role="status">
             <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
               המפתח מוצג פעם אחת בלבד. העתק אותו עכשיו להגדרות העוזר:
             </p>
             <CopyBlock label="המפתח" text={token} />
-            <CopyBlock label="ChatGPT / Claude.ai — כתובת החיבור (Authentication: ללא)" text={`${url}/mcp/${token}`} />
+            <CopyBlock label="חלופה ל-OAuth — כתובת עם המפתח (Authentication: ללא)" text={`${url}/mcp/${token}`} />
             <p className="text-xs text-amber-900/80 dark:text-amber-200/80">
-              הכתובת לעיל כוללת את המפתח — התייחס אליה כסיסמה ואל תשתף אותה. ב-ChatGPT: הגדרות ← Apps &amp; Connectors ← Advanced ← Developer mode.
+              הכתובת לעיל כוללת את המפתח — התייחס אליה כסיסמה ואל תשתף אותה. עדיף להתחבר עם OAuth (למעלה).
             </p>
             <CopyBlock label="Claude Code — פקודה אחת בטרמינל" text={codeCommand} />
             <CopyBlock label="Claude Desktop — להוסיף ל-claude_desktop_config.json" text={desktopConfig} />
@@ -123,18 +133,20 @@ export default function AiAccessSection() {
         {keys === null ? (
           <p className="text-sm text-slate-400">טוען…</p>
         ) : keys.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">אין מפתחות פעילים.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">אין מפתחות או עוזרים מחוברים.</p>
         ) : (
           <ul className="divide-y divide-slate-100 dark:divide-white/[0.06]">
             {keys.map((k) => (
               <li key={k._id} className="flex items-center justify-between gap-3 py-2 text-sm">
                 <div>
                   <span className="font-medium text-slate-700 dark:text-slate-200">{k.name}</span>
-                  <span className="mr-2 text-xs text-slate-400" dir="ltr">{k.tokenHint}…</span>
+                  {k.oauthClient
+                    ? <span className="mr-2 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:bg-blue-500/15 dark:text-blue-200">מחובר דרך OAuth</span>
+                    : <span className="mr-2 text-xs text-slate-400" dir="ltr">{k.tokenHint}…</span>}
                   <span className={`mr-2 rounded-full px-2 py-0.5 text-[11px] font-medium ${(k.scopes || []).includes('categorize') ? 'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200' : 'bg-slate-100 text-slate-600 dark:bg-white/[0.06] dark:text-slate-300'}`}>
                     {(k.scopes || []).includes('categorize') ? 'קריאה + שינוי שמות וקטגוריות' : 'קריאה בלבד'}
                   </span>
-                  <p className="text-xs text-slate-400">נוצר {fmt(k.createdAt)} · שימוש אחרון: {fmt(k.lastUsedAt)}</p>
+                  <p className="text-xs text-slate-400">{k.oauthClient ? 'חובר' : 'נוצר'} {fmt(k.createdAt)} · שימוש אחרון: {fmt(k.lastUsedAt)}</p>
                 </div>
                 <Button type="button" size="sm" variant="ghost" className="text-red-500 hover:bg-red-50 hover:text-red-700" onClick={() => revoke(k)} aria-label={`בטל את ${k.name}`}>
                   <Trash2 className="h-4 w-4" />

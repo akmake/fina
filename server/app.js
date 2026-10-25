@@ -45,6 +45,8 @@ import deviceRoutes from './routes/deviceRoutes.js';
 import { aiDataRouter, aiKeysRouter } from './routes/aiRoutes.js';
 import apiKeyAuth from './middlewares/apiKeyAuth.js';
 import { handleMcp } from './mcp/remoteMcp.js';
+import { wellKnownRouter, oauthPublicRouter, oauthConsentRouter } from './routes/oauthRoutes.js';
+import { resourceMetadataUrl } from './controllers/oauthController.js';
 import calRoutes from './routes/calRoutes.js';
 import maaserRoutes from './routes/maaserRoutes.js';
 import familyRoutes from './routes/familyRoutes.js';
@@ -55,7 +57,7 @@ import accountRoutes from './routes/accountRoutes.js';
 import subscriptionRoutes from './routes/subscriptionRoutes.js';
 
 // ייבוא מידלוור
-import rateLimiter, { authLimiter, scrapeLimiter, deviceLimiter, deviceSmsLimiter, mcpLimiter } from './middlewares/rateLimiter.js';
+import rateLimiter, { authLimiter, scrapeLimiter, deviceLimiter, deviceSmsLimiter, mcpLimiter, oauthLimiter } from './middlewares/rateLimiter.js';
 import deviceAuth from './middlewares/deviceAuth.js';
 import { relaySmsInbound, heartbeat as deviceHeartbeat, calStep } from './controllers/deviceController.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
@@ -169,11 +171,19 @@ app.all('/api/mcp', mcpLimiter, (req, res, next) => {
     req.headers.authorization = `Bearer ${req.mcpKey}`;
   }
   if (!req.get('authorization')) {
-    return res.status(401).json({ message: 'נדרש מפתח AI בכותרת Authorization או בכתובת החיבור' });
+    // Points OAuth clients (ChatGPT / Claude.ai) at the discovery document → login + consent.
+    return res.status(401).set('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataUrl(req)}"`)
+      .json({ message: 'נדרש מפתח AI בכותרת Authorization או בכתובת החיבור' });
   }
   req.isMcp = true;
   next();
 }, apiKeyAuth, resolveHousehold, handleMcp);
+
+// --- OAuth for the remote MCP (ChatGPT / Claude.ai "OAuth" connectors): discovery,
+//     client registration, authorize redirect and token — server-to-server, so before CSRF.
+//     The consent decision itself (session) is mounted below, after CSRF. ---
+app.use('/.well-known', oauthLimiter, wellKnownRouter);
+app.use('/api/oauth', oauthLimiter, oauthPublicRouter);
 
 // --- הפעלת הגנת CSRF על כל הנתיבים מכאן ומטה ---
 app.use(csrfProtection);
@@ -219,6 +229,7 @@ app.use('/api/devices', deviceRoutes); // per-route auth: session (web) or devic
 // AI assistant (MCP): read-only data with a personal AI key; keys managed with a session.
 app.use('/api/ai',      deviceLimiter, apiKeyAuth, resolveHousehold, aiDataRouter);
 app.use('/api/ai-keys', requireAuth, aiKeysRouter);
+app.use('/api/oauth/consent', requireAuth, oauthConsentRouter); // consent page: approve an assistant
 app.use('/api/cal',     scrapeLimiter, calRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/admin/users', adminUsersRoutes);
