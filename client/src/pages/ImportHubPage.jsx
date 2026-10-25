@@ -1,6 +1,10 @@
-import { lazy, Suspense, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Link2, DownloadCloud, FileSpreadsheet, Database, Loader2 } from 'lucide-react';
+import { Link2, DownloadCloud, FileSpreadsheet, Database } from 'lucide-react';
+import BankConnectionsPage from '@/pages/BankConnectionsPage';
+import AutoImportPage from '@/pages/AutoImportPage';
+import ExcelImportPage from '@/pages/ExcelImportPage';
+import LegacySqliteImportPage from '@/pages/ImportPage';
 
 /*
  * ImportHubPage — אשף ייבוא/חיבורים אחד (Phase 3, §6.1).
@@ -11,11 +15,6 @@ import { Link2, DownloadCloud, FileSpreadsheet, Database, Loader2 } from 'lucide
  *   - העברה מתוכנה ישנה (SQLite)
  * הטאב הפעיל נגזר מה-URL כדי לשמור על deep-linking והתאמה ל-nav הישן.
  */
-
-const BankConnectionsPage = lazy(() => import('@/pages/BankConnectionsPage'));
-const AutoImportPage = lazy(() => import('@/pages/AutoImportPage'));
-const ExcelImportPage = lazy(() => import('@/pages/ExcelImportPage'));
-const LegacySqliteImportPage = lazy(() => import('@/pages/ImportPage'));
 
 const TABS = [
   { key: 'connections', label: 'חיבורים אוטומטיים', icon: Link2, path: '/connections', Component: BankConnectionsPage,
@@ -82,17 +81,7 @@ export default function ImportHubPage() {
         </div>
       </header>
 
-      <main className="min-h-[520px]">
-        <Suspense
-          fallback={(
-            <div className="flex min-h-[360px] items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 shadow-sm dark:border-white/[0.08] dark:bg-[#0f1117]">
-              <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-          )}
-        >
-          <ActiveComponent />
-        </Suspense>
-      </main>
+      <main className="min-h-[520px]"><ActiveComponent /></main>
     </div>
   );
 }

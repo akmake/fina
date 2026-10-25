@@ -82,7 +82,7 @@ login), [database.md](../database.md) (schemas), [api-reference.md](../api-refer
 - Account deletion is anonymize-in-place, **not** `deleteOne` — a hard delete would
   orphan `Household`/`HouseholdMember`/`AuditLog` references. Business data uses the
   existing soft-delete plugin.
-- The 2FA `mfaToken` is a purpose-scoped JWT (`{ mfa:true }`); `requireAuth` rejects it
+- The 2FA `mfaToken` is a purpose-scoped JWT (`{ mfa:true }`); `requireAuth` is *intended* to reject it — ⚠ currently NOT enforced (docs/product/AUDIT.md P0-1)
   for normal routes because it isn't a full access token — keep it that way.
 - Plan limits are enforced server-side in `planGate`; the client only *reflects* the
   plan. Never trust a client-sent plan.

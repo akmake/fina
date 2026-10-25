@@ -41,10 +41,7 @@ export const TransactionCard = ({ transaction, onClick, onDelete, onEdit }) => {
   };
 
   return (
-    <div
-      onClick={onClick}
-      className={`group relative px-3.5 py-3 cursor-pointer flex items-center justify-between border-b last:border-b-0 transition-colors ${isPending ? 'border-amber-100 bg-amber-50/60 dark:bg-amber-500/[0.06]' : 'border-slate-100 hover:bg-slate-50/80 dark:border-white/[0.06] dark:hover:bg-white/[0.03]'}`}
-    >
+    <div onClick={onClick} className={`group relative grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center border-b px-4 py-3 transition-colors md:grid-cols-[minmax(260px,1.5fr)_minmax(130px,.7fr)_minmax(110px,.5fr)_120px] ${isPending ? 'border-amber-100 bg-amber-50/60 dark:bg-amber-500/[0.06]' : 'border-[#eee9df] hover:bg-[#faf7f1] dark:border-white/[0.06] dark:hover:bg-white/[0.03]'}`}>
       <div className="flex min-w-0 items-center gap-3">
         <CategoryIcon category={transaction.category} />
         <div className="flex min-w-0 flex-col">
@@ -58,10 +55,8 @@ export const TransactionCard = ({ transaction, onClick, onDelete, onEdit }) => {
               </span>
             )}
           </div>
-          <span className="text-[11px] font-medium text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
-            <span>{transaction.category}</span>
-            <span className="h-0.5 w-0.5 rounded-full bg-slate-300" />
-            <span>{format(new Date(transaction.date), 'd בMMM', { locale: he })}</span>
+          <span className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-medium text-slate-400 md:hidden">
+            <span>{transaction.category}</span><span>·</span><span>{format(new Date(transaction.date), 'd בMMM', { locale: he })}</span>
             {transaction.cardNumber && (
               <span className="text-slate-400 flex items-center gap-0.5">
                 <CreditCard className="h-3 w-3" />···{transaction.cardNumber}
@@ -86,8 +81,11 @@ export const TransactionCard = ({ transaction, onClick, onDelete, onEdit }) => {
         </div>
       </div>
 
-      <div className="mr-3 flex flex-shrink-0 items-center gap-1">
-        <span className={`text-[14px] font-bold tracking-tight ${isExpense ? 'text-slate-900 dark:text-slate-100' : 'text-emerald-600'}`}>
+      <span className="hidden text-[11px] font-medium text-slate-500 md:block">{transaction.category}</span>
+      <span className="hidden text-[11px] text-slate-400 md:block">{format(new Date(transaction.date), 'd בMMMM', { locale: he })}</span>
+
+      <div className="mr-3 flex flex-shrink-0 items-center justify-end gap-1">
+        <span className={`text-[13px] font-semibold tracking-tight ${isExpense ? 'text-slate-900 dark:text-slate-100' : 'text-emerald-600'}`}>
           {sign}{formatCurrency(transaction.amount)}
         </span>
         <button

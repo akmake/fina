@@ -89,13 +89,31 @@ const allowedOrigins = [
   process.env.DEPLOYMENT_URL,                 // כתובת development/staging
 ].filter(Boolean); // הסר null/undefined values
 
+// Vite automatically advances to the next free port (5174, 5175, ...).
+// Permit those loopback origins only when explicitly enabled in the local env;
+// production deployments stay restricted to the exact allow-list above.
+const allowLocalDevOrigins = process.env.ALLOW_LOCAL_DEV_ORIGINS === 'true';
+const isLocalDevOrigin = (origin) => {
+  if (!allowLocalDevOrigins || !origin) return false;
+  try {
+    const url = new URL(origin);
+    return url.protocol === 'http:'
+      && ['localhost', '127.0.0.1'].includes(url.hostname)
+      && /^\d+$/.test(url.port);
+  } catch {
+    return false;
+  }
+};
+
 app.use(cors({ 
   origin: function (origin, callback) {
     // מאפשר בקשות ללא origin (כמו Postman) או אם ה-origin ברשימה המותרת
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || isLocalDevOrigin(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      const error = new Error('Not allowed by CORS');
+      error.statusCode = 403;
+      callback(error);
     }
   },
   credentials: true, // חובה להעברת עוגיות

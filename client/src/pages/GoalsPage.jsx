@@ -83,11 +83,12 @@ export default function GoalsPage() {
   const filteredGoals = filter === 'all' ? goals : goals.filter(g => g.status === filter);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="page-shell space-y-5" dir="rtl">
+      <div className="page-header">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Target className="h-7 w-7 text-blue-500" /> יעדים פיננסיים</h1>
-          <p className="text-sm text-gray-500 mt-1">הגדר יעדים ועקוב אחרי ההתקדמות</p>
+          <p className="eyebrow">תכנון לטווח ארוך</p>
+          <h1 className="page-title">יעדים</h1>
+          <p className="page-description">כל מה שחשוב לך, עם סכום יעד וקצב התקדמות ברור.</p>
         </div>
         <Button onClick={() => { setEditing(null); setForm(emptyForm); setShowDialog(true); }}>
           <Plus className="h-4 w-4 me-1" /> יעד חדש
@@ -95,7 +96,7 @@ export default function GoalsPage() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-slate-200 bg-white md:grid-cols-5 [&>*]:rounded-none [&>*]:border-0 [&>*]:border-l [&>*]:border-slate-200 [&>*]:shadow-none">
         <Card><CardContent className="pt-4 text-center"><p className="text-xs text-gray-500">יעדים פעילים</p><p className="text-xl font-bold text-blue-600">{summary.active}</p></CardContent></Card>
         <Card><CardContent className="pt-4 text-center"><p className="text-xs text-gray-500">הושלמו</p><p className="text-xl font-bold text-green-600">{summary.completed}</p></CardContent></Card>
         <Card><CardContent className="pt-4 text-center"><p className="text-xs text-gray-500">סה״כ יעד</p><p className="text-xl font-bold">{formatCurrency(summary.totalTarget)}</p></CardContent></Card>
@@ -124,13 +125,13 @@ export default function GoalsPage() {
       </div>
 
       {/* Goals */}
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
         <AnimatePresence>
           {filteredGoals.length === 0 ? (
             <Card className="md:col-span-2"><CardContent className="py-12 text-center text-gray-400"><Target className="h-12 w-12 mx-auto mb-3 opacity-30" /><p>אין יעדים. הגדר את הראשון!</p></CardContent></Card>
           ) : filteredGoals.map(g => (
-            <motion.div key={g._id} initial={{ opacity:0, scale:0.95 }} animate={{ opacity:1, scale:1 }}>
-              <Card className={`hover:shadow-md transition ${g.status === 'completed' ? 'border-green-300 bg-green-50/30 dark:border-green-700' : !g.isOnTrack && g.targetDate ? 'border-red-200' : ''}`}>
+            <motion.div key={g._id}>
+              <Card className={`relative min-h-[240px] overflow-hidden border-[#ded7cb] bg-[#fffefa] transition-colors before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-[#ff6b45] ${g.status === 'completed' ? 'border-green-300 before:bg-emerald-500 dark:border-green-700' : !g.isOnTrack && g.targetDate ? 'border-red-200 before:bg-red-500' : ''}`}>
                 <CardContent className="py-4">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">

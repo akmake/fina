@@ -293,7 +293,7 @@ export default function DepositsPage() {
     };
 
     return (
-        <div className="container mx-auto p-3 sm:p-4 md:p-6 lg:p-8 bg-muted/20 min-h-screen">
+        <div className="min-h-screen py-2">
 
 
             <main className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 items-start">

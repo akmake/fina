@@ -57,7 +57,7 @@ const LoanDetailPage = () => {
   const formatCurrency = (num) => (num || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <div className="max-w-6xl mx-auto p-3 sm:p-4 space-y-4 sm:space-y-6">
+    <div className="page-shell max-w-6xl space-y-5" dir="rtl">
       <Link to="/my-loans" className="text-blue-600 hover:underline text-sm sm:text-base">
         &larr; חזרה לכל ההלוואות
       </Link>

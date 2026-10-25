@@ -309,32 +309,33 @@ export default function TransactionsPage() {
 
   // ─── Render ──────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#f7f8fa] font-sans text-slate-900 dark:bg-[#0b0d11] dark:text-slate-100 pb-20">
+    <div className="min-h-screen pb-12 font-sans text-slate-900 dark:text-slate-100">
 
       {/* Header */}
-      <header className="border-b border-slate-200/80 bg-white dark:border-white/[0.07] dark:bg-[#111318]">
-        <div className="mx-auto flex max-w-[1320px] flex-col items-start justify-between gap-4 px-4 py-6 sm:flex-row sm:items-center sm:px-6">
+      <header className="page-shell pb-0">
+        <div className="page-header">
         <div>
-          <p className="mb-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400">ניהול פיננסי</p>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-950 dark:text-white">עסקאות</h1>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">כל ההכנסות וההוצאות במקום אחד</p>
+          <p className="eyebrow">ניהול תזרים</p>
+          <h1 className="page-title">עסקאות</h1>
+          <p className="page-description">חיפוש, סיווג ועדכון של כל ההכנסות וההוצאות.</p>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
           <Button
             onClick={() => setIsAddOpen(true)}
-            className="rounded-lg h-9 sm:h-10 px-4 bg-slate-950 hover:bg-slate-800 text-white shadow-sm transition-colors flex-1 sm:flex-none text-xs font-semibold flex items-center gap-2 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+            className="flex-1 sm:flex-none"
           >
             <Plus className="h-4 w-4" /> עסקה חדשה
           </Button>
           <Button
             onClick={() => navigate('/import/auto')}
-            className="rounded-lg h-9 sm:h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-colors flex-1 sm:flex-none text-xs font-semibold flex items-center gap-2"
+            variant="outline"
+            className="flex-1 sm:flex-none"
           >
             <Zap className="h-4 w-4" /> ייבוא אוטומטי
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="rounded-lg h-9 sm:h-10 px-4 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors flex-1 sm:flex-none text-xs font-semibold dark:bg-white/[0.04] dark:border-white/[0.09] dark:text-slate-200 dark:hover:bg-white/[0.07]">
+              <Button variant="ghost" className="flex-1 sm:flex-none">
                 <Upload className="ml-2 h-4 w-4" /> ייבוא אשראי <ChevronDown className="mr-2 h-4 w-4 text-slate-400" />
               </Button>
             </DropdownMenuTrigger>
@@ -350,7 +351,7 @@ export default function TransactionsPage() {
         </div>
       </header>
 
-      <div className="max-w-[1320px] mx-auto px-4 sm:px-6 py-6">
+      <div className="page-shell pt-0">
 
         {/* KPI bar */}
         <KpiBar transactions={transactions} effectiveMonth={effectiveMonth} />
@@ -361,7 +362,7 @@ export default function TransactionsPage() {
           <main className="min-w-0">
 
             {/* Search + filters */}
-            <div className="mb-3 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+            <div className="toolbar mb-3 flex-col items-start justify-between sm:flex-row sm:items-center">
               <div className="flex items-center gap-3 shrink-0">
                 <h2 className="text-base font-bold text-slate-950 dark:text-white">תנועות אחרונות</h2>
                 {filterCategory && (
@@ -389,7 +390,7 @@ export default function TransactionsPage() {
                       key={val}
                       onClick={() => setFilterType(val)}
                       className={`cursor-pointer px-3 py-1.5 rounded-md font-medium text-[11px] transition-colors ${
-                        filterType === val ? 'bg-white hover:bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'bg-transparent text-slate-500 hover:bg-white/50'
+                        filterType === val ? 'bg-white hover:bg-white text-slate-900 border border-slate-200 dark:bg-slate-700 dark:text-white' : 'bg-transparent text-slate-500 hover:bg-white/50'
                       }`}
                     >
                       {label}
@@ -439,8 +440,11 @@ export default function TransactionsPage() {
               </div>
             ) : (
               <>
+                <div className="hidden grid-cols-[minmax(260px,1.5fr)_minmax(130px,.7fr)_minmax(110px,.5fr)_120px] rounded-t-2xl border border-b-0 border-black/[.04] bg-[#f6f6f5] px-4 py-3 text-[10px] font-semibold text-slate-500 md:grid">
+                  <span>בית עסק</span><span>קטגוריה</span><span>תאריך</span><span className="text-left">סכום</span>
+                </div>
                 {groupedByMonth.map(([monthLabel, { date, txns }]) => (
-                  <div key={monthLabel} className="mb-6 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-white/[0.08] dark:bg-[#15181f]">
+                  <div key={monthLabel} className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/[0.08] dark:bg-[#15181f]">
                     <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-4 py-3 dark:border-white/[0.07] dark:bg-white/[0.025]">
                       <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">
                         {monthLabel}

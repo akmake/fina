@@ -114,37 +114,39 @@ export default function NetWorthPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-7xl" dir="rtl">
-      {/* כותרת */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <Scale className="h-7 w-7 text-blue-600" />
-          שווי נקי ובריאות פיננסית
-        </h1>
-        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-          תמונה פיננסית כוללת של כל הנכסים וההתחייבויות
-        </p>
+    <div className="page-shell" dir="rtl">
+      <div className="page-header">
+        <div>
+          <p className="eyebrow">נכסים פחות התחייבויות</p>
+          <h1 className="page-title">שווי נקי</h1>
+          <p className="page-description">תמונה מלאה של הנכסים, החובות והמגמה הפיננסית שלך.</p>
+        </div>
+      </div>
+      <div className="mb-5 flex items-center gap-6 border-b border-black/[.06] text-sm font-medium">
+        <button className="border-b-2 border-[#c92f4c] px-1 pb-3 text-[#171717]">סיכום</button>
+        <button className="px-1 pb-3 text-slate-400">נכסים</button>
+        <button className="px-1 pb-3 text-slate-400">חובות</button>
       </div>
 
       {netWorthData && (
         <>
           {/* שווי נקי */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          <motion.div
             className="mb-6">
-            <Card className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white border-0">
+            <Card className="border border-black/[.04] bg-white text-[#171717]">
               <CardContent className="py-8">
                 <div className="text-center">
-                  <p className="text-blue-200 text-sm font-medium mb-1">שווי נקי כולל</p>
+                  <p className="text-slate-500 text-sm font-medium mb-1">שווי נקי כולל</p>
                   <p className="text-4xl font-extrabold mb-4">{formatCurrency(netWorthData.netWorth)}</p>
                   <div className="flex justify-center gap-8">
                     <div className="text-center">
-                      <p className="text-blue-200 text-xs">נכסים</p>
+                      <p className="text-slate-400 text-xs">נכסים</p>
                       <p className="text-xl font-bold flex items-center gap-1">
                         <ArrowUpRight className="h-4 w-4" />{formatCurrency(netWorthData.assets.total)}
                       </p>
                     </div>
                     <div className="text-center">
-                      <p className="text-blue-200 text-xs">התחייבויות</p>
+                      <p className="text-slate-400 text-xs">התחייבויות</p>
                       <p className="text-xl font-bold flex items-center gap-1">
                         <ArrowDownRight className="h-4 w-4" />{formatCurrency(netWorthData.liabilities.total)}
                       </p>
@@ -156,7 +158,7 @@ export default function NetWorthPage() {
           </motion.div>
 
           {/* פירוט נכסים + גרף */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,.75fr)] gap-4 mb-5">
             {/* גרף התפלגות */}
             <Card>
               <CardHeader><CardTitle className="text-lg">התפלגות נכסים</CardTitle></CardHeader>
@@ -231,7 +233,7 @@ export default function NetWorthPage() {
 
           {/* היסטוריית שווי נקי */}
           {history.length > 1 && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mb-6">
+            <motion.div className="mb-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -279,7 +281,7 @@ export default function NetWorthPage() {
 
       {/* ציון בריאות פיננסית */}
       {healthData && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+        <motion.div>
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -306,7 +308,7 @@ export default function NetWorthPage() {
               {/* פירוט ציונים */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                 {healthData.scores.map((s, i) => (
-                  <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 * i }}
+                  <motion.div key={i}
                     className="p-3 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{s.category}</span>
@@ -324,7 +326,7 @@ export default function NetWorthPage() {
                   <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">טיפים לשיפור</h4>
                   <div className="space-y-2">
                     {healthData.tips.map((tip, i) => (
-                      <motion.div key={i} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 * i }}
+                      <motion.div key={i}
                         className={`flex items-start gap-3 p-3 rounded-lg border ${
                           tip.priority === 'high' ? 'border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800' :
                           tip.priority === 'medium' ? 'border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800' :

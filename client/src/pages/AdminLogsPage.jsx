@@ -764,7 +764,7 @@ const AdminLogsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans" dir="rtl">
+    <div className="page-shell min-h-screen font-sans" dir="rtl">
       <div className="max-w-[1500px] mx-auto p-4 md:p-6 lg:p-8">
 
         {/* ═══ HEADER ═══ */}

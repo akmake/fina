@@ -54,7 +54,7 @@ export default function DebtPage() {
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <div className="page-shell space-y-5" dir="rtl">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><CreditCard className="h-7 w-7 text-red-500" /> ניהול חובות</h1>
         <p className="text-sm text-gray-500 mt-1">סקירת כל החובות ואסטרטגיית פירעון</p>

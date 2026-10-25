@@ -76,7 +76,7 @@ export default function FamilyPage() {
   // ── Loading ──────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F2F4F8] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -85,7 +85,7 @@ export default function FamilyPage() {
   // ── No group — landing ───────────────────────────────────────
   if (!group) {
     return (
-      <div className="min-h-screen bg-[#F2F4F8] flex flex-col items-center justify-center px-4 py-12">
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
 
           {/* Hero */}
@@ -195,7 +195,7 @@ export default function FamilyPage() {
 
   // ── Has group ────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#F2F4F8] px-4 py-8">
+    <div className="page-shell min-h-screen">
       <div className="max-w-lg mx-auto space-y-5">
 
         {/* Header card */}

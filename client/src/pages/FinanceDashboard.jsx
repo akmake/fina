@@ -30,17 +30,17 @@ const ALERT_SEVERITY = {
 // ─── UI Helpers ─────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, positive, icon: Icon }) {
   return (
-    <Panel className="p-5 flex flex-col justify-between h-32">
+    <Panel className="group flex h-28 flex-col justify-between p-4 transition-colors">
       <div className="flex justify-between items-start">
-        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{label}</span>
+        <span className="text-[10px] font-semibold tracking-[.08em] text-slate-500 dark:text-slate-400">{label}</span>
         {Icon && (
-          <div className="bg-slate-50 dark:bg-white/5 p-1.5 rounded-md">
-            <Icon className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+          <div className="section-icon">
+            <Icon className="h-4 w-4" />
           </div>
         )}
       </div>
       <div className="mt-2">
-        <p className="text-2xl lg:text-3xl font-bold text-slate-900 dark:text-white tabular-nums">{value}</p>
+        <p className="text-xl font-semibold tracking-[-0.035em] text-[#111] dark:text-white lg:text-[1.45rem]">{value}</p>
         {sub && (
           <p className={`text-xs font-semibold flex items-center gap-1 mt-1.5 ${positive === true ? 'text-emerald-600 dark:text-emerald-400' : positive === false ? 'text-red-500 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
             {positive === true && <ArrowUpRight className="h-3 w-3" />}
@@ -65,7 +65,7 @@ function Block({ children, className = '', colSpan = 1, rowSpan = 1 }) {
     2: 'lg:row-span-2',
   };
   return (
-    <Panel className={`p-6 flex flex-col ${colClasses[colSpan]} ${rowClasses[rowSpan]} ${className}`}>
+    <Panel className={`p-4 flex flex-col ${colClasses[colSpan]} ${rowClasses[rowSpan]} ${className}`}>
       {children}
     </Panel>
   );
@@ -81,9 +81,9 @@ function DashboardSkeleton() {
           {[0, 1, 2, 3].map(i => <div key={i} className="h-32 bg-white dark:bg-[#0f1117] border border-slate-200 dark:border-white/[0.06] rounded-2xl" />)}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6">
-          <div className="lg:col-span-2 h-[380px] bg-white dark:bg-[#0f1117] border border-slate-200 dark:border-white/[0.06] rounded-2xl" />
-          <div className="h-[380px] bg-white dark:bg-[#0f1117] border border-slate-200 dark:border-white/[0.06] rounded-2xl" />
-          <div className="h-[380px] bg-white dark:bg-[#0f1117] border border-slate-200 dark:border-white/[0.06] rounded-2xl" />
+          <div className="lg:col-span-2 h-[380px] bg-white dark:bg-[#0f1117] border border-slate-200 dark:border-white/[0.06] rounded-lg" />
+          <div className="h-[380px] bg-white dark:bg-[#0f1117] border border-slate-200 dark:border-white/[0.06] rounded-lg" />
+          <div className="h-[380px] bg-white dark:bg-[#0f1117] border border-slate-200 dark:border-white/[0.06] rounded-lg" />
         </div>
       </div>
     </div>
@@ -94,30 +94,30 @@ function DashboardSkeleton() {
 function ActionHero({ alertsCount }) {
   const hasAlerts = alertsCount > 0;
   return (
-    <div className={`rounded-2xl p-5 flex items-center justify-between gap-4 border ${
+    <div className={`flex items-center justify-between gap-4 rounded-2xl border border-black/[.04] bg-white p-4 shadow-[0_2px_10px_rgba(17,17,17,.055)] ${
       hasAlerts
-        ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50'
-        : 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/50'
+        ? 'ring-1 ring-amber-400/30'
+        : ''
     }`}>
       <div className="flex items-center gap-3 min-w-0">
         <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-          hasAlerts ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400' : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400'
+          hasAlerts ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400' : 'bg-white dark:bg-blue-900/50 text-blue-600 dark:text-blue-300'
         }`}>
           {hasAlerts ? <Bell className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-bold text-slate-900 dark:text-white">
+          <p className="text-sm font-semibold text-[#171717] dark:text-white">
             {hasAlerts ? `יש ${alertsCount} התראות שדורשות טיפול` : 'הכול מעודכן'}
           </p>
-          <p className="text-xs text-slate-600 dark:text-slate-400 truncate">
+          <p className="mt-1 text-xs text-slate-500 truncate">
             {hasAlerts ? 'עבור להתראות כדי לראות מה קרה' : 'סנכרן את החשבונות שלך כדי לשמור על נתונים עדכניים'}
           </p>
         </div>
       </div>
       <Link
         to={hasAlerts ? '/alerts' : '/import/auto'}
-        className={`flex-shrink-0 inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl transition-colors text-white ${
-          hasAlerts ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'
+        className={`relative flex-shrink-0 inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-semibold transition-colors ${
+          hasAlerts ? 'bg-amber-400 text-[#171717] hover:bg-amber-300' : 'bg-[#171717] text-white hover:bg-black'
         }`}
       >
         {hasAlerts ? 'לצפייה בהתראות' : 'סנכרן עכשיו'}
@@ -289,20 +289,19 @@ export default function FinanceDashboard() {
   }
 
   return (
-    <div className="text-slate-800 dark:text-slate-200 p-4 sm:p-6 lg:p-8 font-sans" dir="rtl">
-      <div className="max-w-[1600px] mx-auto space-y-6">
+    <div className="page-shell text-slate-800 dark:text-slate-200 font-sans" dir="rtl">
+      <div className="space-y-7">
 
         {/* ─── Header ─── */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-2 gap-4">
+        <div className="page-header">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-              לוח בקרה מרכזי
-            </h1>
+            <p className="eyebrow">התמונה הפיננסית שלך</p>
+            <h1 className="page-title">בוקר טוב</h1>
             <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-              מעודכן ל: {summary?.recentTransactions?.[0]?.date ? format(new Date(summary.recentTransactions[0].date), "dd.MM.yyyy") : 'היום'}
+              תמונת מצב עדכנית · {summary?.recentTransactions?.[0]?.date ? format(new Date(summary.recentTransactions[0].date), "dd.MM.yyyy") : 'היום'}
             </p>
           </div>
-          <Link to="/import/auto" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors flex items-center gap-2 shadow-sm">
+          <Link to="/import/auto" className="inline-flex h-10 items-center gap-2 rounded-full bg-[#171717] px-4 text-xs font-semibold text-white transition-colors hover:bg-black">
             <Upload className="h-4 w-4" /> ייבוא נתונים
           </Link>
         </div>
@@ -311,7 +310,7 @@ export default function FinanceDashboard() {
         <ActionHero alertsCount={activeAlerts.length} />
 
         {/* ─── Row 1: Key Performance Indicators (KPIs) ─── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard 
             label="שווי נקי כולל" value={fmt(netWorth?.totalNetWorth ?? 0)} 
             sub={healthScore ? `דירוג בריאות: ${healthScore.grade}` : null} 
@@ -335,10 +334,10 @@ export default function FinanceDashboard() {
         </div>
 
         {/* ─── Row 2: Analytics & Budget (Current Focus) ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
           
           {/* Main Chart: Income vs Expenses Trend (Spans 2 cols) */}
-          <Block colSpan={2} className="min-h-[380px]">
+          <Block colSpan={2} className="min-h-[350px]">
             <SectionTitle icon={<BarChart2 className="h-4 w-4" />} title="מגמות תזרים מזומנים (6 חודשים)" link="/smart-analytics" linkLabel="דו״ח מלא" />
             <div className="flex-1 w-full h-full min-h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -457,13 +456,13 @@ export default function FinanceDashboard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={histData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                     <defs>
-                      <linearGradient id="nwColor" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient>
+                      <linearGradient id="nwColor" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f45d26" stopOpacity={0.18}/><stop offset="95%" stopColor="#f45d26" stopOpacity={0}/></linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.grid} />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: chartTheme.axis }} dy={10} />
                     <YAxis axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}k`} tick={{ fontSize: 12, fill: chartTheme.axis }} width={50} />
                     <Tooltip contentStyle={chartTheme.tooltip} formatter={v => fmt(v)} />
-                    <Area type="monotone" dataKey="שווי" stroke="#3b82f6" fill="url(#nwColor)" strokeWidth={3} />
+                    <Area type="monotone" dataKey="שווי" stroke="#f45d26" fill="url(#nwColor)" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (

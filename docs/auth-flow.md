@@ -75,7 +75,7 @@ POST /api/auth/login  { email, password }
       │  (password OK, user.twoFactorEnabled)
       ▼
 200 { twoFactorRequired: true, mfaToken }      ← NO jwt/refresh cookies yet
-      │   mfaToken = 5-min JWT with { mfa:true } claim (requireAuth rejects it)
+      │   mfaToken = 5-min JWT with { mfa:true } claim (intended: requireAuth rejects it — ⚠ NOT implemented, see docs/product/AUDIT.md P0-1)
       ▼
 Client shows the 6-digit code step (LoginPage)
       │

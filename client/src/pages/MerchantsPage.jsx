@@ -46,7 +46,7 @@ export default function MerchantsPage() {
   const recurringCount = merchants.filter(m => m.isRecurring).length;
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto" dir="rtl">
+    <div className="page-shell max-w-5xl" dir="rtl">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
         <Store className="h-6 w-6 text-blue-600" />
         בתי עסק

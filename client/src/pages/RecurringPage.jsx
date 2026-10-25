@@ -217,26 +217,28 @@ export default function RecurringPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-7xl" dir="rtl">
-      {/* כותרת */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+    <div className="page-shell" dir="rtl">
+      {/* Rocket Money recurring header */}
+      <div className="page-header">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <RefreshCw className="h-7 w-7 text-blue-600" />
-            הוצאות והכנסות קבועות
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            ניהול מנויים, חשבונות והעברות קבועות
-          </p>
+          <p className="eyebrow">תשלומים חוזרים</p>
+          <h1 className="page-title">מנויים וחשבונות</h1>
+          <p className="page-description">כל החיובים הקבועים, מועדי התשלום והעלות החודשית במקום אחד.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={openDetect}>
             <Search className="h-4 w-4 me-2" /> זיהוי אוטומטי
           </Button>
-          <Button onClick={openAddDialog}>
+          <Button onClick={openAddDialog} className="rounded-full bg-[#171717] px-5 text-white hover:bg-black">
             <Plus className="h-4 w-4 me-2" /> הוסף חדש
           </Button>
         </div>
+      </div>
+
+      <div className="mb-5 flex items-center gap-6 border-b border-black/[.06] text-sm font-medium">
+        <button className="border-b-2 border-[#c92f4c] px-1 pb-3 text-[#171717]">הכל</button>
+        <button className="px-1 pb-3 text-slate-400">קרובים</button>
+        <button className="px-1 pb-3 text-slate-400">לוח שנה</button>
       </div>
 
       {/* InsightsBar — המלצות פעולה */}
@@ -260,7 +262,7 @@ export default function RecurringPage() {
       )}
 
       {/* כרטיסי סיכום */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-slate-500">הוצאות חודשיות קבועות</p>
@@ -314,7 +316,7 @@ export default function RecurringPage() {
       )}
 
       {/* פילטרים */}
-      <div className="flex gap-2 mb-4 flex-wrap">
+      <div className="toolbar mb-4 flex-wrap">
         {[
           { key: 'all', label: 'הכל' },
           { key: 'expenses', label: 'הוצאות' },
@@ -334,8 +336,8 @@ export default function RecurringPage() {
             const sub = SUBCATEGORY_MAP[t.subcategory] || SUBCATEGORY_MAP.other;
             const SubIcon = sub.icon;
             return (
-              <motion.div key={t._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ delay: i * 0.03 }}>
-                <Card className={`${t.isPaused ? 'opacity-50' : ''}`}>
+              <motion.div key={t._id}>
+                <Card className={`rounded-2xl shadow-none ${t.isPaused ? 'opacity-50' : ''}`}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3 flex-1 min-w-0">

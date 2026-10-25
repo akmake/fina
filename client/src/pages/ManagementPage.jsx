@@ -4,7 +4,7 @@ import { Bot } from 'lucide-react';
 
 export default function ManagementPage() {
   return (
-    <div className="p-4 md:p-8 space-y-6 bg-slate-50 dark:bg-slate-950 min-h-screen" dir="rtl">
+    <div className="page-shell min-h-screen space-y-5" dir="rtl">
 
       <div className="flex items-center gap-3 mb-2">
         <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-2.5 rounded-xl shadow">

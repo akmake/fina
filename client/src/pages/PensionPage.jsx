@@ -165,7 +165,7 @@ export default function PensionPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-7xl" dir="rtl">
+    <div className="min-h-screen py-2" dir="rtl">
       {/* כותרת */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div>
@@ -391,7 +391,7 @@ export default function PensionPage() {
             <Button className="w-full" onClick={loadSimulation}>חשב</Button>
 
             {simulation && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4 pt-4 border-t">
+              <motion.div className="space-y-4 pt-4 border-t">
                 <div className="text-center">
                   <p className="text-sm text-slate-500">צבירה צפויה בפרישה</p>
                   <p className="text-3xl font-bold text-blue-600">{formatCurrency(simulation.projectedTotal)}</p>
@@ -450,7 +450,7 @@ function ProductGrid({ products, onEdit, onDelete }) {
         const profitPct = p.totalDeposited > 0 ? ((profitLoss / p.totalDeposited) * 100) : 0;
 
         return (
-          <motion.div key={p._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+          <motion.div key={p._id}>
             <Card className="hover:shadow-md transition-shadow">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-3">

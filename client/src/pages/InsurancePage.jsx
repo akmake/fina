@@ -107,7 +107,7 @@ export default function InsurancePage() {
   ).map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] }));
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <div className="page-shell space-y-5" dir="rtl">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -165,7 +165,7 @@ export default function InsurancePage() {
                 <p>אין פוליסות ביטוח. הוסף את הראשונה!</p>
               </CardContent></Card>
             ) : policies.map(p => (
-              <motion.div key={p._id} initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}>
+              <motion.div key={p._id}>
                 <Card className={`hover:shadow-md transition ${p.isRenewalSoon ? 'border-orange-300 bg-orange-50/30 dark:border-orange-700 dark:bg-orange-950/20' : ''}`}>
                   <CardContent className="py-3 px-4">
                     <div className="flex items-center justify-between gap-2 flex-wrap">

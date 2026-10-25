@@ -13,7 +13,7 @@ import { useUIStore } from '@/stores/uiStore';
 export function Panel({ children, className = '', ...props }) {
   return (
     <div
-      className={`bg-white dark:bg-[#0f1117] border border-slate-200 dark:border-white/[0.06] shadow-sm rounded-2xl ${className}`}
+      className={`surface-panel ${className}`}
       {...props}
     >
       {children}
@@ -24,17 +24,17 @@ export function Panel({ children, className = '', ...props }) {
 /** כותרת סקשן עם קישור אופציונלי ל"פירוט מלא" */
 export function SectionTitle({ icon, title, link, linkLabel }) {
   return (
-    <div className="flex items-center justify-between mb-5 border-b border-slate-100 dark:border-white/[0.06] pb-3">
+    <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-white/[0.06] pb-3">
       <div className="flex items-center gap-2">
-        <div className="p-1.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-lg">
+        <div className="section-icon">
           {icon}
         </div>
-        <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">{title}</h2>
+        <h2 className="font-display text-[14px] font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
       </div>
       {link && (
         <Link
           to={link}
-          className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors flex items-center gap-1 px-3 py-1.5 rounded-full"
+          className="text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors flex items-center gap-1 px-2 py-1 rounded-md"
         >
           {linkLabel} <ChevronLeft className="h-3 w-3" />
         </Link>
@@ -87,4 +87,4 @@ export function useChartTheme() {
 }
 
 /** פלטת סדרות משותפת לגרפים */
-export const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
+export const CHART_COLORS = ['#f45d26', '#2c9c73', '#e7a93f', '#6d8d9f', '#d95555', '#9b7e63', '#7d6b91', '#7b9b62'];

@@ -25,10 +25,10 @@ import PlanSection from '@/components/settings/PlanSection';
 // ---------------------------------------------------------------------------
 function Section({ icon: Icon, title, description, children }) {
   return (
-    <Card className="dark:bg-slate-900">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg dark:text-slate-100">
-          <Icon className="h-5 w-5 text-blue-500" />
+    <Card className="rounded-lg shadow-none dark:bg-slate-900">
+      <CardHeader className="border-b border-slate-100 pb-4 dark:border-white/[0.06]">
+        <CardTitle className="flex items-center gap-2 text-[15px] dark:text-slate-100">
+          <Icon className="h-4 w-4 text-blue-500" />
           {title}
         </CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
@@ -98,14 +98,24 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-4 md:p-8 space-y-8">
+    <div className="page-shell max-w-6xl space-y-5" dir="rtl">
 
       {/* Page title */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">הגדרות</h1>
-        <p className="text-gray-500 dark:text-slate-400 mt-1">התאם אישית את חוויית השימוש שלך</p>
+      <div className="page-header">
+        <div>
+          <p className="eyebrow">העדפות מערכת</p>
+          <h1 className="page-title">הגדרות</h1>
+          <p className="page-description">תצוגה, התראות, אבטחה וניהול נתונים.</p>
+        </div>
       </div>
 
+      <div className="grid items-start gap-0 overflow-hidden rounded-[22px] border border-black/[.06] bg-white shadow-[0_18px_60px_rgba(17,17,17,.12)] lg:grid-cols-[220px_minmax(0,1fr)]">
+      <aside className="sticky top-0 hidden min-h-[680px] border-l border-slate-100 bg-[#f6f6f5] p-4 lg:block dark:border-white/[0.07] dark:bg-slate-900">
+        {['כללי', 'התראות', 'תוכנית וחיוב', 'אבטחה', 'ניהול נתונים'].map((item, index) => (
+          <div key={item} className={`rounded-md px-3 py-2 text-[12px] font-medium ${index === 0 ? 'bg-slate-100 text-slate-950' : 'text-slate-500'}`}>{item}</div>
+        ))}
+      </aside>
+      <div className="space-y-4 p-5 sm:p-7">
       {/* Appearance */}
       <Section icon={Palette} title="מראה" description="שלוט בצבעים ובמצב התצוגה">
         <div className="space-y-4">
@@ -221,6 +231,8 @@ export default function SettingsPage() {
       <div className="text-center text-xs text-gray-400 dark:text-slate-600 pb-4">
         <p>Fina · גרסה 1.0.0</p>
         <p className="mt-1">נבנה ע"י DahanWeb </p>
+      </div>
+      </div>
       </div>
 
       {/* Confirm logout */}

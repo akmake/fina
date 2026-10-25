@@ -69,7 +69,7 @@ export default function ProjectsPage() {
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+    <div className="page-shell" dir="rtl">
 
       {/* Header */}
       <header className="flex justify-between items-center mb-8">

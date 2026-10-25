@@ -17,6 +17,7 @@ Full-stack personal finance management application. Hebrew RTL. React + Node.js 
 | [contracts.md](contracts.md) | Conventions: response format, naming, folder structure, patterns |
 | [sync-map.md](sync-map.md) | Coupling map: change file X → must update files A, B, C |
 | [known-unknowns.md](known-unknowns.md) | Open questions and unresolved items from project scan |
+| [product/AUDIT.md](product/AUDIT.md) | Product audit 2026-10-13: prioritized defects (P0–P3), evidence, repair roadmap |
 
 ## Module Deep-Dives (`modules/`)
 

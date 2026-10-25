@@ -376,7 +376,7 @@ function StocksManager() {
 // ---------------------------------------------------------------------------
 export default function InvestmentsPage() {
   return (
-    <div className="container mx-auto p-3 sm:p-4 md:p-6 lg:p-8 bg-slate-50 dark:bg-slate-950 min-h-screen">
+    <div className="min-h-screen py-2">
       <StocksErrorBoundary>
         <StocksManager />
       </StocksErrorBoundary>

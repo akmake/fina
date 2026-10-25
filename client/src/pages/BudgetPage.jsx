@@ -199,21 +199,17 @@ export default function BudgetPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-7xl" dir="rtl">
+    <div className="page-shell" dir="rtl">
       {/* כותרת + ניווט חודשים */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+      <div className="page-header">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Wallet className="h-7 w-7 text-blue-600" />
-            תקציב חודשי
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            תכנן ועקוב אחרי ההוצאות שלך
-          </p>
+          <p className="eyebrow">תכנון חודשי</p>
+          <h1 className="page-title">תקציב</h1>
+          <p className="page-description">תכנון מסגרות הוצאה ומעקב אחר הביצוע בפועל.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={prevMonth}><ChevronRight className="h-4 w-4" /></Button>
-          <span className="text-lg font-semibold min-w-[140px] text-center text-slate-800 dark:text-white">
+          <span className="min-w-[140px] text-center text-sm font-semibold text-slate-800 dark:text-white">
             {MONTHS_HE[month]} {year}
           </span>
           <Button variant="outline" size="icon" onClick={nextMonth}><ChevronLeft className="h-4 w-4" /></Button>
@@ -222,7 +218,7 @@ export default function BudgetPage() {
 
       {/* אם אין תקציב */}
       {!exists ? (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        <motion.div
           className="text-center py-16">
           <Target className="h-16 w-16 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
           <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">
@@ -241,13 +237,13 @@ export default function BudgetPage() {
       ) : (
         <>
           {/* כרטיסי סיכום */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="mb-5 grid grid-cols-2 overflow-hidden rounded-2xl border border-black/[.04] bg-white lg:grid-cols-4 [&>*]:rounded-none [&>*]:border-0 [&>*]:border-l [&>*]:border-black/[.05] [&>*]:bg-transparent [&>*]:shadow-none">
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-slate-500">תקציב כולל</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(budget.totalLimit)}</p>
+                    <p className="text-xl font-semibold text-slate-900 dark:text-white">{formatCurrency(budget.totalLimit)}</p>
                   </div>
                   <Target className="h-8 w-8 text-blue-500" />
                 </div>
@@ -258,7 +254,7 @@ export default function BudgetPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-slate-500">הוצאות בפועל</p>
-                    <p className="text-2xl font-bold text-red-600">{formatCurrency(totalSpent)}</p>
+                    <p className="text-xl font-semibold text-red-600">{formatCurrency(totalSpent)}</p>
                   </div>
                   <ArrowDown className="h-8 w-8 text-red-500" />
                 </div>
@@ -269,7 +265,7 @@ export default function BudgetPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-slate-500">נותר</p>
-                    <p className={`text-2xl font-bold ${budget.totalLimit - totalSpent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className={`text-xl font-semibold ${budget.totalLimit - totalSpent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {formatCurrency(budget.totalLimit - totalSpent)}
                     </p>
                   </div>
@@ -284,7 +280,7 @@ export default function BudgetPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-slate-500">ניצול</p>
-                    <p className={`text-2xl font-bold ${percentUsed > 100 ? 'text-red-600' : percentUsed > 80 ? 'text-amber-600' : 'text-green-600'}`}>
+                    <p className={`text-xl font-semibold ${percentUsed > 100 ? 'text-red-600' : percentUsed > 80 ? 'text-amber-600' : 'text-green-600'}`}>
                       {percentUsed}%
                     </p>
                   </div>
@@ -296,7 +292,7 @@ export default function BudgetPage() {
           </div>
 
           {/* גרף + פירוט */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(260px,.75fr)_minmax(0,1.5fr)]">
             {/* גרף עוגה */}
             <Card className="lg:col-span-1">
               <CardHeader><CardTitle className="text-lg">התפלגות תקציב</CardTitle></CardHeader>
@@ -323,7 +319,7 @@ export default function BudgetPage() {
                     <YAxis tick={{ fontSize: 12 }} />
                     <Tooltip formatter={(v) => formatCurrency(v)} />
                     <Legend />
-                    <Bar dataKey="planned" name="תקציב" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="planned" name="תקציב" fill="#f45d26" radius={[2, 2, 0, 0]} />
                     <Bar dataKey="actual" name="בפועל" fill="#ef4444" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -356,8 +352,8 @@ export default function BudgetPage() {
                   const isNear = pct >= budget.alertThreshold && !isOver;
 
                   return (
-                    <motion.div key={i} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
-                      className={`p-4 rounded-lg border ${isOver ? 'border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800' : isNear ? 'border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800' : 'border-slate-200 dark:border-slate-700'}`}>
+                    <motion.div key={i}
+                      className={`px-3 py-3 border-b last:border-b-0 ${isOver ? 'border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800' : isNear ? 'border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800' : 'border-slate-100 dark:border-slate-700'}`}>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />

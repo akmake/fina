@@ -98,21 +98,22 @@ export default function CategoryInsightsPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#F2F4F8] flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#F2F4F8] font-sans text-slate-900 pb-20" dir="rtl">
+        <div className="page-shell min-h-screen font-sans text-slate-900 pb-20" dir="rtl">
 
             {/* ── Page header ── */}
-            <div className="bg-white border-b border-slate-100 px-6 py-5 sticky top-0 z-10 shadow-sm">
-                <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="page-header">
+                <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-end">
                     <div className="flex-1">
-                        <h1 className="text-xl font-bold text-slate-900">פירוט לפי קטגוריה</h1>
-                        <p className="text-sm text-slate-500 mt-0.5">
+                        <p className="eyebrow">ניתוח הוצאות</p>
+                        <h1 className="page-title">הוצאות</h1>
+                        <p className="page-description">
                             סה"כ הוצאות: <span className="font-bold text-slate-800">{formatCurrency(totalExpenses)}</span>
                         </p>
                     </div>
@@ -137,7 +138,7 @@ export default function CategoryInsightsPage() {
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+            <div>
                 <div className="flex gap-6 items-start">
 
                     {/* ── Category list ── */}
@@ -160,10 +161,10 @@ export default function CategoryInsightsPage() {
                                     <div
                                         key={cat}
                                         onClick={() => setSelectedCategory(isSelected ? null : cat)}
-                                        className={`bg-white rounded-2xl p-4 cursor-pointer border-2 transition-all duration-200 ${
+                                        className={`bg-white rounded-2xl p-4 cursor-pointer border transition-colors ${
                                             isSelected
-                                                ? 'border-blue-500 shadow-lg shadow-blue-100/50'
-                                                : 'border-transparent shadow-sm hover:shadow-md hover:border-slate-200'
+                                                ? 'border-[#c92f4c] ring-2 ring-[#c92f4c]/10'
+                                                : 'border-black/[.04] hover:border-black/[.12]'
                                         }`}
                                     >
                                         <div className="flex items-center justify-between mb-2.5">
@@ -211,10 +212,10 @@ export default function CategoryInsightsPage() {
                     {selectedCategory && (
                         <div className="flex-1 space-y-4 min-w-0">
                             {/* Header card */}
-                            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 rounded-2xl p-5 text-white">
+                            <div className="rounded-2xl border border-black/[.04] bg-white p-5 text-[#171717] shadow-[0_2px_10px_rgba(17,17,17,.055)]">
                                 <div className="flex items-start justify-between">
                                     <div>
-                                        <p className="text-white/50 text-sm mb-1">
+                                        <p className="text-slate-400 text-sm mb-1">
                                             {format(selectedMonth, 'MMMM yyyy', { locale: he })}
                                         </p>
                                         <h2 className="text-xl font-bold">{selectedCategory}</h2>
@@ -225,7 +226,7 @@ export default function CategoryInsightsPage() {
                                     <div className="flex flex-col items-end gap-2">
                                         <button
                                             onClick={() => setSelectedCategory(null)}
-                                            className="h-8 w-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+                                            className="h-8 w-8 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center transition-colors"
                                         >
                                             <X className="h-4 w-4" />
                                         </button>
@@ -238,7 +239,7 @@ export default function CategoryInsightsPage() {
                                             </span>
                                         )}
                                         {prevAmt > 0 && (
-                                            <p className="text-white/40 text-xs">חודש שעבר: {formatCurrency(prevAmt)}</p>
+                                            <p className="text-slate-400 text-xs">חודש שעבר: {formatCurrency(prevAmt)}</p>
                                         )}
                                     </div>
                                 </div>

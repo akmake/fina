@@ -28,8 +28,6 @@ const FundCard = ({ fund, onSellClick, onDeleteClick }) => {
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.3 }}
       className="bg-white rounded-2xl border shadow-sm p-4 flex flex-col justify-between"

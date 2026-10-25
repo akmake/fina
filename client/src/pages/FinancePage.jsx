@@ -78,7 +78,7 @@ function FinancePage() {
   if (error) return <p className="p-6 text-center text-red-600">שגיאה: {error}</p>;
 
   return (
-    <div className="container mx-auto p-3 sm:p-4 md:p-6 lg:p-8 space-y-6 sm:space-y-8">
+    <div className="page-shell space-y-5" dir="rtl">
       <header>
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">ניהול פיננסי</h1>
         <p className="mt-2 text-sm sm:text-lg text-gray-600">סקירה וניהול של כל הנכסים שלך.</p>

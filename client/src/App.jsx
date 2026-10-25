@@ -1,4 +1,3 @@
-import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
 import Layout         from "@/components/Layout";
@@ -8,58 +7,47 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import LoginPage    from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 
-const PrivacyPage = lazy(() => import("@/pages/PrivacyPage"));
-const VerifyEmailPage = lazy(() => import("@/pages/VerifyEmailPage"));
-
-/* All other pages — lazy loaded on demand */
-const FinanceDashboard     = lazy(() => import("@/pages/FinanceDashboard"));
-const TransactionsTab      = lazy(() => import("@/pages/Transactions_tab"));
-const FinancePage          = lazy(() => import("@/pages/FinancePage"));
-const ImportHubPage        = lazy(() => import("@/pages/ImportHubPage"));
-const ManagementPage       = lazy(() => import("@/pages/ManagementPage"));
-const PortfolioHubPage     = lazy(() => import("@/pages/PortfolioHubPage"));
-const MyLoansPage          = lazy(() => import("@/pages/MyLoansPage"));
-const NewLoanPage          = lazy(() => import("@/pages/NewLoanPage"));
-const LoanDetailPage       = lazy(() => import("@/pages/LoanDetailPage"));
-const ProjectsPage         = lazy(() => import("@/pages/ProjectsPage"));
-const NewProjectPage       = lazy(() => import("@/pages/NewProjectPage"));
-const ProjectPage          = lazy(() => import("@/pages/ProjectPage"));
-const ProfilePage          = lazy(() => import("@/pages/ProfilePage"));
-const SettingsPage         = lazy(() => import("@/pages/SettingsPage"));
-const NotFoundPage         = lazy(() => import("@/pages/NotFoundPage"));
-const SuggestionsPage      = lazy(() => import("@/pages/SuggestionsPage"));
-const AdminLogsPage        = lazy(() => import("@/pages/AdminLogsPage"));
-const AdminUsersPage       = lazy(() => import("@/pages/AdminUsersPage"));
-const UserActivityPage     = lazy(() => import("@/pages/UserActivityPage"));
-const BudgetPage           = lazy(() => import("@/pages/BudgetPage"));
-const RecurringPage        = lazy(() => import("@/pages/RecurringPage"));
-const CategoryInsightsPage = lazy(() => import("@/pages/CategoryInsightsPage"));
-const NetWorthPage         = lazy(() => import("@/pages/NetWorthPage"));
-const InsurancePage        = lazy(() => import("@/pages/InsurancePage"));
-const MortgagePage         = lazy(() => import("@/pages/MortgagePage"));
-const GoalsPage            = lazy(() => import("@/pages/GoalsPage"));
-const AlertsPage           = lazy(() => import("@/pages/AlertsPage"));
-const TaxPage              = lazy(() => import("@/pages/TaxPage"));
-const DebtPage             = lazy(() => import("@/pages/DebtPage"));
-const ChildSavingsPage     = lazy(() => import("@/pages/ChildSavingsPage"));
-const ReportsPage          = lazy(() => import("@/pages/ReportsPage"));
-const MaaserPage           = lazy(() => import("@/pages/MaaserPage"));
-const FamilyPage           = lazy(() => import("@/pages/FamilyPage"));
-const HelpPage             = lazy(() => import("@/pages/HelpPage"));
-const MerchantsPage        = lazy(() => import("@/pages/MerchantsPage"));
-const BusinessPage         = lazy(() => import("@/pages/BusinessPage"));
-
-function PageLoader() {
-  return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-    </div>
-  );
-}
+import PrivacyPage from "@/pages/PrivacyPage";
+import VerifyEmailPage from "@/pages/VerifyEmailPage";
+import FinanceDashboard from "@/pages/FinanceDashboard";
+import TransactionsTab from "@/pages/Transactions_tab";
+import FinancePage from "@/pages/FinancePage";
+import ImportHubPage from "@/pages/ImportHubPage";
+import ManagementPage from "@/pages/ManagementPage";
+import PortfolioHubPage from "@/pages/PortfolioHubPage";
+import MyLoansPage from "@/pages/MyLoansPage";
+import NewLoanPage from "@/pages/NewLoanPage";
+import LoanDetailPage from "@/pages/LoanDetailPage";
+import ProjectsPage from "@/pages/ProjectsPage";
+import NewProjectPage from "@/pages/NewProjectPage";
+import ProjectPage from "@/pages/ProjectPage";
+import ProfilePage from "@/pages/ProfilePage";
+import SettingsPage from "@/pages/SettingsPage";
+import NotFoundPage from "@/pages/NotFoundPage";
+import SuggestionsPage from "@/pages/SuggestionsPage";
+import AdminLogsPage from "@/pages/AdminLogsPage";
+import AdminUsersPage from "@/pages/AdminUsersPage";
+import UserActivityPage from "@/pages/UserActivityPage";
+import BudgetPage from "@/pages/BudgetPage";
+import RecurringPage from "@/pages/RecurringPage";
+import CategoryInsightsPage from "@/pages/CategoryInsightsPage";
+import NetWorthPage from "@/pages/NetWorthPage";
+import InsurancePage from "@/pages/InsurancePage";
+import MortgagePage from "@/pages/MortgagePage";
+import GoalsPage from "@/pages/GoalsPage";
+import AlertsPage from "@/pages/AlertsPage";
+import TaxPage from "@/pages/TaxPage";
+import DebtPage from "@/pages/DebtPage";
+import ChildSavingsPage from "@/pages/ChildSavingsPage";
+import ReportsPage from "@/pages/ReportsPage";
+import MaaserPage from "@/pages/MaaserPage";
+import FamilyPage from "@/pages/FamilyPage";
+import HelpPage from "@/pages/HelpPage";
+import MerchantsPage from "@/pages/MerchantsPage";
+import BusinessPage from "@/pages/BusinessPage";
 
 export default function App() {
   return (
-    <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<Layout />}>
 
@@ -149,6 +137,5 @@ export default function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
-    </Suspense>
   );
 }

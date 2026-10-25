@@ -127,7 +127,7 @@ export default function SuggestionsPage() {
     : suggestions.filter(s => s.status === statusFilter);
 
   return (
-    <div className="min-h-screen bg-[#F2F4F8] font-sans text-slate-900 pb-20">
+    <div className="page-shell min-h-screen font-sans text-slate-900 pb-20" dir="rtl">
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-white/50 px-4 sm:px-8 py-4 sm:py-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-sm">
         <div className="flex items-center gap-3">

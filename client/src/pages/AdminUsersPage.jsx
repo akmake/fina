@@ -44,7 +44,7 @@ export default function AdminUsersPage() {
   const admins = filtered.filter(u => u.role === 'admin').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0f1117] p-4 md:p-8" dir="rtl">
+    <div className="page-shell min-h-screen" dir="rtl">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">

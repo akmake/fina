@@ -130,7 +130,7 @@ export default function ProjectPage() {
   const percentage = targetAmount > 0 ? Math.round((currentAmount / targetAmount) * 100) : 0;
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+    <div className="page-shell max-w-5xl" dir="rtl">
       <Card>
         <CardHeader>
           <div className="flex justify-between items-start">

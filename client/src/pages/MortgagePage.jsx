@@ -132,7 +132,7 @@ export default function MortgagePage() {
   const { mortgages = [], summary = {} } = data || {};
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <div className="page-shell space-y-5" dir="rtl">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><Home className="h-7 w-7 text-blue-500" /> משכנתאות</h1>
@@ -155,7 +155,7 @@ export default function MortgagePage() {
       {mortgages.length === 0 ? (
         <Card><CardContent className="py-12 text-center text-gray-400"><Home className="h-12 w-12 mx-auto mb-3 opacity-30" /><p>אין משכנתאות. הוסף את הראשונה!</p></CardContent></Card>
       ) : mortgages.map(m => (
-        <motion.div key={m._id} initial={{ opacity:0 }} animate={{ opacity:1 }}>
+        <motion.div key={m._id}>
           <Card className="hover:shadow-md transition">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">

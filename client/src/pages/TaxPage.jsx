@@ -63,7 +63,7 @@ export default function TaxPage() {
   })) || [];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <div className="page-shell space-y-5" dir="rtl">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><Calculator className="h-7 w-7 text-blue-500" /> מחשבון מס הכנסה</h1>
         <p className="text-sm text-gray-500 mt-1">חישוב מס הכנסה, ביטוח לאומי ומס בריאות — מדרגות 2025/2026</p>

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import api from '@/utils/api';
 import { useAuthStore } from '@/stores/authStore';
-import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, TrendingUp, WalletCards } from 'lucide-react';
 
 export default function LoginPage() {
   const [email,        setEmail]        = useState('');
@@ -63,27 +63,43 @@ export default function LoginPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4" dir="rtl">
+    <div className="auth-canvas min-h-screen flex items-center justify-center p-4 sm:p-8" dir="rtl">
 
-      {/* Decorative blobs */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-200/40 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-200/40 rounded-full blur-3xl" />
-      </div>
+      <div className="relative grid w-full max-w-5xl overflow-hidden rounded-[24px] border border-black/[.06] bg-white shadow-[0_24px_70px_-40px_rgba(17,17,17,.35)] lg:grid-cols-[1fr_430px]">
 
-      <div className="relative w-full max-w-md">
+        <section className="hidden bg-[#f1f1ef] p-12 text-[#171717] lg:block">
+          <div className="mb-10 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#c92f4c] text-sm font-bold text-white">F</div>
+            <span className="font-display text-2xl font-semibold text-[#171717]">fina</span>
+          </div>
+          <p className="mb-2 text-xs font-medium text-[#c92f4c]">הכסף שלך, ברור יותר</p>
+          <h2 className="font-display text-4xl font-semibold leading-[1.2] tracking-[-0.04em] text-[#171717]">
+            תמונה פיננסית אחת.<br />החלטות טובות יותר.
+          </h2>
+          <p className="mt-5 max-w-lg text-base leading-7 text-slate-500">
+            חשבונות, הוצאות, תקציבים ונכסים במרחב עבודה אחד, מאובטח וברור.
+          </p>
+          <div className="mt-10 grid grid-cols-3 gap-3">
+            {[{ icon: WalletCards, text: 'כל החשבונות' }, { icon: TrendingUp, text: 'מגמות ברורות' }, { icon: ShieldCheck, text: 'מידע מוגן' }].map(({ icon: Icon, text }) => (
+              <div key={text} className="rounded-2xl border border-black/[.05] bg-white p-4 shadow-sm">
+                <Icon className="mb-4 h-5 w-5 text-[#c92f4c]" />
+                <p className="text-sm font-medium text-slate-700">{text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
         {/* Card */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl shadow-slate-200/60 border border-white/60 px-8 py-10">
+        <div className="px-6 py-9 sm:px-10 sm:py-12">
 
           {/* Logo / Brand */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-200 mb-4">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#c92f4c] shadow-sm mb-4">
               <svg viewBox="0 0 24 24" className="w-7 h-7 text-white fill-current">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
               </svg>
             </div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">ברוכים השבים</h1>
+            <h1 className="font-display text-3xl font-semibold text-slate-950 tracking-tight">ברוכים השבים</h1>
             <p className="text-sm text-slate-400 mt-1">התחברו לחשבון שלכם</p>
           </div>
 
@@ -112,7 +128,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 rounded-xl bg-gradient-to-l from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold shadow-md shadow-blue-200 transition-all active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full h-11 rounded-full bg-[#171717] hover:bg-black text-white text-sm font-semibold shadow-sm transition-colors active:translate-y-px disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'אמת והתחבר'}
             </button>
@@ -150,7 +166,7 @@ export default function LoginPage() {
                 <label className="text-xs font-semibold text-slate-500">סיסמה</label>
                 <button
                   type="button"
-                  className="text-xs text-blue-500 hover:text-blue-700 font-medium transition-colors"
+                  className="text-xs text-[#c92f4c] hover:text-[#a8243d] font-medium transition-colors"
                   onClick={() => setError('איפוס סיסמה בפיתוח — התחבר עם Google או צור חשבון חדש')}
                 >
                   שכחת סיסמה?
@@ -182,7 +198,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading || gLoading}
-              className="w-full h-12 rounded-xl bg-gradient-to-l from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold shadow-md shadow-blue-200 transition-all active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
+              className="w-full h-11 rounded-full bg-[#171717] hover:bg-black text-white text-sm font-semibold shadow-sm transition-colors active:translate-y-px disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'התחבר'}
             </button>
@@ -218,7 +234,7 @@ export default function LoginPage() {
           {/* Register link */}
           <p className="text-center text-sm text-slate-400 mt-6">
             עדיין אין חשבון?{' '}
-            <Link to="/register" className="font-semibold text-blue-600 hover:text-blue-700 transition-colors">
+            <Link to="/register" className="font-semibold text-[#c92f4c] hover:text-[#a8243d] transition-colors">
               הירשם עכשיו
             </Link>
           </p>

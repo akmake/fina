@@ -70,14 +70,15 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] md:min-h-screen flex w-full bg-white font-sans" dir="rtl">
+    <div className="auth-canvas min-h-screen flex w-full font-sans" dir="rtl">
       
       {/* צד ימין: אזור הטופס */}
-      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-20 xl:px-24 bg-white z-10">
+      <div className="flex-1 flex items-center justify-center px-4 py-10 sm:px-8 lg:px-16 xl:px-24 z-10">
         <div className="w-full max-w-sm space-y-8">
           
           <div className="text-center sm:text-right">
-            <h2 className="mt-6 text-4xl font-extrabold text-gray-900 tracking-tight">
+            <p className="eyebrow">מתחילים מסודר</p>
+            <h2 className="font-display text-4xl font-semibold text-slate-950 tracking-[-0.04em]">
               יצירת חשבון
             </h2>
             <p className="mt-2 text-sm text-gray-500">
@@ -108,7 +109,7 @@ export default function RegisterPage() {
                     required
                     value={form.name}
                     onChange={handleChange}
-                    className="appearance-none block w-full px-4 py-3.5 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base"
+                    className="appearance-none block w-full px-4 py-3 border border-slate-300 bg-white rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-500 transition-colors text-base"
                     placeholder="ישראל ישראלי"
                   />
                 </div>
@@ -128,7 +129,7 @@ export default function RegisterPage() {
                     value={form.email}
                     onChange={handleChange}
                     style={{ direction: 'ltr', textAlign: 'right' }} 
-                    className="appearance-none block w-full px-4 py-3.5 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base"
+                    className="appearance-none block w-full px-4 py-3 border border-slate-300 bg-white rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-500 transition-colors text-base"
                     placeholder="name@example.com"
                   />
                 </div>
@@ -148,7 +149,7 @@ export default function RegisterPage() {
                     value={form.password}
                     onChange={handleChange}
                     style={{ direction: 'ltr' }}
-                    className="appearance-none block w-full px-4 py-3.5 border border-gray-300 rounded-xl placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base text-right pr-12" // pr-12 for icon space if LTR, but here we handle explicitly
+                    className="appearance-none block w-full px-4 py-3 border border-slate-300 bg-white rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-500 transition-colors text-base text-right pr-12"
                   />
                   <div className="absolute inset-y-0 right-0 pl-3 flex items-center pr-3 cursor-pointer" onClick={() => setShowPassword(!showPassword)}>
                     {showPassword ? (
@@ -178,7 +179,7 @@ export default function RegisterPage() {
                     value={form.confirmPassword}
                     onChange={handleChange}
                     style={{ direction: 'ltr' }}
-                    className="appearance-none block w-full px-4 py-3.5 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base text-right"
+                    className="appearance-none block w-full px-4 py-3 border border-slate-300 bg-white rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-500 transition-colors text-base text-right"
                   />
                 </div>
               </div>
@@ -188,7 +189,7 @@ export default function RegisterPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-4 px-4 border border-transparent rounded-xl shadow-sm text-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all transform active:scale-[0.98]"
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors active:translate-y-px"
               >
                 {loading ? (
                   <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -211,20 +212,20 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      {/* צד שמאל: תמונה גדולה */}
-      <div className="hidden lg:block relative w-0 flex-1 overflow-hidden">
-        {/* שימוש בתמונה חיצונית איכותית מאנספלאש */}
-        <img
-          className="absolute inset-0 h-full w-full object-cover"
-          src="https://images.unsplash.com/photo-1497215728101-856f4ea42174?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80"
-          alt="Office Background"
-        />
-        {/* שכבת כיסוי עדינה כדי שהתמונה לא תהיה רועשת מדי */}
-        <div className="absolute inset-0 bg-blue-900/20 mix-blend-multiply"></div>
-        
-        <div className="absolute inset-0 flex flex-col justify-end p-20 pb-24 bg-gradient-to-t from-black/60 via-transparent to-transparent">
-            <h3 className="text-4xl font-bold text-white mb-4">ניהול חכם, עתיד בטוח.</h3>
-            <p className="text-lg text-gray-200 max-w-md">המערכת המתקדמת לניהול התקציב שלך, בקלות ובנוחות מכל מקום.</p>
+      <div className="hidden lg:flex relative w-0 flex-1 overflow-hidden bg-slate-950 text-white items-end">
+        <div className="absolute -left-24 -top-24 h-96 w-96 rounded-full border border-blue-400/15" />
+        <div className="absolute right-16 top-20 grid grid-cols-2 gap-4 opacity-90">
+          {[42, 68, 55, 84].map((value, index) => (
+            <div key={value} className={`h-28 w-36 rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur ${index % 2 ? 'translate-y-8' : ''}`}>
+              <div className="mb-5 h-2 w-12 rounded-full bg-blue-400/60" />
+              <div className="h-2 rounded-full bg-white/10"><div className="h-full rounded-full bg-blue-400" style={{ width: `${value}%` }} /></div>
+            </div>
+          ))}
+        </div>
+        <div className="relative p-16 pb-20 xl:p-20">
+          <p className="mb-4 text-xs font-semibold tracking-[0.12em] text-blue-300">fina למשפחה שלך</p>
+          <h3 className="font-display text-5xl font-semibold leading-tight mb-5">פחות רעש.<br />יותר החלטות טובות.</h3>
+          <p className="text-lg leading-8 text-slate-400 max-w-md">כל החשבונות, היעדים וההרגלים הפיננסיים שלך — מחוברים לתמונה אחת.</p>
         </div>
       </div>
     </div>

@@ -175,7 +175,7 @@ export default function ExcelImportPage() {
   };
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
+    <div className="mx-auto max-w-5xl py-2">
       <Card className="max-w-4xl mx-auto shadow-lg">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold">אשף ייבוא עסקאות</CardTitle>

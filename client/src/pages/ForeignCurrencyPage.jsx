@@ -94,7 +94,7 @@ export default function ForeignCurrencyPage() {
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+    <div className="page-shell max-w-6xl space-y-5" dir="rtl">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><Globe className="h-7 w-7 text-indigo-500" /> מט"ח</h1>

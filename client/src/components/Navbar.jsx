@@ -126,8 +126,8 @@ export default function Navbar() {
   return (
     <>
       {/* ════════════════ DESKTOP SIDEBAR ════════════════ */}
-      <div className="hidden md:flex md:w-20 md:flex-col md:fixed md:inset-y-0 md:z-40">
-        <DesktopSidebar groups={groups} user={user} isAuthenticated={isAuthenticated} logout={logout} />
+      <div className="hidden md:fixed md:inset-y-0 md:right-0 md:z-40 md:flex md:w-52 md:flex-col">
+        <RocketSidebar groups={groups} user={user} isAuthenticated={isAuthenticated} logout={logout} />
       </div>
 
       {/* ════════════════ MOBILE ════════════════ */}
@@ -620,37 +620,37 @@ function LegacyDesktopSidebar({ groups, user, isAuthenticated, logout, onClose }
   }));
 
   return (
-    <aside className="flex h-full flex-col bg-white text-slate-900 dark:bg-[#111318] dark:text-slate-100 border-l border-slate-200/80 dark:border-white/[0.08]">
+    <aside className="flex h-full flex-col border-l border-slate-200 bg-[#f7f6f3] text-slate-800 dark:border-white/[0.07] dark:bg-slate-950 dark:text-slate-100">
 
       {/* Brand */}
-      <div className="h-16 px-5 flex items-center justify-between flex-shrink-0">
+      <div className="h-[68px] px-4 flex items-center justify-between flex-shrink-0 border-b border-slate-200 dark:border-white/[0.07]">
         <Link to="/" onClick={onClose} className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm shadow-blue-600/20">
+          <div className="h-8 w-8 rounded-lg bg-blue-500 flex items-center justify-center">
             <span className="text-white text-[13px] font-bold">F</span>
           </div>
-          <span className="text-lg font-bold tracking-tight">fina</span>
+          <span className="font-display text-[19px] font-semibold tracking-[-0.03em] text-slate-950 dark:text-white">fina</span>
         </Link>
         <button
           onClick={toggleDark}
           aria-label={isDark ? "מעבר למצב בהיר" : "מעבר למצב כהה"}
-          className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/[0.07] dark:hover:text-slate-200 transition-colors"
+          className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-200/70 hover:text-slate-900 dark:hover:bg-white/[0.08] dark:hover:text-white transition-colors"
         >
           {isDark ? <Sun className="h-4 w-4" strokeWidth={1.8} /> : <Moon className="h-4 w-4" strokeWidth={1.8} />}
         </button>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 pb-4 [scrollbar-width:thin]">
+      <nav className="flex-1 overflow-y-auto px-2.5 py-3 [scrollbar-width:thin]">
         <div className="space-y-1">
           {pinnedItems.map(item => (
             <NavLink
               key={item.to}
               to={item.to}
               onClick={onClose}
-              className={({ isActive }) => `flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors ${
+              className={({ isActive }) => `flex h-9 items-center gap-2.5 rounded-md px-3 text-[12.5px] font-medium transition-colors ${
                 isActive
-                  ? "bg-blue-600 text-white shadow-sm shadow-blue-600/15"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
+                  ? "bg-[#e8e4dd] text-slate-950 dark:bg-white/[0.1] dark:text-white"
+                  : "text-slate-600 hover:bg-[#eeebe5] hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.07] dark:hover:text-white"
               }`}
             >
               <item.icon className="h-[17px] w-[17px] flex-shrink-0" strokeWidth={1.8} />
@@ -659,8 +659,8 @@ function LegacyDesktopSidebar({ groups, user, isAuthenticated, logout, onClose }
           ))}
         </div>
 
-        <div className="my-4 h-px bg-slate-100 dark:bg-white/[0.07]" />
-        <p className="mb-2 px-3 text-[10px] font-bold tracking-[0.08em] text-slate-400 dark:text-slate-500">
+        <div className="my-3 h-px bg-slate-200 dark:bg-white/[0.07]" />
+        <p className="mb-1.5 px-3 text-[9px] font-semibold tracking-[0.1em] text-slate-500">
           כל הכלים
         </p>
 
@@ -673,14 +673,14 @@ function LegacyDesktopSidebar({ groups, user, isAuthenticated, logout, onClose }
               <button
                 onClick={() => toggle(group.label)}
                 aria-expanded={open}
-                className={`w-full flex h-9 items-center justify-between rounded-lg px-3 transition-colors ${
+                className={`w-full flex h-8 items-center justify-between rounded-md px-3 transition-colors ${
                   open || active
-                    ? "text-slate-900 dark:text-slate-100"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-slate-200"
+                    ? "text-slate-950 dark:text-white"
+                    : "text-slate-600 hover:bg-[#eeebe5] hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.05] dark:hover:text-white"
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <group.icon className={`h-4 w-4 flex-shrink-0 ${active ? "text-blue-600 dark:text-blue-400" : "text-slate-400"}`} strokeWidth={1.8} />
+                  <group.icon className={`h-4 w-4 flex-shrink-0 ${active ? "text-blue-600" : "text-slate-500"}`} strokeWidth={1.8} />
                   <span className="text-[12.5px] font-semibold">{group.label}</span>
                 </div>
                 <ChevronDown
@@ -690,7 +690,7 @@ function LegacyDesktopSidebar({ groups, user, isAuthenticated, logout, onClose }
                 />
               </button>
               {open && (
-                <ul className="mb-2 mt-1 space-y-0.5 border-r border-slate-200 pr-3 mr-5 dark:border-white/[0.09]">
+                <ul className="mb-2 mt-1 space-y-0.5 border-r border-slate-300 pr-3 mr-5 dark:border-white/[0.1]">
                   {group.items.map(item => (
                     <li key={item.to}>
                       <NavLink
@@ -698,10 +698,10 @@ function LegacyDesktopSidebar({ groups, user, isAuthenticated, logout, onClose }
                         end={item.to === "/"}
                         onClick={onClose}
                         className={({ isActive }) =>
-                          `flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[12px] font-medium transition-colors ${
+                          `flex h-7 items-center gap-2.5 rounded-md px-2.5 text-[11.5px] font-medium transition-colors ${
                             isActive
-                              ? "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
-                              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/[0.05] dark:hover:text-slate-100"
+                              ? "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300"
+                              : "text-slate-500 hover:bg-[#eeebe5] hover:text-slate-900 dark:hover:bg-white/[0.05] dark:hover:text-white"
                           }`
                         }
                       >
@@ -720,13 +720,13 @@ function LegacyDesktopSidebar({ groups, user, isAuthenticated, logout, onClose }
 
       {/* Privacy */}
       <div className="px-5 pb-2">
-        <Link to="/privacy" className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+        <Link to="/privacy" className="text-[10px] text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
           מדיניות פרטיות
         </Link>
       </div>
 
       {/* User footer */}
-      <div className="mx-3 mb-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-1 dark:border-white/[0.07] dark:bg-white/[0.03] flex-shrink-0">
+      <div className="mx-3 mb-3 rounded-lg border border-slate-200 bg-white p-1 flex-shrink-0 dark:border-white/[0.08] dark:bg-white/[0.05]">
         {isAuthenticated ? (
           <DesktopUserNav user={user} logout={logout} onClose={onClose} />
         ) : (
@@ -742,6 +742,138 @@ function LegacyDesktopSidebar({ groups, user, isAuthenticated, logout, onClose }
   );
 }
 
+function WorkspaceSidebar({ groups, user, isAuthenticated, logout }) {
+  const { isDark, toggleDark } = useUIStore();
+  const location = useLocation();
+  const primaryPaths = ['/finance-dashboard', '/portfolio', '/budget', '/assets', '/goals', '/reports'];
+  const allItems = groups.flatMap(group => group.items);
+  const primaryItems = primaryPaths.map(path => allItems.find(item => item.to === path)).filter(Boolean);
+  const secondaryGroups = groups
+    .map(group => ({ ...group, items: group.items.filter(item => !primaryPaths.includes(item.to)) }))
+    .filter(group => group.items.length);
+  const [openGroup, setOpenGroup] = useState(() =>
+    secondaryGroups.find(group => group.items.some(item => isPathActive(item.to, location.pathname)))?.label || null
+  );
+
+  useEffect(() => {
+    const current = secondaryGroups.find(group => group.items.some(item => isPathActive(item.to, location.pathname)));
+    if (current) setOpenGroup(current.label);
+  }, [location.pathname]);
+
+  return (
+    <aside className="flex h-full flex-col overflow-hidden border-l border-[#232a36] bg-[#111722] text-white">
+      <div className="px-4 pb-4 pt-5">
+        <Link to="/finance-dashboard" className="flex items-center gap-3 px-2">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#ff6b45] text-sm font-black text-white">F</span>
+          <div>
+            <p className="font-display text-[20px] font-semibold leading-none tracking-[-.04em]">fina</p>
+            <p className="mt-1 text-[9px] font-medium tracking-[.16em] text-slate-400">FINANCIAL DESK</p>
+          </div>
+        </Link>
+        <Link to="/connections" className="mt-5 flex items-center justify-between rounded-xl border border-white/[.08] bg-white/[.045] px-3 py-2.5 text-[11px] text-slate-300 transition hover:bg-white/[.08]">
+          <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-400" />מרכז החיבורים</span>
+          <ChevronLeft className="h-3.5 w-3.5 text-slate-500" />
+        </Link>
+      </div>
+
+      <nav className="scrollbar-thin flex-1 overflow-y-auto px-3 pb-4">
+        <p className="mb-2 px-3 text-[9px] font-semibold tracking-[.16em] text-slate-500">מרחב עבודה</p>
+        <div className="space-y-1">
+          {primaryItems.map(item => (
+            <NavLink key={item.to} to={item.to} className={({ isActive }) => `relative flex h-10 items-center gap-3 rounded-xl px-3 text-[12.5px] font-medium transition ${isActive ? 'bg-white text-[#111722]' : 'text-slate-400 hover:bg-white/[.06] hover:text-white'}`}>
+              {({ isActive }) => <><item.icon className={`h-4 w-4 ${isActive ? 'text-[#ff5b35]' : ''}`} strokeWidth={1.8} /><span>{item.label}</span>{isActive && <span className="mr-auto h-1.5 w-1.5 rounded-full bg-[#ff5b35]" />}</>}
+            </NavLink>
+          ))}
+        </div>
+
+        <div className="my-4 h-px bg-white/[.07]" />
+        <p className="mb-2 px-3 text-[9px] font-semibold tracking-[.16em] text-slate-500">כלים נוספים</p>
+        <div className="space-y-1">
+          {secondaryGroups.map(group => {
+            const active = group.items.some(item => isPathActive(item.to, location.pathname));
+            const open = openGroup === group.label;
+            return (
+              <div key={group.label}>
+                <button type="button" onClick={() => setOpenGroup(open ? null : group.label)} className={`flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-[11.5px] transition ${active ? 'text-white' : 'text-slate-500 hover:bg-white/[.04] hover:text-slate-300'}`}>
+                  <group.icon className={`h-3.5 w-3.5 ${active ? 'text-[#ff7b5b]' : ''}`} />
+                  <span>{group.label}</span>
+                  <ChevronDown className={`mr-auto h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+                </button>
+                {open && <div className="mb-2 mr-4 border-r border-white/[.08] pr-2">
+                  {group.items.map(item => <NavLink key={item.to} to={item.to} className={({ isActive }) => `flex h-8 items-center gap-2 rounded-lg px-3 text-[11px] ${isActive ? 'bg-[#ff6b45]/15 text-[#ff9a80]' : 'text-slate-500 hover:text-white'}`}><item.icon className="h-3.5 w-3.5" />{item.label}</NavLink>)}
+                </div>}
+              </div>
+            );
+          })}
+        </div>
+      </nav>
+
+      <div className="border-t border-white/[.07] p-3">
+        <button onClick={toggleDark} className="mb-2 flex h-8 w-full items-center gap-2 rounded-lg px-3 text-[11px] text-slate-500 hover:bg-white/[.05] hover:text-white">
+          {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}{isDark ? 'מצב בהיר' : 'מצב כהה'}
+        </button>
+        {isAuthenticated ? <DesktopUserNav user={user} logout={logout} /> : <Link to="/login" className="flex h-10 items-center justify-center rounded-xl bg-[#ff6b45] text-xs font-semibold">התחברות</Link>}
+      </div>
+    </aside>
+  );
+}
+
+function RocketSidebar({ groups, user, isAuthenticated, logout }) {
+  const location = useLocation();
+  const core = [
+    { to: '/finance-dashboard', label: 'לוח בקרה', icon: LayoutDashboard },
+    { to: '/recurring', label: 'קבועים ומנויים', icon: RefreshCw },
+    { to: '/categories', label: 'ניתוח הוצאות', icon: BarChart3 },
+    { to: '/budget', label: 'תקציבים', icon: Wallet },
+    { to: '/net-worth', label: 'שווי נקי', icon: TrendingUp },
+    { to: '/portfolio', label: 'עסקאות', icon: Receipt },
+  ];
+  const corePaths = new Set(core.map(item => item.to));
+  const extras = groups.flatMap(group => group.items).filter(item => !corePaths.has(item.to));
+  const [moreOpen, setMoreOpen] = useState(() => extras.some(item => isPathActive(item.to, location.pathname)));
+
+  return (
+    <aside className="flex h-full flex-col border-l border-black/[.055] bg-white text-[#171717] dark:border-white/[.07] dark:bg-slate-950 dark:text-white">
+      <div className="px-5 pb-4 pt-6">
+        <Link to="/finance-dashboard" className="flex items-center gap-2.5 text-[#c92f4c]">
+          <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#c92f4c] text-xs font-black text-white">F</span>
+          <span className="text-[18px] font-bold tracking-[-.035em]">fina</span>
+        </Link>
+      </div>
+
+      <div className="flex items-center gap-3 px-5 py-3">
+        <div className="grid h-8 w-8 place-items-center rounded-full bg-[#f1f1f0] text-[11px] font-semibold text-slate-700">{initials(user?.name)}</div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[12px] font-semibold">היי, {user?.name?.split(' ')[0] || 'משתמש'}</p>
+          <p className="mt-0.5 text-[9px] text-slate-400">החשבון הפיננסי שלך</p>
+        </div>
+        <Link to="/settings" className="grid h-8 w-8 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Settings className="h-4 w-4" /></Link>
+      </div>
+
+      <nav className="scrollbar-thin flex-1 overflow-y-auto px-3 py-3">
+        <div className="space-y-1">
+          {core.map(item => (
+            <NavLink key={item.to} to={item.to} className={({ isActive }) => `flex h-10 items-center gap-3 rounded-xl px-3 text-[12px] font-medium transition-colors ${isActive ? 'bg-[#faeef1] text-[#bf2946]' : 'text-slate-600 hover:bg-[#f6f6f5] hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[.05] dark:hover:text-white'}`}>
+              <item.icon className="h-4 w-4" strokeWidth={1.8} />{item.label}
+            </NavLink>
+          ))}
+        </div>
+
+        <button onClick={() => setMoreOpen(value => !value)} className="mt-3 flex h-9 w-full items-center gap-3 rounded-xl px-3 text-[11px] font-medium text-slate-400 hover:bg-[#f6f6f5] hover:text-slate-700">
+          <Layers className="h-4 w-4" />כלים נוספים<ChevronDown className={`mr-auto h-3.5 w-3.5 transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {moreOpen && <div className="mt-1 grid grid-cols-2 gap-1 px-1">
+          {extras.map(item => <NavLink key={item.to} to={item.to} title={item.label} className={({ isActive }) => `flex min-h-9 items-center gap-2 rounded-lg px-2 text-[10px] ${isActive ? 'bg-[#faeef1] text-[#bf2946]' : 'text-slate-500 hover:bg-[#f6f6f5] hover:text-slate-800'}`}><item.icon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{item.label}</span></NavLink>)}
+        </div>}
+      </nav>
+
+      <div className="border-t border-black/[.05] p-3">
+        {isAuthenticated ? <DesktopUserNav user={user} logout={logout} /> : <Link to="/login" className="flex h-10 items-center justify-center rounded-full bg-[#171717] text-xs font-semibold text-white">התחברות</Link>}
+      </div>
+    </aside>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────
 // Desktop — User Nav
 // ─────────────────────────────────────────────────────────────
@@ -749,15 +881,15 @@ function DesktopUserNav({ user, logout, onClose }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-start group">
-          <div className="h-8 w-8 rounded-lg bg-slate-900 dark:bg-slate-100 flex items-center justify-center text-white dark:text-slate-900 text-[11px] font-bold flex-shrink-0">
+        <button className="group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-start transition-colors hover:bg-slate-100 dark:hover:bg-white/[.06]">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#faeef1] text-[11px] font-bold text-[#bf2946]">
             {initials(user?.name)}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[12.5px] font-semibold text-slate-800 dark:text-slate-100 truncate leading-tight">
+            <p className="truncate text-[12px] font-semibold leading-tight text-slate-800 dark:text-white">
               {user?.name || "משתמש"}
             </p>
-            <p className="text-[11px] text-slate-400 truncate leading-tight mt-0.5">{user?.email}</p>
+            <p className="mt-0.5 truncate text-[10px] leading-tight text-slate-500">{user?.email}</p>
           </div>
           <ChevronDown className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" strokeWidth={2} />
         </button>

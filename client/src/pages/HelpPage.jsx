@@ -347,7 +347,7 @@ export default function HelpPage() {
   const [expandAll, setExpandAll] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#F2F4F8]" dir="rtl">
+    <div className="page-shell min-h-screen" dir="rtl">
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
 
         {/* Hero */}

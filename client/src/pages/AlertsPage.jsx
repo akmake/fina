@@ -60,7 +60,7 @@ export default function AlertsPage() {
   if (loading) return <div className="flex justify-center items-center h-[60vh]"><div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" /></div>;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+    <div className="page-shell max-w-5xl space-y-5" dir="rtl">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -94,7 +94,7 @@ export default function AlertsPage() {
               const config = SEVERITY_CONFIG[alert.severity] || SEVERITY_CONFIG.info;
               const Icon = config.icon;
               return (
-                <motion.div key={alert._id} initial={{ opacity:0, x:20 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:-20 }} layout>
+                <motion.div key={alert._id}>
                   <Card className={`${config.bg} ${config.border} border ${!alert.isRead ? 'ring-2 ring-blue-300 dark:ring-blue-700' : ''}`}>
                     <CardContent className="py-3 px-4">
                       <div className="flex items-start gap-3">
