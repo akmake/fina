@@ -115,33 +115,57 @@ with the manual-entry box; both poll while a job is waiting.
 
 ## Phone OTP relay
 
-**Relay app (AppSms repo, `GitHub/AppSms`) — no code changes needed.** It forwards every
-SMS to a webhook. Configure it with **endpoint** `https://<fina>/api/devices/sms` and
-**bearer token** = the pairing code from `/connections`. The server ignores any SMS that
-doesn't look like CAL (`looksLikeCalSms`: sender/body matches cal|כאל|ויזה) and never
-stores SMS text. Recommended app change for privacy: a sender allow-list so personal
-SMS never leave the phone.
+The phone side is the **Relay app** (separate repo `GitHub/AppSms`, Android, Kotlin +
+Compose), adapted to Fina in 2026-10. Production server: **https://ziporiteem.com**.
 
-Generic contract (for any other client):
+### How the app is wired to Fina
 
-Contract for the Android companion app (the app lives in a separate repo):
+- **Fixed server.** The address is `BuildConfig.FINA_BASE_URL` (default
+  `https://ziporiteem.com`, override with `-PFINA_BASE_URL=https://…`, https only). There is
+  no editable address; an old stored one is deleted on start. Endpoints:
+  `POST /api/devices/sms` and `POST /api/devices/heartbeat` (both **before CSRF**, Bearer auth).
+- **Pairing.** Fina → `/connections` → "צימוד טלפון" gives a one-time `fd_…` key. The app
+  **verifies it with a heartbeat before saving** (so "connected" means Fina accepted it;
+  wrong key / no network show a clear message).
+- **Only CAL codes leave the phone.** `SmsFilter` (same pattern as the server's `CAL_SMS`):
+  sender/body matches CAL (Visa Cal, cal-online, whole-word כאל/ויזה with one prefix letter —
+  not "כאלה") **and** the body has a standalone 4-8 digit code. Everything else stays local.
+- **Delivery.** The SMS broadcast (`goAsync`) records the message in a durable ledger, enqueues
+  an expedited WorkManager job (safety net: survives process death / Doze / no network;
+  `getForegroundInfo` implemented for Android 8-11), and tries immediately (7 s). A ledger
+  **claim** makes receiver and worker never send the same message twice. Retries use backoff
+  (10 s, 20 s, 40 s …) until the code's lifetime ends (12 min), then the message is marked
+  expired. 2xx = done even if "nothing was waiting"; 401/403 = key revoked → the app shows
+  "re-pair"; 425/429/5xx/network = retry.
+- **Heartbeat** every 15 min (+ on open / after pairing): refreshes "last seen" on Fina and
+  detects a revoked key. The app shows a health card: connection, SMS permission, battery
+  optimization (with a button), last code and its result, pending count.
 
-1. **Pairing** — the user taps "צימוד טלפון" on `/connections` → `POST /api/devices`
-   returns a one-time token `fd_…` (shown once). The user enters it in the app.
-   The app stores it in encrypted storage (Android Keystore / EncryptedSharedPreferences).
-2. **Every request** sends `Authorization: Device <token>` and `X-Fina-Client: web-app`
-   (global CSRF header), JSON body, to `<API_BASE>/devices/...`.
-3. **Heartbeat** (optional, e.g. every 15 min via WorkManager):
-   `POST /devices/heartbeat` → `{ ok, awaitingOtp }`. `lastSeenAt` is shown on the web.
-4. **SMS** — on an incoming SMS from CAL (sender filter in the app), send the whole
-   text: `POST /devices/otp { message: "<sms body>", sender: "<address>" }`.
-   The server extracts the 4-8 digit code. Responses:
-   `200 { matched:true, status:'success', stats }` · `404 { matched:false }` (no sync
-   waiting — ignore) · `422` wrong code (sync keeps waiting) · `429` too many wrong
-   codes / rate limit · `410` expired · `401` = unknown/revoked token → ask to re-pair.
-   **Filter by sender in the app** (CAL only): every relayed SMS counts as a code attempt.
-5. **Scope** — the token can only do (3) and (4). It can't read any data.
-   Rate limit: `deviceLimiter` (30/hour per device token, production) on both phone endpoints.
+### Server behaviour for the Relay app (`relaySmsInbound`)
+
+`POST /api/devices/sms { id, from, body, receivedAt, platform }` with `Authorization: Bearer fd_…`:
+
+| Response | Meaning |
+|----------|---------|
+| `200 { handled:true, accepted:true }` | A sync was waiting; the code is accepted and the sync finishes **in the background** (acknowledged at once — fetching transactions can outlast the phone's HTTP timeout) |
+| `200 { handled:false, reason }` | `not-a-cal-sms` · `no-code` · `no-sync-waiting` (nothing to do — not an error) |
+| `425 { retry:true, reason:'sync-starting' }` | The SMS **beat the server** (the sync has begun but has not yet saved "waiting for code"). The phone retries in ~10 s. Only returned while such a sync started < 2 min ago |
+| `401` | Unknown / revoked key |
+| `429` | Rate limit (`deviceLimiter`, 30/hour per key in production) |
+
+`POST /api/devices/heartbeat` → `200 { ok, awaitingOtp, deviceName, serverTime }`.
+
+### Generic contract (any other client)
+
+1. **Pairing** — `POST /api/devices` (session) returns a one-time token `fd_…`.
+2. **Auth** — `Authorization: Device <token>` **or** `Bearer <token>`.
+3. **`POST /devices/otp { code | message, sender }`** — needs the `X-Fina-Client` header (global
+   CSRF). `200 { matched, status, stats }` (waits for the whole sync) · `404 { matched:false }` ·
+   `422` wrong code (sync keeps waiting) · `429` too many wrong codes / rate limit · `410` expired ·
+   `401` unknown/revoked token.
+4. **Scope** — a device token can only call the phone endpoints (`/sms`, `/heartbeat`, `/otp`);
+   it can't read any data. Every relayed SMS counts as a code attempt at CAL, so clients must
+   filter by sender (the server also refuses anything that doesn't look like CAL).
 
 ---
 

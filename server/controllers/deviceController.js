@@ -4,7 +4,8 @@ import ImportJob from '../models/ImportJob.js';
 import AppError from '../utils/AppError.js';
 import { audit } from '../utils/audit.js';
 import { hashDeviceToken } from '../middlewares/deviceAuth.js';
-import { submitJobOtp } from '../services/importRunner.js';
+import { submitJobOtp, extractOtp } from '../services/importRunner.js';
+import logger from '../utils/logger.js';
 import { notify } from '../services/notificationService.js';
 import { COMPANY_CONFIG } from '../services/scrapeService.js';
 
@@ -15,6 +16,9 @@ import { COMPANY_CONFIG } from '../services/scrapeService.js';
  */
 
 const MAX_DEVICES = 5;
+// How long after a sync begins its SMS may legitimately arrive before the job is
+// saved as 'waiting for code' (the CAL request itself takes a few seconds).
+const SYNC_STARTING_WINDOW_MS = 2 * 60 * 1000;
 const DEVICE_OTP_COMPANIES = Object.entries(COMPANY_CONFIG)
   .filter(([, cfg]) => cfg.deviceOtp)
   .map(([key]) => key);
@@ -88,13 +92,15 @@ export const heartbeat = async (req, res, next) => {
       status: 'awaiting_otp',
       otpExpiresAt: { $gt: new Date() },
     });
-    res.json({ ok: true, awaitingOtp: !!waiting });
+    res.json({ ok: true, awaitingOtp: !!waiting, deviceName: req.device.name, serverTime: new Date().toISOString() });
   } catch (err) { next(err); }
 };
 
 // The SMS must look like it comes from CAL before it may be tried as a code —
 // every attempt counts at CAL, and the Relay app forwards *all* incoming SMS.
-const CAL_SMS = /cal|כאל|ויזה/i;
+// (Hebrew words are matched whole: "כאלה" = "such" must not count.) Keep in sync with
+// SmsFilter.kt in the AppSms repo — same pattern on both sides.
+export const CAL_SMS = /visa\s*cal|\bcal\b|cal-?online|(?<![\u05D0-\u05EA])[\u05D1\u05DC\u05DE\u05D4\u05D5\u05E9\u05DB]?(\u05DB\u05D0\u05DC|\u05D5\u05D9\u05D6\u05D4)(?![\u05D0-\u05EA])/i;
 export const looksLikeCalSms = (from, body) => CAL_SMS.test(String(from || '')) || CAL_SMS.test(String(body || ''));
 
 /**
@@ -117,20 +123,37 @@ export const relaySmsInbound = async (req, res, next) => {
       otpExpiresAt: { $gt: new Date() },
     }).sort({ otpRequestedAt: -1 }).lean();
 
-    if (!job) return res.json({ handled: false, reason: 'no-sync-waiting' });
     if (!body || !looksLikeCalSms(from, body)) return res.json({ handled: false, reason: 'not-a-cal-sms' });
+    if (!extractOtp(body)) return res.json({ handled: false, reason: 'no-code' });
 
-    try {
-      const finished = await submitJobOtp(job._id, body);
-      req.device.lastOtpAt = new Date();
-      await req.device.save();
-      await audit(req, 'device.otp', 'ImportJob', { entityId: job._id, after: { device: req.device._id, via: 'relay' } });
-      return res.json({ handled: true, status: finished.status, inserted: finished.stats?.inserted ?? 0 });
-    } catch (err) {
-      // Wrong / expired code etc. — reported, but not as a retryable failure.
-      if (err.statusCode && err.statusCode < 500) return res.json({ handled: false, reason: err.message });
-      throw err;
+    if (!job) {
+      // The SMS can beat the server: CAL has sent it, but the sync has not yet saved
+      // its 'waiting for code' state. Tell the phone to retry shortly instead of
+      // dropping the one-time code.
+      const starting = await ImportJob.exists({
+        user: req.user._id,
+        company: { $in: DEVICE_OTP_COMPANIES },
+        status: { $in: ['queued', 'running'] },
+        otpRequestedAt: null,
+        // measured from when the job actually started (a job may sit queued first)
+        $or: [
+          { startedAt: { $gt: new Date(Date.now() - SYNC_STARTING_WINDOW_MS) } },
+          { startedAt: null, createdAt: { $gt: new Date(Date.now() - SYNC_STARTING_WINDOW_MS) } },
+        ],
+      });
+      if (starting) return res.status(425).json({ handled: false, reason: 'sync-starting', retry: true });
+      return res.json({ handled: false, reason: 'no-sync-waiting' });
     }
+
+    // Acknowledge at once: finishing the sync (CAL login + fetching transactions) can
+    // take longer than the phone's HTTP timeout, and a timed-out request would be
+    // retried for nothing. The result shows in Fina (and in an alert on failure).
+    req.device.lastOtpAt = new Date();
+    await req.device.save();
+    submitJobOtp(job._id, body)
+      .then(() => audit(req, 'device.otp', 'ImportJob', { entityId: job._id, after: { device: req.device._id, via: 'relay' } }))
+      .catch((err) => logger.warn('[devices/sms] code not accepted: ' + err.message));
+    return res.json({ handled: true, accepted: true });
   } catch (err) { next(err); }
 };
 

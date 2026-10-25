@@ -178,27 +178,75 @@ describe('כאל — קוד SMS שמגיע מהטלפון', () => {
     expect((await ImportJob.findById(stuck._id)).status).toBe('error');
   });
 
-  it('Relay webhook (אפליקציית AppSms): Bearer, בלי כותרת CSRF; SMS שאינו מכאל לא נוגע בסנכרון', async () => {
+  it('Relay webhook (אפליקציית AppSms): Bearer, בלי CSRF; מאשר מיד ומסיים ברקע; SMS שאינו מכאל לא נוגע בסנכרון', async () => {
     const { agent } = await userAgent('relay1@test.com');
     const conn = await createCalAuto(agent);
     const token = await pairDevice(agent);
     const job = await startScheduledJob(conn.body._id);
+    const sms = (body) => request(app).post('/api/devices/sms').set('Authorization', 'Bearer ' + token)
+      .send({ id: '1', from: 'CAL', body, receivedAt: Date.now(), platform: 'android' });
 
-    // Unrelated SMS (another service's code) — ignored, no attempt at CAL.
-    const other = await request(app).post('/api/devices/sms').set('Authorization', `Bearer ${token}`)
+    // Another service's code, and a CAL message without a code — ignored, no attempt at CAL.
+    const other = await request(app).post('/api/devices/sms').set('Authorization', 'Bearer ' + token)
       .send({ id: '1', from: 'AliExpress', body: 'Your code is 777777', receivedAt: Date.now(), platform: 'android' });
     expect(other.status).toBe(200);
     expect(other.body).toMatchObject({ handled: false, reason: 'not-a-cal-sms' });
+    expect((await sms('כאל: הצטרפו עכשיו למועדון')).body).toMatchObject({ handled: false, reason: 'no-code' });
     expect(calService.verifyCalOtp).not.toHaveBeenCalled();
     expect((await ImportJob.findById(job._id)).status).toBe('awaiting_otp');
 
-    const cal = await request(app).post('/api/devices/sms').set('Authorization', `Bearer ${token}`)
-      .send({ id: '2', from: 'CAL', body: SMS, receivedAt: Date.now(), platform: 'android' });
+    // The real code: acknowledged immediately; the sync finishes in the background.
+    const cal = await sms(SMS);
     expect(cal.status).toBe(200);
-    expect(cal.body).toMatchObject({ handled: true, status: 'success', inserted: 1 });
+    expect(cal.body).toMatchObject({ handled: true, accepted: true });
+    for (let i = 0; i < 60 && (await ImportJob.findById(job._id)).status !== 'success'; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    expect((await ImportJob.findById(job._id)).status).toBe('success');
 
     const bad = await request(app).post('/api/devices/sms').set('Authorization', 'Bearer fd_nope').send({ from: 'CAL', body: SMS });
     expect(bad.status).toBe(401);
+  });
+
+  it('Relay: ה-SMS הקדים את השרת (הסנכרון מתחיל, עוד לא ממתין לקוד) → 425 כדי שהטלפון ינסה שוב', async () => {
+    const { agent } = await userAgent('relay2@test.com');
+    const conn = await createCalAuto(agent);
+    const token = await pairDevice(agent);
+    const connDoc = await BankConnection.findById(conn.body._id);
+    await ImportJob.create({ user: connDoc.user, connection: connDoc._id, company: 'calAuto', trigger: 'scheduled', status: 'running', startedAt: new Date() });
+
+    const early = await request(app).post('/api/devices/sms').set('Authorization', 'Bearer ' + token)
+      .send({ id: '1', from: 'CAL', body: SMS, receivedAt: Date.now(), platform: 'android' });
+    expect(early.status).toBe(425);
+    expect(early.body).toMatchObject({ handled: false, reason: 'sync-starting', retry: true });
+    expect(calService.verifyCalOtp).not.toHaveBeenCalled();
+
+    // Nothing is starting at all (e.g. the user logged in to CAL themselves) → plain 200, no retry.
+    await ImportJob.deleteMany({ connection: connDoc._id });
+    const none = await request(app).post('/api/devices/sms').set('Authorization', 'Bearer ' + token)
+      .send({ id: '2', from: 'CAL', body: SMS, receivedAt: Date.now(), platform: 'android' });
+    expect(none.status).toBe(200);
+    expect(none.body).toMatchObject({ handled: false, reason: 'no-sync-waiting' });
+  });
+
+  it('Relay: heartbeat עם Bearer בלבד (בלי כותרת CSRF) מזהה את המכשיר', async () => {
+    const { agent } = await userAgent('relay3@test.com');
+    const token = await pairDevice(agent);
+    const ok = await request(app).post('/api/devices/heartbeat').set('Authorization', 'Bearer ' + token);
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ ok: true, awaitingOtp: false, deviceName: 'הטלפון שלי' });
+    expect((await request(app).post('/api/devices/heartbeat').set('Authorization', 'Bearer fd_nope')).status).toBe(401);
+    expect((await request(app).post('/api/devices/heartbeat')).status).toBe(401);
+  });
+
+  it('זיהוי SMS של כאל: מילה שלמה בעברית (עם תחילית), לא "כאלה"', async () => {
+    const { looksLikeCalSms } = await import('../controllers/deviceController.js');
+    for (const [from, body] of [['CAL', ''], ['VisaCal', 'x'], ['+97250', 'קוד האימות שלך בכאל: 123456'], ['', 'ויזה כאל']]) {
+      expect(looksLikeCalSms(from, body)).toBe(true);
+    }
+    for (const [from, body] of [['Shop', 'calendar invite'], ['Dad', 'יש לי כאלה וכאלה'], ['Bank', 'your code 123456']]) {
+      expect(looksLikeCalSms(from, body)).toBe(false);
+    }
   });
 
   it('extractOtp מוציא את הקוד מתוך הודעה מלאה', () => {

@@ -7,13 +7,14 @@ import { requireAuth } from '../middlewares/authMiddleware.js';
 import deviceAuth from '../middlewares/deviceAuth.js';
 import { deviceLimiter } from '../middlewares/rateLimiter.js';
 import {
-  listDevices, pairDevice, revokeDevice, heartbeat, submitDeviceOtp,
+  listDevices, pairDevice, revokeDevice, submitDeviceOtp,
 } from '../controllers/deviceController.js';
 
 const router = Router();
 
 // Phone side — device token only (declared first so requireAuth doesn't catch them).
-router.post('/heartbeat', deviceLimiter, deviceAuth, heartbeat);
+// /heartbeat and /sms are mounted in app.js BEFORE the CSRF middleware (the Relay app
+// sends only a Bearer token); /otp keeps the generic contract (needs X-Fina-Client).
 router.post('/otp', deviceLimiter, deviceAuth, submitDeviceOtp);
 
 // Web side — the signed-in user manages their phones.

@@ -47,5 +47,18 @@ export const deviceLimiter = isDev
       message: { message: 'יותר מדי בקשות מהמכשיר. נסה שוב מאוחר יותר.' },
     });
 
+/* SMS מהטלפון — מכסה נפרדת וגבוהה: כל קוד עשוי לדרוש כמה ניסיונות חוזרים, ואסור שפעימות
+   הלב או בדיקות ידניות יגזלו ממנה */
+export const deviceSmsLimiter = isDev
+  ? (_req, _res, next) => next()
+  : rateLimit({
+      windowMs: 60 * 60 * 1000,
+      max: 120,
+      standardHeaders: true,
+      legacyHeaders: false,
+      keyGenerator: (req) => req.get('authorization') || req.ip,
+      message: { message: 'יותר מדי הודעות מהמכשיר. נסה שוב מאוחר יותר.' },
+    });
+
 /* ברירת-מחדל */
 export default publicLimiter;

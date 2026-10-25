@@ -106,10 +106,10 @@ Contract details: [modules/import.md § Phone OTP relay](modules/import.md#phone
 | GET | `/devices` | Session | The user's active paired phones (no token hashes) |
 | POST | `/devices` | Session | Pair a phone `{ name? }` → `201 { device, token }` — the raw token is shown **once** (max 5 devices) |
 | DELETE | `/devices/:id` | Session | Revoke a phone (its token stops working immediately) |
-| POST | `/devices/heartbeat` | `Authorization: Device <token>` | Marks the phone alive → `{ ok, awaitingOtp }` |
+| POST | `/devices/heartbeat` | `Authorization: Device\|Bearer <token>` | Marks the phone alive → `{ ok, awaitingOtp, deviceName, serverTime }`. Mounted **before CSRF** (no `X-Fina-Client` needed) |
 | POST | `/devices/otp` | `Authorization: Device <token>` | `{ code }` or `{ message, sender }` (full SMS text) → applied to the owner's newest sync waiting for a code → `{ matched, status, stats }`; `404 { matched:false }` if nothing is waiting (scrape rate-limited) |
 
-| POST | `/devices/sms` | `Authorization: Bearer <device token>` | **Webhook of the Relay SMS app** (AppSms repo) — body `{ id, from, body, receivedAt, platform }`. Mounted **before CSRF** (no `X-Fina-Client`). Only a CAL-looking SMS (sender/body matches CAL) is tried as a code; always `200 { handled, reason? | status, inserted }` for a handled message, `401` bad token. The SMS text is never stored |
+| POST | `/devices/sms` | `Authorization: Bearer <device token>` | **Webhook of the Relay SMS app** (AppSms repo, adapted to Fina) — body `{ id, from, body, receivedAt, platform }`. Mounted **before CSRF**. Only a CAL-looking SMS that carries a 4-8 digit code is used. `200 { handled:true, accepted:true }` (sync finishes in the background) · `200 { handled:false, reason }` (`not-a-cal-sms` / `no-code` / `no-sync-waiting`) · **`425 { retry:true }`** when the SMS beat the server (sync starting, not yet waiting) · `401` bad/revoked key · `429` rate limit. SMS text is never stored |
 
 > A device token can **only** call these phone endpoints — it is rejected everywhere
 > else (it is not a session). Requests still need `X-Fina-Client` (global CSRF).

@@ -34,7 +34,7 @@ default `approved` applies, so nobody existing is locked out (no migration neede
 
 `Authorization: Device <token>` (or `Bearer <token>` from the Relay app) — issued once by `POST /api/devices` (session), stored
 only as a SHA-256 hash (`Device.tokenHash`), revocable. `middlewares/deviceAuth.js`
-accepts it **only** on `/api/devices/heartbeat` and `/api/devices/otp`; every other
+accepts it **only** on `/api/devices/sms`, `/api/devices/heartbeat` and `/api/devices/otp`; every other
 route ignores the header (cookie-based `requireAuth`), so a stolen phone token can
 submit an SMS code but can never read data. Revoked devices and inactive owners → 401.
 

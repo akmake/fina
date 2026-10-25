@@ -54,9 +54,9 @@ import accountRoutes from './routes/accountRoutes.js';
 import subscriptionRoutes from './routes/subscriptionRoutes.js';
 
 // ייבוא מידלוור
-import rateLimiter, { authLimiter, scrapeLimiter, deviceLimiter } from './middlewares/rateLimiter.js';
+import rateLimiter, { authLimiter, scrapeLimiter, deviceLimiter, deviceSmsLimiter } from './middlewares/rateLimiter.js';
 import deviceAuth from './middlewares/deviceAuth.js';
-import { relaySmsInbound } from './controllers/deviceController.js';
+import { relaySmsInbound, heartbeat as deviceHeartbeat } from './controllers/deviceController.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
 import { requestLogger, errorHandler } from './middlewares/errorHandler.js';
 import { csrfTokenHandler, csrfProtection } from './middlewares/csrf.js';
@@ -149,7 +149,8 @@ app.get('/api/csrf-token', rateLimiter, csrfTokenHandler);
 
 // --- Webhook of the Relay SMS app (phone) — device-token auth, no cookies, so
 //     it sits before CSRF. See docs/modules/import.md § Phone OTP relay. ---
-app.post('/api/devices/sms', deviceLimiter, deviceAuth, relaySmsInbound);
+app.post('/api/devices/sms', deviceSmsLimiter, deviceAuth, relaySmsInbound);
+app.post('/api/devices/heartbeat', deviceLimiter, deviceAuth, deviceHeartbeat);
 
 // --- הפעלת הגנת CSRF על כל הנתיבים מכאן ומטה ---
 app.use(csrfProtection);
