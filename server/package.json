@@ -9,6 +9,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "migrate:households": "node ./scripts/migrateToHouseholds.js",
+    "repair:foreign": "node ./scripts/repairForeignTransactions.js",
     "install:chrome": "node ./scripts/installChrome.mjs",
     "postinstall": "node ./scripts/installChrome.mjs"
   },

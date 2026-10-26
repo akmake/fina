@@ -223,3 +223,12 @@ charge is `0` while pending (Max, Isracard/Amex), equals the original-currency a
 offline) and stamps `amountEstimated: true` + `fxRate`. A row with a real ILS charge is
 left as-is. The UI shows `≈` and the original amount (`TransactionCard`). The real
 charge replaces the estimate via the pending-supersede rule above.
+
+**Repairing data imported before the fix** — `npm run repair:foreign` (in `server/`,
+`scripts/repairForeignTransactions.js` → `services/foreignRepair.js`). Dry run by
+default; `--apply` writes, `--since=YYYY-MM-DD` (default: last 365 days), `--backfill`
+moves card connections' `lastSuccessAt` back so their next sync re-reads the period
+(deals dropped at import exist only at the bank). It soft-deletes pending foreign rows
+whose completed version is stored, and converts rows whose ILS `amount` equals the
+original-currency amount at the charge-date rate (Frankfurter/ECB, `api.frankfurter.dev`),
+flagging them `amountEstimated`. Idempotent.

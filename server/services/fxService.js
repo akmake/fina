@@ -13,7 +13,8 @@ const FETCH_TIMEOUT_MS = 5000;
 
 // Last-resort rates (ILS per unit) when the rates API is unreachable — keeps a
 // foreign deal visible instead of dropping it. Always flagged as estimated.
-const FALLBACK_RATES = { USD: 3.7, EUR: 4.0, GBP: 4.7, CHF: 4.2, CAD: 2.7, AUD: 2.4, JPY: 0.025 };
+// Snapshot of ECB rates, 2026-10-23 — refresh if they drift far.
+const FALLBACK_RATES = { USD: 3.12, EUR: 3.49, GBP: 4.17, CHF: 3.79, CAD: 2.23, AUD: 2.19, JPY: 0.0199 };
 
 const SYMBOL_TO_CODE = {
   '₪': 'ILS', 'ש"ח': 'ILS', 'ש״ח': 'ILS', 'שח': 'ILS', NIS: 'ILS', 'שקל': 'ILS',
