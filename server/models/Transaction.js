@@ -58,6 +58,9 @@ const transactionSchema = new mongoose.Schema({
   processedDate: { type: Date },
   originalAmount: { type: Number },
   originalCurrency: { type: String },
+  // עסקת מט"ח שטרם חויבה בש"ח: amount הומר לפי שער היום (משוער) עד שהחיוב האמיתי מחליף אותה
+  amountEstimated: { type: Boolean },
+  fxRate: { type: Number },
   scraperType: { type: String, enum: ['normal', 'installments'] },
   installments: {
     number: { type: Number },

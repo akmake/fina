@@ -56,6 +56,8 @@ Auto-categorization:
   memo: String,             // bank memo field
   originalCurrency: String,
   originalAmount: Number,
+  amountEstimated: Boolean, // foreign deal not yet billed in ILS — amount converted at today's rate
+  fxRate: Number,           // ILS per unit used for that estimate (see docs/modules/import.md § Foreign-currency deals)
   // Import metadata:
   source: String (enum: 'manual' | 'import' | 'scraper'),
   createdAt: Date

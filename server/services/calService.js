@@ -296,6 +296,7 @@ function convertTransaction(t) {
     originalAmount,
     originalCurrency: t.trnCurrencySymbol || 'ILS',
     chargedAmount:    charged,
+    chargedCurrency:  t.debCrdCurrencySymbol || undefined,
     status:           'completed',
     type:             isNormal ? 'normal' : 'installments',
     installments,
@@ -319,6 +320,8 @@ function convertPendingTransaction(t) {
     memo:             String(t.transTypeCommentDetails || ''),
     originalAmount,
     originalCurrency: t.trnCurrencySymbol || 'ILS',
+    // Pending: trnAmt is still in the ORIGINAL currency (no ILS charge yet) —
+    // parseTransactions converts it to an estimated ILS amount.
     chargedAmount:    rawAmt * -1,
     status:           'pending',
     type:             'normal',
@@ -331,6 +334,7 @@ const extraFields = (txn) => ({
   _processedDate:    txn.processedDate ? new Date(txn.processedDate) : null,
   _originalAmount:   txn.originalAmount  ?? null,
   _originalCurrency: txn.originalCurrency ?? null,
+  _chargedCurrency:  txn.chargedCurrency  ?? null,
   _scraperType:      txn.type     ?? null,
   _status:           txn.status   ?? null,
   _installments:     txn.installments ?? null,
@@ -349,7 +353,7 @@ function calTxnToRow(txn, accountNumber) {
     'שם בית העסק': txn.description || txn.memo || 'לא ידוע',
     'סכום בש"ח': Math.abs(charged),
     ...extraFields(txn),
-    _transactionType: charged <= 0 ? 'הוצאה' : 'הכנסה',
+    _transactionType: (charged || txn.originalAmount || 0) <= 0 ? 'הוצאה' : 'הכנסה',
     _cardNumber: accountNumber || null,
   };
 }

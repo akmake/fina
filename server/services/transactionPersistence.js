@@ -63,6 +63,19 @@ const makeDedupeKey = (t) => {
   return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}_${t.amount}_${(t.rawDescription || t.description || '').trim()}${pdKey}${instKey}`;
 };
 
+// Deal key that survives the pending → completed transition: purchase day +
+// merchant + the ORIGINAL amount for foreign deals (the ILS amount of a pending
+// foreign deal is only an estimate and changes with the rate), else the amount.
+const FOREIGN_SKIP = new Set(['ILS', '₪', 'ש"ח', 'NIS']);
+const makeDealKey = (t) => {
+  const d = new Date(t.date);
+  const day = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
+  const desc = (t.rawDescription || t.description || '').trim();
+  const foreign = t.originalCurrency && !FOREIGN_SKIP.has(t.originalCurrency) && t.originalAmount != null;
+  const money = foreign ? `${Math.abs(t.originalAmount)}${t.originalCurrency}` : `${t.amount}`;
+  return `${day}_${desc}_${money}`;
+};
+
 /** Recompute FinanceProfile per-account balances from all of a user's transactions. */
 const refreshBalances = async (userId) => {
   const aggregation = await Transaction.aggregate([
@@ -103,6 +116,10 @@ const refreshBalances = async (userId) => {
  *        sync: a row the user deleted must not come back). Manual imports keep it false
  *        so "delete all, re-import the file" still works.
  * @returns {Promise<{inserted:number, skipped:number, received:number}>}
+ *
+ * Pending rows: a stored pending deal is soft-deleted and replaced when its
+ * completed version arrives (matched by identifier or makeDealKey), so a foreign
+ * deal's estimated ILS amount gives way to the real charge without a duplicate.
  */
 export const persistTransactions = async ({ userId, transactions, rules, includeDeleted = false }) => {
   const received = Array.isArray(transactions) ? transactions.length : 0;
@@ -128,18 +145,53 @@ export const persistTransactions = async ({ userId, transactions, rules, include
   // come back on the next sync (the bank re-sends the same rows every day).
   const existingQuery = Transaction.find(
     { user: userId, date: { $gte: minDate, $lte: maxDate } },
-    { date: 1, amount: 1, rawDescription: 1, description: 1, identifier: 1, processedDate: 1, installments: 1 },
+    {
+      date: 1, amount: 1, rawDescription: 1, description: 1, identifier: 1, processedDate: 1,
+      installments: 1, status: 1, originalAmount: 1, originalCurrency: 1, deletedAt: 1,
+    },
   );
   const existingInRange = await (includeDeleted ? existingQuery.withDeleted() : existingQuery).lean();
 
-  const existingKeys = new Set(existingInRange.map(makeDedupeKey));
-  const existingIdentifiers = new Set(existingInRange.filter((t) => t.identifier).map((t) => t.identifier));
+  // A stored *pending* row is superseded (not a duplicate) when its completed
+  // version arrives — the completed one carries the real ILS charge.
+  const livePending = existingInRange.filter((t) => t.status === 'pending' && !t.deletedAt);
+  const settled = existingInRange.filter((t) => t.status !== 'pending');
 
+  const allKeys = new Set(existingInRange.map(makeDedupeKey));
+  const allIdentifiers = new Set(existingInRange.filter((t) => t.identifier).map((t) => t.identifier));
+  const allDealKeys = new Set(existingInRange.map(makeDealKey));
+  const settledKeys = new Set(settled.map(makeDedupeKey));
+  const settledIdentifiers = new Set(settled.filter((t) => t.identifier).map((t) => t.identifier));
+  const deletedPendingDealKeys = new Set(
+    existingInRange.filter((t) => t.status === 'pending' && t.deletedAt).map(makeDealKey),
+  );
+
+  const supersededPending = new Set();
   const newTransactions = processed.filter((t) => {
-    if (t.identifier && existingIdentifiers.has(t.identifier)) return false;
-    return !existingKeys.has(makeDedupeKey(t));
+    if (t.status === 'pending') {
+      // Still pending: already stored (its estimated amount may differ day to day)
+      if (t.identifier && allIdentifiers.has(t.identifier)) return false;
+      if (allDealKeys.has(makeDealKey(t))) return false;
+      return !allKeys.has(makeDedupeKey(t));
+    }
+    if (t.identifier && settledIdentifiers.has(t.identifier)) return false;
+    if (settledKeys.has(makeDedupeKey(t))) return false;
+    const dealKey = makeDealKey(t);
+    const match = livePending.find((p) => (t.identifier && p.identifier === t.identifier) || makeDealKey(p) === dealKey);
+    if (match) {
+      supersededPending.add(String(match._id));
+      return true;
+    }
+    // includeDeleted: a pending deal the user deleted stays deleted once it settles
+    if (deletedPendingDealKeys.has(dealKey)) return false;
+    if (t.identifier && allIdentifiers.has(t.identifier)) return false;
+    return !allKeys.has(makeDedupeKey(t));
   });
   const skipped = processed.length - newTransactions.length;
+
+  if (supersededPending.size > 0) {
+    await Transaction.softDeleteMany({ _id: { $in: [...supersededPending] }, user: userId });
+  }
 
   // 4. Insert (unordered so one dup key doesn't abort the batch)
   let inserted = 0;

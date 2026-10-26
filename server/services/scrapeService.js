@@ -138,6 +138,7 @@ const extraFields = (txn, source) => ({
   _processedDate:    txn.processedDate ? new Date(txn.processedDate) : null,
   _originalAmount:   txn.originalAmount  ?? null,
   _originalCurrency: txn.originalCurrency ?? null,
+  _chargedCurrency:  txn.chargedCurrency  ?? null, // foreign-billed cards report USD/EUR here
   _scraperType:      txn.type     ?? null, // 'normal' | 'installments'
   _status:           txn.status   ?? null, // 'completed' | 'pending'
   _installments:     txn.installments ?? null, // { number, total }
@@ -158,12 +159,14 @@ const extraFields = (txn, source) => ({
 const toRowCreditCard = (source) => (txn) => {
   // Use ?? so chargedAmount===0 doesn't incorrectly fall through to originalAmount
   const charged = txn.chargedAmount ?? txn.originalAmount ?? 0;
+  // A not-yet-billed foreign deal has chargedAmount 0 — take the sign from originalAmount.
+  const signed = charged || txn.originalAmount || 0;
   return {
     'תאריך עסקה': new Date(txn.date),
     'שם בית העסק': txn.description || txn.memo || 'לא ידוע',
     'סכום בש"ח': Math.abs(charged),
     ...extraFields(txn, source),
-    _transactionType: charged <= 0 ? 'הוצאה' : 'הכנסה',
+    _transactionType: signed <= 0 ? 'הוצאה' : 'הכנסה',
   };
 };
 
@@ -176,7 +179,7 @@ const toRowBank = (source) => (txn) => {
     'שם בית העסק': txn.description || txn.memo || 'לא ידוע',
     'סכום בש"ח': Math.abs(charged),
     ...extraFields(txn, source),
-    _transactionType: charged < 0 ? 'הוצאה' : 'הכנסה',
+    _transactionType: (charged || txn.originalAmount || 0) < 0 ? 'הוצאה' : 'הכנסה',
   };
 };
 

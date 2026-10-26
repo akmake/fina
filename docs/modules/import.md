@@ -208,3 +208,18 @@ connections; CAL auto-sync is offered as `calAuto` (see above).
   mid-run; the scheduler is designed for a long-lived Node process (Render, VPS).
 - Dedupe is by `(day, amount, description [+processedDate/installment])` plus the
   scraper `identifier` — matches the partial unique index on `Transaction`.
+  A stored **pending** row is superseded (soft-deleted, replaced) when its completed
+  version arrives — matched by `identifier` or by deal key `(day, description,
+  original amount+currency for foreign deals / amount otherwise)`; an incoming pending
+  row matching any stored deal key is skipped (its estimated amount drifts daily).
+
+### Foreign-currency deals
+
+Card companies send a foreign purchase with its original amount/currency, but the ILS
+charge is `0` while pending (Max, Isracard/Amex), equals the original-currency amount
+(CAL pending), or is billed in USD/EUR (`chargedCurrency`). `parseTransactions`
+(`utils/excelParser.js` → `estimateForeignAmount`) converts these at the day's rate from
+`services/fxService.js` (exchangerate-api, 6h cache, built-in fallback rates when
+offline) and stamps `amountEstimated: true` + `fxRate`. A row with a real ILS charge is
+left as-is. The UI shows `≈` and the original amount (`TransactionCard`). The real
+charge replaces the estimate via the pending-supersede rule above.

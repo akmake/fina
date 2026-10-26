@@ -1,6 +1,7 @@
 import Transaction from '../models/Transaction.js';
 import MerchantMap from '../models/MerchantMap.js';
 import CategoryRule from '../models/CategoryRule.js';
+import { getIlsRates, normalizeCurrency } from '../services/fxService.js';
 
 function parseDate(dateInput) {
   if (dateInput instanceof Date && !isNaN(dateInput.getTime())) return dateInput;
@@ -38,7 +39,34 @@ function parseDate(dateInput) {
   return null;
 }
 
-const createTransactionObject = (row, userId, type) => {
+/**
+ * Foreign-currency scraper row → estimated ILS amount, or null when the row
+ * already carries a real ILS charge (or isn't foreign at all).
+ *
+ * A foreign deal comes with an ILS charge of 0 while pending (Max/Isracard), its
+ * original-currency amount in the ILS column (CAL pending), or a charge billed in
+ * USD/EUR. Each of these is converted at today's rate and flagged as estimated.
+ */
+const estimateForeignAmount = (row, ilsAmount, rates) => {
+    const origCur = normalizeCurrency(row._originalCurrency);
+    if (!origCur || origCur === 'ILS') return null;
+
+    const chargedCur = normalizeCurrency(row._chargedCurrency);
+    const origAbs = Math.abs(Number(row._originalAmount) || 0);
+    const charged = Number.isFinite(ilsAmount) ? ilsAmount : 0;
+
+    // Real ILS charge already present
+    if (charged > 0 && (chargedCur === 'ILS' || (!chargedCur && charged !== origAbs))) return null;
+
+    const [cur, base] = chargedCur && chargedCur !== 'ILS' && charged > 0
+        ? [chargedCur, charged]
+        : [origCur, origAbs];
+    const rate = rates[cur];
+    if (!rate || !base) return null;
+    return { amount: Math.round(base * rate * 100) / 100, fxRate: rate };
+};
+
+const createTransactionObject = (row, userId, type, rates = {}) => {
     // --- התיקון הקריטי כאן: פונקציית עזר חכמה שעוקפת רווחים נסתרים באקסל ---
     const getValue = (keyPhrases) => {
         for (const actualKey of Object.keys(row)) {
@@ -64,13 +92,15 @@ const createTransactionObject = (row, userId, type) => {
     
     const description = String(descriptionVal).trim();
 
-    let amount, transactionType;
+    let amount, transactionType, estimate = null;
 
     // Scraper imports pass _transactionType explicitly — use it directly to avoid sign ambiguity.
     if (row._transactionType) {
         const rawAmt = getValue(["סכום בש\"ח", "סכום עסקה", "סכום חיוב", "Amount", "amount"]);
         if (rawAmt == null) return null;
         amount = Math.abs(parseFloat(String(rawAmt).replace(/,/g, '')));
+        estimate = estimateForeignAmount(row, amount, rates);
+        if (estimate) amount = estimate.amount;
         if (isNaN(amount) || amount === 0) return null;
         transactionType = row._transactionType;
     } else if (type === 'max') {
@@ -128,6 +158,10 @@ const createTransactionObject = (row, userId, type) => {
     if (row._scraperCategory  != null) scraperExtras.scraperCategory = row._scraperCategory;
     if (row._memo             != null) scraperExtras.memo            = row._memo;
     if (row._cardNumber       != null) scraperExtras.cardNumber      = row._cardNumber;
+    if (estimate) {
+        scraperExtras.amountEstimated = true;
+        scraperExtras.fxRate = estimate.fxRate;
+    }
 
     return {
         user: userId,
@@ -143,7 +177,9 @@ const createTransactionObject = (row, userId, type) => {
 };
 
 export async function parseTransactions(cleanedData, fileType, userId) {
-    const mapper = (row) => createTransactionObject(row, userId, fileType);
+    // Rates only for scraper rows that carry a foreign currency (manual Excel rows have none)
+    const rates = await getIlsRates(cleanedData.flatMap((r) => [r._originalCurrency, r._chargedCurrency]));
+    const mapper = (row) => createTransactionObject(row, userId, fileType, rates);
     const initialTransactions = cleanedData.map(mapper).filter(Boolean);
 
     const genericNames = ['כללי', 'שונות', '', 'null', 'undefined'];

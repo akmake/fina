@@ -40,7 +40,7 @@ Located in `server/models/`.
 
 | Model | File | Key Fields |
 |-------|------|-----------|
-| `Transaction` | `Transaction.js` | `user`, `amount`, `date`, `description`, `category`, `type` (income/expense), `account`, bank scraper fields (`identifier`, `processedDate`, `memo`); indexes incl. `{user, createdAt}` (dashboard / what's new) |
+| `Transaction` | `Transaction.js` | `user`, `amount`, `date`, `description`, `category`, `type` (income/expense), `account`, bank scraper fields (`identifier`, `processedDate`, `memo`, `status`, `originalAmount`/`originalCurrency`, `amountEstimated`/`fxRate`); indexes incl. `{user, createdAt}` (dashboard / what's new) |
 | `Category` | `Category.js` | `user`, `name`, `type`, `color`, `icon`, `isDefault` |
 | `CategoryRule` | `CategoryRule.js` | `user`, `searchString`, `matchType` (contains/exact/starts_with), `newName`, `category` (ref) |
 | `Budget` | `Budget.js` | `user`, `month`, `year`, `totalLimit`, `items[]` {category, limit, spent, color}, `alertThreshold`, `carryOverEnabled` (Phase 3 §5.4), soft-delete |

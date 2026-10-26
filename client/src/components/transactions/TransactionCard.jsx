@@ -5,6 +5,16 @@ import { formatCurrency } from './utils';
 
 const ILS_CODES = ['ILS', '₪', 'ש"ח', 'שח', 'NIS', 'שקל'];
 
+// Original-currency amount ("$49.90"); falls back to "49.90 XYZ" for non-ISO codes.
+const formatForeign = (amount, currency) => {
+  const abs = Math.abs(amount || 0);
+  try {
+    return new Intl.NumberFormat('he-IL', { style: 'currency', currency, maximumFractionDigits: 2 }).format(abs);
+  } catch {
+    return `${abs.toLocaleString('he-IL')} ${currency}`;
+  }
+};
+
 export const CategoryIcon = ({ category }) => {
   const c = category?.toLowerCase() || '';
   let Icon = ShoppingBag;
@@ -72,11 +82,6 @@ export const TransactionCard = ({ transaction, onClick, onDelete, onEdit }) => {
                 )}
               </span>
             )}
-            {isForeign && (
-              <span className="bg-slate-50 text-slate-500 px-2 py-0.5 rounded-md">
-                {transaction.originalAmount?.toLocaleString()} {transaction.originalCurrency}
-              </span>
-            )}
           </span>
         </div>
       </div>
@@ -85,9 +90,20 @@ export const TransactionCard = ({ transaction, onClick, onDelete, onEdit }) => {
       <span className="hidden text-[11px] text-slate-400 md:block">{format(new Date(transaction.date), 'd בMMMM', { locale: he })}</span>
 
       <div className="mr-3 flex flex-shrink-0 items-center justify-end gap-1">
-        <span className={`text-[13px] font-semibold tracking-tight ${isExpense ? 'text-slate-900 dark:text-slate-100' : 'text-emerald-600'}`}>
-          {sign}{formatCurrency(transaction.amount)}
-        </span>
+        <div className="flex flex-col items-end">
+          <span
+            className={`text-[13px] font-semibold tracking-tight ${isExpense ? 'text-slate-900 dark:text-slate-100' : 'text-emerald-600'}`}
+            title={transaction.amountEstimated ? 'סכום משוער לפי שער היום — יתעדכן כשהעסקה תחויב בש"ח' : undefined}
+          >
+            {transaction.amountEstimated && '≈'}{sign}{formatCurrency(transaction.amount)}
+          </span>
+          {isForeign && transaction.originalAmount != null && (
+            <span className="text-[10px] font-medium text-slate-400" dir="ltr">
+              {formatForeign(transaction.originalAmount, transaction.originalCurrency)}
+              {transaction.amountEstimated && <span dir="rtl"> · משוער</span>}
+            </span>
+          )}
+        </div>
         <button
           onClick={handleEdit}
           className="opacity-0 focus:opacity-100 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-blue-50 text-slate-300 hover:text-blue-500 dark:hover:bg-blue-500/10"
